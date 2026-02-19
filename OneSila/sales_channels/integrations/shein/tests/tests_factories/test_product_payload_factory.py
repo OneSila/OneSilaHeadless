@@ -480,6 +480,77 @@ class SheinProductPayloadFactoryTests(TestCase):
         )
         self.assertEqual(fill_configuration, {"filled_quantity_to_sku": True})
 
+    def test_shein_build_sku_list_rejects_non_integral_quantity_info_float(self) -> None:
+        self._assign_supplier_code(product=self.product, value="SUP-QTY-FLOAT")
+        unit_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        unit_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=unit_property,
+        )
+        quantity_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=unit_property,
+            value_select=unit_value,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=quantity_property,
+            value_float=3.5,
+        )
+        unit_internal = SheinInternalProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="quantity_info__unit",
+            name="Quantity unit",
+            type=Property.TYPES.SELECT,
+            payload_field="quantity_unit",
+            local_instance=unit_property,
+        )
+        SheinInternalPropertyOption.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_property=unit_internal,
+            sales_channel=self.sales_channel,
+            local_instance=unit_value,
+            value="1",
+            label="Piece",
+            sort_order=0,
+            raw_data={},
+        )
+        SheinInternalProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="quantity_info__quantity",
+            name="Quantity",
+            type=Property.TYPES.INT,
+            payload_field="quantity",
+            local_instance=quantity_property,
+        )
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+
+        with self.assertRaises(PreFlightCheckError) as raised:
+            factory._build_sku_list(assigns=[])
+
+        self.assertIn("quantity_info__quantity must be a whole number", str(raised.exception))
+
     def test_shein_create_payload_omits_spu_name_and_includes_site_list(self) -> None:
         factory = SheinProductCreateFactory(
             sales_channel=self.sales_channel,
@@ -903,6 +974,7 @@ class SheinProductPayloadFactoryTests(TestCase):
             remote_instance=remote_product,
             get_value_only=True,
             skip_checks=True,
+            skip_property_values_category_validation=False
         )
         factory.remote_rule = type("Rule", (), {"category_id": shein_product_type.category_id, "remote_id": shein_product_type.remote_id})()
 
@@ -1131,6 +1203,228 @@ class SheinProductPayloadFactoryTests(TestCase):
             ],
         }
         self.assertEqual(payload, expected, self._format_payload_debug(payload, expected))
+
+    def test_shein_simple_payload_includes_multiple_remote_mappings_for_same_local_property(self) -> None:
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            active=True,
+            sku="SIMPLE-MULTI-MAP",
+        )
+        self._assign_supplier_code(product=product, value="SUP-MULTI")
+        rule, shein_product_type = self._create_product_type_rule(
+            product,
+            remote_id="TYPE-MULTI",
+            category_id="CAT-MULTI",
+        )
+
+        local_color = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+            internal_name="matrix_color_local",
+        )
+        local_main_color = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+            internal_name="matrix_main_color_local",
+        )
+        local_size = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+            internal_name="matrix_size_local",
+        )
+        local_width = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+            internal_name="matrix_width_local",
+        )
+        local_package_width = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+            internal_name="matrix_package_width_local",
+        )
+        local_not_mapped = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+            internal_name="matrix_not_mapped_local",
+        )
+
+        color_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_color,
+        )
+        size_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_size,
+        )
+
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_color,
+            value_select=color_value,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_size,
+            value_select=size_value,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_width,
+            value_float=15.75,
+        )
+        not_mapped_product_property = ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_not_mapped,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=not_mapped_product_property,
+            language=self.multi_tenant_company.language,
+            value_text="ignore-me",
+        )
+
+        for local_property in [
+            local_color,
+            local_main_color,
+            local_size,
+            local_width,
+            local_package_width,
+            local_not_mapped,
+        ]:
+            ProductPropertiesRuleItem.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                rule=rule,
+                property=local_property,
+                type=ProductPropertiesRuleItem.OPTIONAL,
+            )
+
+        shein_color, _ = self._link_shein_property(
+            property_obj=local_color,
+            shein_product_type=shein_product_type,
+            remote_id="COLOR-A",
+            is_main=True,
+        )
+        shein_main_color, _ = self._link_shein_property(
+            property_obj=local_color,
+            shein_product_type=shein_product_type,
+            remote_id="MAIN-COLOR-A",
+            is_main=False,
+        )
+        shein_size, _ = self._link_shein_property(
+            property_obj=local_size,
+            shein_product_type=shein_product_type,
+            remote_id="SIZE-A",
+            is_main=False,
+        )
+        shein_width = SheinProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="WIDTH-A",
+            local_instance=local_width,
+            type=Property.TYPES.FLOAT,
+        )
+        shein_package_width = SheinProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="PACKAGE-WIDTH-A",
+            local_instance=local_width,
+            type=Property.TYPES.FLOAT,
+        )
+        SheinProductTypeItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=shein_product_type,
+            property=shein_width,
+            requirement=SheinProductTypeItem.Requirement.REQUIRED,
+            attribute_type=SheinProductTypeItem.AttributeType.COMMON,
+            is_main_attribute=False,
+        )
+        SheinProductTypeItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=shein_product_type,
+            property=shein_package_width,
+            requirement=SheinProductTypeItem.Requirement.REQUIRED,
+            attribute_type=SheinProductTypeItem.AttributeType.COMMON,
+            is_main_attribute=False,
+        )
+
+        self._link_shein_value(shein_property=shein_color, local_value=color_value, remote_value="RED-A")
+        self._link_shein_value(shein_property=shein_main_color, local_value=color_value, remote_value="RED-B")
+        self._link_shein_value(shein_property=shein_size, local_value=size_value, remote_value="L-A")
+
+        remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku=product.sku,
+        )
+        SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=product,
+            sales_channel_view=self.view,
+            remote_product=remote_product,
+        )
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_instance=remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+        factory.remote_rule = type(
+            "Rule",
+            (),
+            {
+                "category_id": shein_product_type.category_id,
+                "remote_id": shein_product_type.remote_id,
+            },
+        )()
+        factory.selected_category_id = shein_product_type.category_id
+        factory.selected_product_type_id = shein_product_type.remote_id
+        factory.rule = rule
+
+        payload = factory.build_payload()
+        import pprint
+        pprint.pprint(payload)
+
+        sale_attribute = payload.get("sale_attribute") or {}
+        sale_attribute_list = payload.get("sale_attribute_list") or []
+        product_attribute_list = payload.get("product_attribute_list") or []
+
+        self.assertEqual(sale_attribute.get("attribute_id"), "COLOR-A")
+        self.assertEqual(sale_attribute.get("attribute_value_id"), "RED-A")
+
+        sale_entries_by_id = {
+            str(entry.get("attribute_id")): entry
+            for entry in sale_attribute_list
+        }
+        self.assertEqual(sale_entries_by_id["MAIN-COLOR-A"].get("attribute_value_id"), "RED-B")
+        self.assertEqual(sale_entries_by_id["SIZE-A"].get("attribute_value_id"), "L-A")
+
+        product_entries_by_id = {
+            str(entry.get("attribute_id")): entry
+            for entry in product_attribute_list
+        }
+        self.assertEqual(product_entries_by_id["WIDTH-A"].get("attribute_extra_value"), 15.75)
+        self.assertEqual(product_entries_by_id["PACKAGE-WIDTH-A"].get("attribute_extra_value"), 15.75)
+        self.assertNotIn("ignore-me", str(payload))
 
     def test_shein_configurable_payload_with_color_only(self) -> None:
         image_info = {

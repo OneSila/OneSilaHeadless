@@ -117,6 +117,16 @@ query ($salesChannel: GlobalID!, $mappedLocally: Boolean!) {
 }
 """
 
+SHEIN_INTERNAL_PROPERTY_ALLOWED_TYPES_QUERY = """
+query ($id: GlobalID!) {
+  sheinInternalProperty(id: $id) {
+    id
+    code
+    allowedTypes
+  }
+}
+"""
+
 SHEIN_CATEGORY_FILTER_BY_SITE_AND_LEAF = """
 query ($salesChannel: GlobalID!) {
   sheinCategories(

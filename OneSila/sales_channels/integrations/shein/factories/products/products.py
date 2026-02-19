@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional
 
 from currencies.models import Currency
@@ -66,6 +68,18 @@ class SheinProductBaseFactory(
     supplier_barcode_type = "EAN"
     _EAN_DIGITS_RE = re.compile(r"\D+")
 
+    def get_identifiers(self, *, fixing_caller: str = "run"):
+        frame = inspect.currentframe()
+        caller = frame.f_back.f_code.co_name
+        class_name = SheinProductBaseFactory.__name__
+
+        fixing_class = getattr(self, "fixing_identifier_class", None)
+        fixing_identifier = None
+        if fixing_caller and fixing_class:
+            fixing_identifier = f"{fixing_class.__name__}:{fixing_caller}"
+
+        return f"{class_name}:{caller}", fixing_identifier
+
     def process_content_translation(
         self,
         *,
@@ -90,7 +104,7 @@ class SheinProductBaseFactory(
         get_value_only: bool = False,
         skip_checks: bool = False,
         skip_price_update: bool = False,
-        skip_property_values_category_validation: bool = False,
+        skip_property_values_category_validation: bool = True, # shein is weird, sometimes it let you even if the value is not in the approved list
     ) -> None:
         self.get_value_only = get_value_only
         self.skip_checks = skip_checks
@@ -549,20 +563,26 @@ class SheinProductBaseFactory(
                 values.setdefault(property_id, set()).add(serialized)
         return values
 
+    def _resolve_type_items_for_property(
+        self,
+        *,
+        product_property: ProductProperty,
+    ) -> list[SheinProductTypeItem]:
+        return list(
+            SheinProductTypeItem.objects.filter(
+                product_type__sales_channel=self.sales_channel,
+                product_type__remote_id=self.selected_product_type_id,
+                property__local_instance=product_property.property,
+            ).select_related("property")
+        )
+
     def _resolve_type_item_for_property(
         self,
         *,
         product_property: ProductProperty,
     ) -> Optional[SheinProductTypeItem]:
-        return (
-            SheinProductTypeItem.objects.filter(
-                product_type__sales_channel=self.sales_channel,
-                product_type__remote_id=self.selected_product_type_id,
-                property__local_instance=product_property.property,
-            )
-            .select_related("property")
-            .first()
-        )
+        type_items = self._resolve_type_items_for_property(product_property=product_property)
+        return type_items[0] if type_items else None
 
     def _get_approved_value_labels(
         self,
@@ -659,50 +679,51 @@ class SheinProductBaseFactory(
 
     def _build_property_payloads(self):
         for product_property in self._collect_product_properties():
-            type_item = self._resolve_type_item_for_property(product_property=product_property)
-            if not type_item:
+            type_items = self._resolve_type_items_for_property(product_property=product_property)
+            if not type_items:
                 continue
 
-            factory = SheinProductPropertyUpdateFactory(
-                sales_channel=self.sales_channel,
-                local_instance=product_property,
-                remote_product=self.remote_instance,
-                product_type_item=type_item,
-                get_value_only=True,
-                skip_checks=True,
-            )
-            factory.run()
-            if not factory.remote_value:
-                continue
-
-            try:
-                payload = json.loads(factory.remote_value)
-            except (TypeError, ValueError):
-                continue
-
-            self._validate_approved_values_for_category(
-                type_item=type_item,
-                product_property=product_property,
-                attribute_value_id=payload.get("attribute_value_id"),
-            )
-
-            attribute_type = payload.get("attribute_type")
-            payload.pop("attribute_type", None)
-
-            if attribute_type == SheinProductTypeItem.AttributeType.SALES:
-                cleaned_payload = {k: v for k, v in payload.items() if v not in (None, "", [], {})}
-                if not cleaned_payload:
+            for type_item in type_items:
+                factory = SheinProductPropertyUpdateFactory(
+                    sales_channel=self.sales_channel,
+                    local_instance=product_property,
+                    remote_product=self.remote_instance,
+                    product_type_item=type_item,
+                    get_value_only=True,
+                    skip_checks=True,
+                )
+                factory.run()
+                if not factory.remote_value:
                     continue
-                if type_item.is_main_attribute and not self.sale_attribute:
-                    self.sale_attribute = cleaned_payload
+
+                try:
+                    payload = json.loads(factory.remote_value)
+                except (TypeError, ValueError):
+                    continue
+
+                self._validate_approved_values_for_category(
+                    type_item=type_item,
+                    product_property=product_property,
+                    attribute_value_id=payload.get("attribute_value_id"),
+                )
+
+                attribute_type = payload.get("attribute_type")
+                payload.pop("attribute_type", None)
+
+                if attribute_type == SheinProductTypeItem.AttributeType.SALES:
+                    cleaned_payload = {k: v for k, v in payload.items() if v not in (None, "", [], {})}
+                    if not cleaned_payload:
+                        continue
+                    if type_item.is_main_attribute and not self.sale_attribute:
+                        self.sale_attribute = cleaned_payload
+                    else:
+                        self.sale_attribute_list.append(cleaned_payload)
+                elif attribute_type == SheinProductTypeItem.AttributeType.SIZE:
+                    for entry in self._expand_attribute_payloads(payload=payload):
+                        self.size_attribute_list.append(entry)
                 else:
-                    self.sale_attribute_list.append(cleaned_payload)
-            elif attribute_type == SheinProductTypeItem.AttributeType.SIZE:
-                for entry in self._expand_attribute_payloads(payload=payload):
-                    self.size_attribute_list.append(entry)
-            else:
-                for entry in self._expand_attribute_payloads(payload=payload):
-                    self.product_attribute_list.append(entry)
+                    for entry in self._expand_attribute_payloads(payload=payload):
+                        self.product_attribute_list.append(entry)
 
     def _build_prices(self):
         assigns = list(
@@ -988,9 +1009,14 @@ class SheinProductBaseFactory(
         if unit_value in (None, "", []) or quantity_value in (None, "", []):
             return None
         try:
-            quantity = int(quantity_value)
-        except (TypeError, ValueError):
+            quantity_decimal = Decimal(str(quantity_value))
+        except (InvalidOperation, TypeError, ValueError):
             return None
+        if quantity_decimal != quantity_decimal.to_integral_value():
+            raise PreFlightCheckError(
+                f"Shein quantity_info__quantity must be a whole number. Received: {quantity_value}."
+            )
+        quantity = int(quantity_decimal)
         if quantity <= 0:
             return None
         try:
@@ -1178,20 +1204,6 @@ class SheinProductBaseFactory(
             return False
         type_item = self._resolve_type_item_for_property(product_property=sample_property)
         return bool(type_item and getattr(type_item, "is_main_attribute", False))
-
-    def _resolve_primary_secondary_attributes(
-        self,
-        *,
-        configurator_items: list[ProductPropertiesRuleItem],
-        variation_properties: dict[int, dict[int, ProductProperty]],
-        varying_map: dict[int, set],
-    ) -> tuple[Optional[ProductPropertiesRuleItem], Optional[ProductPropertiesRuleItem]]:
-        primary, sku_items = self._resolve_primary_and_sku_attributes(
-            configurator_items=configurator_items,
-            variation_properties=variation_properties,
-            varying_map=varying_map,
-        )
-        return primary, (sku_items[0] if sku_items else None)
 
     def _resolve_primary_and_sku_attributes(
         self,

@@ -727,8 +727,12 @@ class EnsureMerchantSuggestedAsinMixin:
             multi_tenant_company=self.sales_channel.multi_tenant_company,
             sales_channel=self.sales_channel,
             code="merchant_suggested_asin",
-            defaults={"type": Property.TYPES.TEXT},
+            defaults={"original_type": Property.TYPES.TEXT},
         )
+
+        if not remote_property.type:
+            remote_property.type = remote_property.original_type or Property.TYPES.TEXT
+            remote_property.save(update_fields=["type"])
 
         if not remote_property.local_instance:
             local_property, _ = Property.objects.get_or_create(

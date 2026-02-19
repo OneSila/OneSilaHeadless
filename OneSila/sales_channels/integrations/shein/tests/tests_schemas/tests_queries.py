@@ -17,6 +17,7 @@ from sales_channels.integrations.shein.models import (
 from .queries import (
     SHEIN_CATEGORY_FILTER_BY_SEARCH,
     SHEIN_CATEGORY_FILTER_BY_SITE_AND_LEAF,
+    SHEIN_INTERNAL_PROPERTY_ALLOWED_TYPES_QUERY,
     SHEIN_INTERNAL_PROPERTY_FILTER_BY_MAPPED_LOCALLY,
     SHEIN_INTERNAL_PROPERTY_OPTION_FILTER_BY_INTERNAL_PROPERTY,
     SHEIN_PRODUCT_TYPE_FILTER_BY_CATEGORY,
@@ -291,6 +292,17 @@ class SheinInternalPropertyQueryTest(TransactionTestCaseMixin, TransactionTestCa
         edges = resp.data["sheinInternalProperties"]["edges"]
         self.assertEqual(len(edges), 1)
         self.assertEqual(edges[0]["node"]["id"], self.to_global_id(unmapped))
+
+    def test_allowed_types_is_exposed(self):
+        resp = self.strawberry_test_client(
+            query=SHEIN_INTERNAL_PROPERTY_ALLOWED_TYPES_QUERY,
+            variables={"id": self.to_global_id(self.internal_property)},
+        )
+        self.assertTrue(resp.errors is None)
+        self.assertEqual(
+            resp.data["sheinInternalProperty"]["allowedTypes"],
+            [Property.TYPES.SELECT],
+        )
 
 
 class SheinInternalPropertyOptionQueryTest(TransactionTestCaseMixin, TransactionTestCase):

@@ -1,5 +1,5 @@
 import json
-from sales_channels.integrations.shopify.factories.mixins import RemoteValueMixin
+from sales_channels.integrations.shopify.factories.mixins import ShopifyRemoteValueMixin
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin, ShopifyMetafieldMixin
 from sales_channels.factories.properties.properties import (
     RemoteProductPropertyCreateFactory,
@@ -11,7 +11,7 @@ from sales_channels.integrations.shopify.models.properties import ShopifyProduct
 
 class ShopifyProductPropertyCreateFactory(
     GetShopifyApiMixin,
-    RemoteValueMixin,
+    ShopifyRemoteValueMixin,
     ShopifyMetafieldMixin,
     RemoteProductPropertyCreateFactory
 ):
@@ -87,7 +87,7 @@ class ShopifyProductPropertyCreateFactory(
 
 class ShopifyProductPropertyUpdateFactory(
     GetShopifyApiMixin,
-    RemoteValueMixin,
+    ShopifyRemoteValueMixin,
     ShopifyMetafieldMixin,
     RemoteProductPropertyUpdateFactory
 ):

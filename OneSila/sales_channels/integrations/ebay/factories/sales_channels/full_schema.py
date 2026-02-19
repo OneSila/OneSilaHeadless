@@ -189,6 +189,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
             multi_tenant_company=self.multi_tenant_company,
             marketplace=self.view,
             localized_name=localized_name,
+            defaults={"original_type": property_type},
         )
 
         update_fields: list[str] = []
@@ -199,8 +200,12 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
                 ebay_property.remote_id = aspect_id
                 update_fields.append("remote_id")
 
-        if ebay_property.type != property_type:
-            ebay_property.type = property_type
+        if ebay_property.original_type != property_type:
+            ebay_property.original_type = property_type
+            update_fields.append("original_type")
+
+        if not ebay_property.type:
+            ebay_property.type = ebay_property.original_type or property_type
             update_fields.append("type")
 
         if ebay_property.allows_unmapped_values != allows_unmapped:

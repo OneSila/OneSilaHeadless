@@ -34,6 +34,7 @@ from sales_channels.integrations.amazon.models.products import (
 )
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProperty,
+    AmazonPropertySelectValue,
     AmazonPublicDefinition,
     AmazonProductType,
 )
@@ -1683,6 +1684,233 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         paths = [patch.get("path") for patch in patches]
 
         self.assertNotIn("/attributes/fake_property", paths)
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_create_payload_includes_multiple_remote_mappings_for_same_local_property(
+        self,
+        mock_listings,
+        mock_get_images,
+        mock_get_client,
+    ):
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        AmazonExternalProductId.objects.filter(type=AmazonExternalProductId.TYPE_ASIN).delete()
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
+        local_color = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+            internal_name="matrix_color_local",
+        )
+        local_main_color = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+            internal_name="matrix_main_color_local",
+        )
+        local_size = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+            internal_name="matrix_size_local",
+        )
+        local_width = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+            internal_name="matrix_width_local",
+        )
+        local_package_width = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+            internal_name="matrix_package_width_local",
+        )
+        local_not_mapped = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+            internal_name="matrix_not_mapped_local",
+        )
+
+        color_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_color,
+        )
+        size_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_size,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=local_color,
+            value_select=color_value,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=local_size,
+            value_select=size_value,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=local_width,
+            value_float=12.5,
+        )
+        product_property_not_mapped = ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=local_not_mapped,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=product_property_not_mapped,
+            language=self.multi_tenant_company.language,
+            value_text="not-mapped-value",
+        )
+
+        for local_property in [
+            local_color,
+            local_main_color,
+            local_size,
+            local_width,
+            local_package_width,
+            local_not_mapped,
+        ]:
+            ProductPropertiesRuleItem.objects.get_or_create(
+                multi_tenant_company=self.multi_tenant_company,
+                rule=self.rule,
+                property=local_property,
+                defaults={"type": ProductPropertiesRuleItem.OPTIONAL},
+            )
+
+        remote_color = AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_color,
+            code="matrix_color",
+            type=Property.TYPES.SELECT,
+            allows_unmapped_values=False,
+        )
+        remote_main_color = AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_color,
+            code="matrix_main_color",
+            type=Property.TYPES.SELECT,
+            allows_unmapped_values=False,
+        )
+        remote_size = AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_size,
+            code="matrix_size",
+            type=Property.TYPES.SELECT,
+            allows_unmapped_values=False,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_width,
+            code="matrix_width",
+            type=Property.TYPES.FLOAT,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_width,
+            code="matrix_package_width",
+            type=Property.TYPES.FLOAT,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            code="matrix_remote_not_mapped",
+            type=Property.TYPES.TEXT,
+        )
+
+        AmazonPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_property=remote_color,
+            marketplace=self.view,
+            local_instance=color_value,
+            remote_value="Red-A",
+            remote_name="Red-A",
+        )
+        AmazonPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_property=remote_main_color,
+            marketplace=self.view,
+            local_instance=color_value,
+            remote_value="Red-B",
+            remote_name="Red-B",
+        )
+        AmazonPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_property=remote_size,
+            marketplace=self.view,
+            local_instance=size_value,
+            remote_value="L-A",
+            remote_name="L-A",
+        )
+
+        for code in [
+            "matrix_color",
+            "matrix_main_color",
+            "matrix_size",
+            "matrix_width",
+            "matrix_package_width",
+        ]:
+            AmazonPublicDefinition.objects.create(
+                api_region_code="EU_UK",
+                product_type_code="CHAIR",
+                code=code,
+                name=code,
+                usage_definition=json.dumps(
+                    {
+                        code: [
+                            {
+                                "value": f"%value:{code}%",
+                                "marketplace_id": "%auto:marketplace_id%",
+                            }
+                        ]
+                    }
+                ),
+            )
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertEqual(attrs["matrix_color"][0]["value"], "Red-A")
+        self.assertEqual(attrs["matrix_main_color"][0]["value"], "Red-B")
+        self.assertEqual(attrs["matrix_size"][0]["value"], "L-A")
+        self.assertEqual(attrs["matrix_width"][0]["value"], 12.5)
+        self.assertEqual(attrs["matrix_package_width"][0]["value"], 12.5)
+        self.assertNotIn("matrix_remote_not_mapped", attrs)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")

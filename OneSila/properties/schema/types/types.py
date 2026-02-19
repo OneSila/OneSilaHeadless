@@ -5,8 +5,13 @@ from core.schema.core.mixins import (
     GetPropertySelectValueQuerysetMultiTenantMixin,
     GetQuerysetMultiTenantMixin,
 )
+from django.db.models import OuterRef
 
 from typing import List, Optional
+from properties.managers import (
+    build_property_select_value_usage_count_expression,
+    build_property_usage_count_expression,
+)
 from properties.models import Property, PropertyTranslation, \
     PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, ProductPropertiesRuleItem
 from .filters import PropertyFilter, PropertyTranslationFilter, \
@@ -20,6 +25,11 @@ from .ordering import PropertyOrder, PropertyTranslationOrder, \
 @type(Property, filters=PropertyFilter, order=PropertyOrder, pagination=True, fields="__all__")
 class PropertyType(relay.Node, GetPropertyQuerysetMultiTenantMixin):
     propertytranslation_set: List[Annotated['PropertyTranslationType', lazy("properties.schema.types.types")]]
+    usage_count: int = field(
+        annotate=build_property_usage_count_expression(
+            multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
+        )
+    )
 
     @field()
     def name(self, info) -> str | None:
@@ -37,6 +47,11 @@ class PropertySelectValueType(relay.Node, GetPropertySelectValueQuerysetMultiTen
     image: Optional[Annotated['ImageType', lazy("media.schema.types.types")]]
     productpropertiesrule_set: List[Annotated['ProductPropertiesRuleType', lazy("properties.schema.types.types")]]
     propertyselectvaluetranslation_set: List[Annotated['PropertySelectValueTranslationType', lazy("properties.schema.types.types")]]
+    usage_count: int = field(
+        annotate=build_property_select_value_usage_count_expression(
+            multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
+        )
+    )
 
     @field()
     def value(self, info) -> str | None:

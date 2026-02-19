@@ -426,6 +426,181 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertIsNone(offer.remote_id)
 
     @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
+        return_value="EAN-VALUE",
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayPriceUpdateFactory.run",
+        return_value={"price_payload": {}, "promotions": []},
+    )
+    def test_value_only_payload_includes_multiple_remote_mappings_for_same_local_property(
+        self,
+        mock_price_run: MagicMock,
+        mock_ean_run: MagicMock,
+    ) -> None:
+        local_color = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        local_main_color = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        local_size = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        local_width = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+        )
+        local_package_width = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+        )
+        local_not_mapped = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+
+        color_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_color,
+        )
+        size_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_size,
+        )
+
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=local_color,
+            value_select=color_value,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=local_size,
+            value_select=size_value,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=local_width,
+            value_float=15.75,
+        )
+        product_property_not_mapped = ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=local_not_mapped,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=product_property_not_mapped,
+            language="en-us",
+            value_text="ignore-me",
+        )
+
+        remote_color = EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=local_color,
+            localized_name="Color",
+            type=Property.TYPES.SELECT,
+        )
+        remote_main_color = EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=local_color,
+            localized_name="Main Color",
+            type=Property.TYPES.SELECT,
+        )
+        remote_size = EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=local_size,
+            localized_name="Size",
+            type=Property.TYPES.SELECT,
+        )
+        EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=local_width,
+            localized_name="Width",
+            type=Property.TYPES.FLOAT,
+        )
+        EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=local_width,
+            localized_name="Package Width",
+            type=Property.TYPES.FLOAT,
+        )
+        EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=None,
+            localized_name="Not Mapped Remote",
+            type=Property.TYPES.TEXT,
+        )
+
+        EbayPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            ebay_property=remote_color,
+            marketplace=self.view,
+            local_instance=color_value,
+            localized_value="Red-A",
+        )
+        EbayPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            ebay_property=remote_main_color,
+            marketplace=self.view,
+            local_instance=color_value,
+            localized_value="Red-B",
+        )
+        EbayPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            ebay_property=remote_size,
+            marketplace=self.view,
+            local_instance=size_value,
+            localized_value="L-A",
+        )
+
+        with patch.object(EbayProductCreateFactory, "get_api") as mock_get_api:
+            factory = self._build_create_factory(get_value_only=True)
+            result = factory.run()
+
+        mock_get_api.assert_not_called()
+        mock_price_run.assert_called_once()
+        mock_ean_run.assert_called()
+
+        aspects = result["inventory"]["product"]["aspects"]
+        self.assertEqual(aspects.get("Color"), ["Red-A"])
+        self.assertEqual(aspects.get("Main Color"), ["Red-B"])
+        self.assertEqual(aspects.get("Size"), ["L-A"])
+        self.assertEqual(aspects.get("Width"), ["15.75"])
+        self.assertEqual(aspects.get("Package Width"), ["15.75"])
+        self.assertNotIn("Not Mapped Remote", aspects)
+
+    @patch(
         "sales_channels.integrations.ebay.factories.products.products.EbayProductContentUpdateFactory.run"
     )
     @patch(

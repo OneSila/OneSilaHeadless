@@ -2,13 +2,14 @@ from typing import Optional, Tuple, Dict
 from huey import crontab
 from huey.contrib.djhuey import db_task, periodic_task, db_periodic_task
 
+from core.huey import CRUCIAL_PRIORITY
 from integrations.models import IntegrationTaskQueue
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-@db_task()
+@db_task(priority=CRUCIAL_PRIORITY)
 def add_task_to_queue(
     *,
     integration_id: str | int,

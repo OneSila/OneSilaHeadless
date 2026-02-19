@@ -47,16 +47,6 @@ class EbayProperty(RemoteProperty):
         blank=True,
         help_text="Aspect name translated into the company language.",
     )
-    allows_unmapped_values = models.BooleanField(
-        default=False,
-        help_text="Whether values outside eBay suggestions are accepted.",
-    )
-    type = models.CharField(
-        max_length=16,
-        choices=Property.TYPES.ALL,
-        default=Property.TYPES.TEXT,
-        help_text="Mapped internal property type for this aspect.",
-    )
     raw_data = models.JSONField(
         default=dict,
         blank=True,
@@ -85,6 +75,7 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
         'properties.Property',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         help_text="Local property associated with this internal eBay field.",
     )
     code = models.CharField(
@@ -118,6 +109,35 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
             )
         ]
         search_terms = ['code', 'name']
+
+    @property
+    def allowed_types(self) -> list[str]:
+        defaults_map = {entry["code"]: entry for entry in EBAY_INTERNAL_PROPERTY_DEFAULTS}
+        default_allowed_types = list(defaults_map.get(self.code, {}).get("allowed_types") or [])
+        if default_allowed_types:
+            return default_allowed_types
+        return [self.type] if self.type else []
+
+    def clean(self):
+        super().clean()
+
+        normalized_allowed_types = list(self.allowed_types or [])
+        errors = {}
+
+        if self.local_instance_id and normalized_allowed_types and self.local_instance.type not in normalized_allowed_types:
+            errors["local_instance"] = _(
+                "Local property type %(type)s is not allowed for this internal field. Allowed types: %(allowed_types)s."
+            ) % {
+                "type": self.local_instance.type,
+                "allowed_types": ", ".join(normalized_allowed_types),
+            }
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.code} ({self.sales_channel})"
@@ -206,6 +226,7 @@ class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
         'properties.PropertySelectValue',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         help_text="Optional link to the local PropertySelectValue.",
     )
     localized_value = models.CharField(
@@ -217,6 +238,11 @@ class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
         null=True,
         blank=True,
         help_text="Aspect value translated into the company language.",
+    )
+    bool_value = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Boolean meaning for this option when mapping select/multiselect remote values to boolean.",
     )
 
     objects = EbayPropertySelectValueManager()

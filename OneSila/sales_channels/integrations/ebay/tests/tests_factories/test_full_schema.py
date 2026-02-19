@@ -401,9 +401,11 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
         self.assertEqual(set(properties), expected_property_names)
 
         self.assertEqual(properties["Brand"].type, Property.TYPES.SELECT)
+        self.assertEqual(properties["Brand"].original_type, Property.TYPES.SELECT)
         self.assertTrue(properties["Brand"].allows_unmapped_values)
         self.assertEqual(properties["Color"].type, Property.TYPES.SELECT)
         self.assertEqual(properties["Connectivity"].type, Property.TYPES.MULTISELECT)
+        self.assertEqual(properties["Connectivity"].original_type, Property.TYPES.MULTISELECT)
         self.assertEqual(properties["EC Range"].type, Property.TYPES.SELECT)
         self.assertFalse(properties["EC Range"].allows_unmapped_values)
         self.assertEqual(properties["Detailed Description"].type, Property.TYPES.DESCRIPTION)
@@ -441,3 +443,54 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
         self.assertEqual(items["EC Range"], ProductPropertiesRuleItem.OPTIONAL)
         self.assertEqual(items["Detailed Description"], ProductPropertiesRuleItem.OPTIONAL)
         self.assertEqual(items["Care Instructions"], ProductPropertiesRuleItem.OPTIONAL)
+
+    def test_run_does_not_override_existing_property_type(self) -> None:
+        _ensure_stubbed_ebay_rest()
+
+        from sales_channels.integrations.ebay.factories.sales_channels.full_schema import (
+            EbayProductTypeRuleFactory,
+        )
+
+        dummy_api = _DummyEbayAPI(
+            category_response=self._build_category_response(),
+            aspects_response=self._build_aspects_response(),
+        )
+        category_aspects = {
+            "Brand": {"Unbranded", "Apple"},
+            "Connectivity": {"2G", "3G", "4G"},
+        }
+
+        with patch.object(EbayProductTypeRuleFactory, "get_api", return_value=dummy_api):
+            factory = EbayProductTypeRuleFactory(
+                sales_channel=self.sales_channel,
+                view=self.view,
+                category_id="3197",
+                category_tree_id="123",
+                category_aspects=category_aspects,
+            )
+            factory.run()
+
+        brand_property = EbayProperty.objects.get(
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            localized_name="Brand",
+        )
+        self.assertEqual(brand_property.type, Property.TYPES.SELECT)
+        self.assertEqual(brand_property.original_type, Property.TYPES.SELECT)
+
+        brand_property.type = Property.TYPES.TEXT
+        brand_property.save(update_fields=["type"])
+
+        with patch.object(EbayProductTypeRuleFactory, "get_api", return_value=dummy_api):
+            factory = EbayProductTypeRuleFactory(
+                sales_channel=self.sales_channel,
+                view=self.view,
+                category_id="3197",
+                category_tree_id="123",
+                category_aspects=category_aspects,
+            )
+            factory.run()
+
+        brand_property.refresh_from_db()
+        self.assertEqual(brand_property.type, Property.TYPES.TEXT)
+        self.assertEqual(brand_property.original_type, Property.TYPES.SELECT)

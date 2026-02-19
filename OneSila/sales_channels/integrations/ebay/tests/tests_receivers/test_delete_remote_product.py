@@ -9,6 +9,7 @@ from products.models import Product
 from sales_channels.integrations.ebay import receivers as ebay_receivers
 from integrations.helpers import get_import_path
 from integrations.models import IntegrationTaskQueue
+from sales_channels.integrations.ebay.tasks import delete_ebay_product_db_task
 from sales_channels.integrations.ebay.models import EbayProduct
 from sales_channels.integrations.ebay.models.sales_channels import EbaySalesChannelView
 from sales_channels.integrations.ebay.tests.tests_factories.mixins import TestCaseEbayMixin
@@ -44,13 +45,20 @@ class EbayDeleteReceiversTests(TestCaseEbayMixin):
             remote_sku="SKU-1",
             remote_id="SKU-1",
         )
-        self.assign = SalesChannelViewAssign.objects.create(
-            sales_channel=self.sales_channel,
-            product=self.product,
-            sales_channel_view=self.view,
-            remote_product=self.remote_product,
-            multi_tenant_company=self.multi_tenant_company,
-        )
+        with patch(
+            "sales_channels.signals.create_remote_product.send",
+            return_value=[],
+        ), patch(
+            "sales_channels.signals.sales_view_assign_updated.send",
+            return_value=[],
+        ):
+            self.assign = SalesChannelViewAssign.objects.create(
+                sales_channel=self.sales_channel,
+                product=self.product,
+                sales_channel_view=self.view,
+                remote_product=self.remote_product,
+                multi_tenant_company=self.multi_tenant_company,
+            )
 
     def tearDown(self) -> None:
         ebay_receivers._PENDING_PRODUCT_DELETE_COUNTS.clear()
@@ -91,32 +99,45 @@ class EbayDeleteReceiversTests(TestCaseEbayMixin):
             name="DE",
             remote_id="EBAY_DE",
         )
-        other_assign = SalesChannelViewAssign.objects.create(
-            sales_channel=self.sales_channel,
-            product=self.product,
-            sales_channel_view=other_view,
-            remote_product=self.remote_product,
-            multi_tenant_company=self.multi_tenant_company,
-        )
+        with patch(
+            "sales_channels.signals.create_remote_product.send",
+            return_value=[],
+        ), patch(
+            "sales_channels.signals.sales_view_assign_updated.send",
+            return_value=[],
+        ):
+            other_assign = SalesChannelViewAssign.objects.create(
+                sales_channel=self.sales_channel,
+                product=self.product,
+                sales_channel_view=other_view,
+                remote_product=self.remote_product,
+                multi_tenant_company=self.multi_tenant_company,
+            )
 
-        initial_count = IntegrationTaskQueue.objects.filter(
-            integration_id=self.sales_channel.id,
-        ).count()
-
-        with patch.object(
+        with patch(
+            "sales_channels.factories.task_queue.task_queue.add_task_to_queue",
+        ) as add_task_mock, patch.object(
             transaction,
             "on_commit",
             side_effect=lambda func, using=None: func(),
         ):
             ebay_receivers.ebay__product__delete(sender=self.product.__class__, instance=self.product)
 
-        tasks = IntegrationTaskQueue.objects.filter(
-            integration_id=self.sales_channel.id,
-        ).order_by("id")
-        self.assertEqual(tasks.count(), initial_count + 2)
-        scheduled_views = {task.task_kwargs.get("view_id") for task in tasks}
+        self.assertEqual(add_task_mock.call_count, 2)
+        self.assertTrue(
+            all(
+                call.kwargs.get("task_func_path") == get_import_path(delete_ebay_product_db_task)
+                for call in add_task_mock.call_args_list
+            )
+        )
+        scheduled_views = {
+            call.kwargs.get("task_kwargs", {}).get("view_id")
+            for call in add_task_mock.call_args_list
+        }
         self.assertSetEqual(scheduled_views, {self.view.id, other_view.id})
         self.assertEqual(ebay_receivers._PENDING_PRODUCT_DELETE_COUNTS.get(self.product.id), 2)
+
+
 
         with patch.object(
             transaction,
@@ -124,12 +145,7 @@ class EbayDeleteReceiversTests(TestCaseEbayMixin):
             side_effect=lambda func, using=None: func(),
         ):
             ebay_receivers.ebay__assign__delete(sender=SalesChannelViewAssign, instance=self.assign)
-        self.assertEqual(
-            IntegrationTaskQueue.objects.filter(
-                integration_id=self.sales_channel.id,
-            ).count(),
-            initial_count + 2,
-        )
+        self.assertEqual(add_task_mock.call_count, 2)
         self.assertEqual(ebay_receivers._PENDING_PRODUCT_DELETE_COUNTS.get(self.product.id), 1)
 
         with patch.object(
@@ -139,9 +155,4 @@ class EbayDeleteReceiversTests(TestCaseEbayMixin):
         ):
             ebay_receivers.ebay__assign__delete(sender=SalesChannelViewAssign, instance=other_assign)
         self.assertNotIn(self.product.id, ebay_receivers._PENDING_PRODUCT_DELETE_COUNTS)
-        self.assertEqual(
-            IntegrationTaskQueue.objects.filter(
-                integration_id=self.sales_channel.id,
-            ).count(),
-            initial_count + 2,
-        )
+        self.assertEqual(add_task_mock.call_count, 2)

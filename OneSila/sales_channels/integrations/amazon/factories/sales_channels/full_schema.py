@@ -660,38 +660,56 @@ class AmazonProductTypeRuleFactory(
     def create_remote_properties(self, public_definition, view, is_default):
 
         for property_data in public_definition.export_definition:
+            incoming_type = property_data["type"]
 
             remote_property, created = AmazonProperty.objects.get_or_create(
                 allow_multiple=True,
                 multi_tenant_company=self.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 code=property_data['code'],
-                defaults={'type': property_data['type']},
+                defaults={"original_type": incoming_type},
             )
 
             allows_unmapped_values = property_data.get('allow_not_mapped_values', False)
+            update_fields: list[str] = []
 
             if not created:
-                old_type = remote_property.type
-                resolved_type = self._resolve_property_type(old_type, property_data['type'])
+                old_original_type = remote_property.original_type or remote_property.type
+                resolved_original_type = incoming_type
+                if old_original_type:
+                    resolved_original_type = self._resolve_property_type(old_original_type, incoming_type)
 
-                if resolved_type != remote_property.type:
-                    remote_property.type = resolved_type
-                if resolved_type == Property.TYPES.SELECT and (
-                    old_type in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION] or
-                    property_data['type'] in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]
+                if resolved_original_type != remote_property.original_type:
+                    remote_property.original_type = resolved_original_type
+                    update_fields.append("original_type")
+                if resolved_original_type == Property.TYPES.SELECT and (
+                    old_original_type in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION] or
+                    incoming_type in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]
                 ):
                     remote_property.allows_unmapped_values = True
-                if allows_unmapped_values:
+                    update_fields.append("allows_unmapped_values")
+                if allows_unmapped_values and not remote_property.allows_unmapped_values:
                     remote_property.allows_unmapped_values = True
+                    update_fields.append("allows_unmapped_values")
             else:
-                remote_property.name = property_data['name']
-                remote_property.allows_unmapped_values = allows_unmapped_values
+                if remote_property.name != property_data["name"]:
+                    remote_property.name = property_data["name"]
+                    update_fields.append("name")
+                if remote_property.allows_unmapped_values != allows_unmapped_values:
+                    remote_property.allows_unmapped_values = allows_unmapped_values
+                    update_fields.append("allows_unmapped_values")
+
+            if not remote_property.type:
+                remote_property.type = remote_property.original_type or incoming_type
+                update_fields.append("type")
 
             if is_default:
-                remote_property.name = property_data['name']
+                if remote_property.name != property_data["name"]:
+                    remote_property.name = property_data["name"]
+                    update_fields.append("name")
 
-            remote_property.save()
+            if update_fields:
+                remote_property.save(update_fields=list(dict.fromkeys(update_fields)))
 
             if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
                 for value in property_data['values']:
