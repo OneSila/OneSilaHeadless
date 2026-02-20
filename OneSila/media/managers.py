@@ -3,11 +3,45 @@ from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
 import base64
 from hashlib import sha256
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
 
 
 class MediaQuerySet(MultiTenantQuerySet):
     pass
+
+
+class DocumentTypeQuerySet(MultiTenantQuerySet):
+    def delete(self, *args, **kwargs):
+        force_delete = kwargs.pop("force_delete", False)
+
+        from .models import DocumentType
+        if not force_delete and self.filter(code=DocumentType.INTERNAL_CODE).exists():
+            raise ValidationError(DocumentType.INTERNAL_DELETE_ERROR_MESSAGE)
+
+        return super().delete(*args, **kwargs)
+
+    def create_internal_for_company(self, *, multi_tenant_company):
+        from .models import DocumentType
+
+        return self.get_or_create(
+            multi_tenant_company=multi_tenant_company,
+            code=DocumentType.INTERNAL_CODE,
+            defaults={
+                "name": DocumentType.INTERNAL_NAME,
+                "description": DocumentType.INTERNAL_DESCRIPTION,
+            },
+        )
+
+
+class DocumentTypeManager(MultiTenantManager):
+    def get_queryset(self):
+        return DocumentTypeQuerySet(self.model, using=self._db)
+
+    def create_internal_for_company(self, *, multi_tenant_company):
+        return self.get_queryset().create_internal_for_company(
+            multi_tenant_company=multi_tenant_company,
+        )
 
 
 class MediaProductThroughQuerySet(MultiTenantQuerySet):

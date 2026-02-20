@@ -2,13 +2,22 @@ from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
 from django.db.models.signals import post_save, post_delete, pre_delete
 from django.dispatch import receiver
+from core.models import MultiTenantCompany
+from core.signals import post_create
 from core.schema.core.subscriptions import refresh_subscription_receiver
 from django.utils.translation import gettext_lazy as _
-from media.models import MediaProductThrough, Media, Image, File, Video
+from media.models import MediaProductThrough, Media, Image, File, Video, DocumentType
 import logging
 from .signals import cleanup_media_storage
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(post_create, sender=MultiTenantCompany)
+def media__multi_tenant_company__create_internal_document_type(sender, instance, **kwargs):
+    DocumentType.objects.create_internal_for_company(
+        multi_tenant_company=instance,
+    )
 
 
 @receiver(post_save, sender=MediaProductThrough)
@@ -38,6 +47,21 @@ def prevent_media_delete_if_linked(sender, instance, **kwargs):
 def populate_media_title_signal_sender(sender, instance, **kwargs):
     from .tasks import populate_media_title_task
     populate_media_title_task(instance)
+
+
+@receiver(post_save, sender=Media)
+@receiver(post_save, sender=File)
+def process_document_media_assets_signal_sender(sender, instance, created, update_fields=None, **kwargs):
+    if instance.type != Media.FILE:
+        return
+
+    if not created and update_fields is not None:
+        if set(update_fields).isdisjoint({"file", "image", "is_document_image", "type", "document_image_thumbnail"}):
+            return
+
+    from .tasks import process_document_media_assets_task
+    process_document_media_assets_task(media_id=instance.id)
+
 
 @receiver(post_delete, sender=Image)
 @receiver(post_delete, sender=Media)

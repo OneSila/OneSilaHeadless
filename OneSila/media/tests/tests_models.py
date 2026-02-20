@@ -1,11 +1,14 @@
-from media.models import Media, Image, MediaProductThrough
+from media.models import Media, Image, MediaProductThrough, DocumentType
 from products.models import Product
 from sales_channels.integrations.shein.models import SheinSalesChannel
 from sales_channels.models import SalesChannel
+from core.models import MultiTenantCompany
 from core.tests import TestCase
 from model_bakery import baker
 from django.core.files import File
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.conf import settings
 from pathlib import Path
 from unittest.mock import patch
@@ -13,6 +16,7 @@ from unittest.mock import patch
 from .helpers import CreateImageMixin
 
 import os
+import base64
 import logging
 
 logger = logging.getLogger(__name__)
@@ -149,6 +153,140 @@ class MediaTestCase(CreateImageMixin, TestCase):
 
         # # Clean up by deleting the second media instance
         # media2.delete()
+
+
+class DocumentTypeTestCase(TestCase):
+    def test_code_is_generated_from_name(self):
+        document_type = DocumentType.objects.create(
+            name="Kid certificate",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.assertEqual(document_type.code, "KID_CERTIFICATE")
+
+    def test_code_generation_is_unique_per_company(self):
+        DocumentType.objects.create(
+            name="Kid certificate",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        document_type = DocumentType.objects.create(
+            name="Kid certificate",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.assertEqual(document_type.code, "KID_CERTIFICATE_1")
+
+    def test_internal_document_type_is_created_for_new_companies(self):
+        self.assertTrue(
+            DocumentType.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                code=DocumentType.INTERNAL_CODE,
+            ).exists()
+        )
+
+        another_company = baker.make(MultiTenantCompany)
+        internal_document_type = DocumentType.objects.get(
+            multi_tenant_company=another_company,
+            code=DocumentType.INTERNAL_CODE,
+        )
+
+        self.assertEqual(internal_document_type.name, DocumentType.INTERNAL_NAME)
+        self.assertEqual(internal_document_type.description, DocumentType.INTERNAL_DESCRIPTION)
+
+    def test_internal_document_type_cannot_be_deleted(self):
+        internal_document_type = DocumentType.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            code=DocumentType.INTERNAL_CODE,
+        )
+
+        with self.assertRaises(ValidationError):
+            internal_document_type.delete()
+
+    def test_internal_document_type_cannot_be_bulk_deleted(self):
+        with self.assertRaises(ValidationError):
+            DocumentType.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                code=DocumentType.INTERNAL_CODE,
+            ).delete()
+
+
+class MediaDocumentTypeTestCase(TestCase):
+    def test_file_requires_document_type_on_clean(self):
+        media = Media(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        with self.assertRaises(ValidationError):
+            media.full_clean()
+
+    def test_file_media_defaults_to_internal_document_type_on_save(self):
+        media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.assertIsNotNone(media.document_type_id)
+        self.assertEqual(media.document_type.code, DocumentType.INTERNAL_CODE)
+
+    def test_file_document_type_constraint_is_enforced_in_database(self):
+        media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Media.objects.filter(id=media.id).update(document_type=None)
+
+    def test_document_language_defaults_to_company_language(self):
+        self.multi_tenant_company.language = "de"
+        self.multi_tenant_company.save(update_fields=["language"])
+
+        media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.assertEqual(media.document_language, "de")
+
+    def test_document_language_keeps_explicit_value(self):
+        explicit_language = next(
+            (
+                code
+                for code, _ in settings.LANGUAGES
+                if code != self.multi_tenant_company.language
+            ),
+            self.multi_tenant_company.language,
+        )
+        internal_document_type = DocumentType.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            code=DocumentType.INTERNAL_CODE,
+        )
+
+        media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+            document_type=internal_document_type,
+            document_language=explicit_language,
+        )
+
+        self.assertEqual(media.document_language, explicit_language)
+
+    def test_file_image_mime_sets_document_image_and_populates_image(self):
+        png_bytes = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII="
+        )
+
+        media = Media.objects.create(
+            type=Media.FILE,
+            file=ContentFile(png_bytes, name="document_image.png"),
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        media.refresh_from_db()
+
+        self.assertTrue(media.is_document_image)
+        self.assertIsNotNone(media.image)
 
 
 class MediaProductThroughManagerTestCase(TestCase):

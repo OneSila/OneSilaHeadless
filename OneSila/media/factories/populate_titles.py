@@ -17,6 +17,12 @@ class PopulateTitleFactory:
             self.path = self.media_instance.image.path
         elif self.media_instance.type == self.media_instance.FILE and self.media_instance.file:
             self.path = self.media_instance.file.path
+        elif (
+            self.media_instance.type == self.media_instance.FILE
+            and getattr(self.media_instance, "is_document_image", False)
+            and self.media_instance.image
+        ):
+            self.path = self.media_instance.image.path
         elif self.media_instance.type == self.media_instance.VIDEO and self.media_instance.video_url:
             self.path = self.media_instance.video_url
         else:

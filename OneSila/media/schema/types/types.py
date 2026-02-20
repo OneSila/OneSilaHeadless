@@ -4,18 +4,20 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 from strawberry_django.fields.types import DjangoImageType
 from strawberry.relay.utils import to_base64
 from typing import List, Optional, Annotated
-from media.models import Media, Image, Video, MediaProductThrough, File
+from media.models import Media, Image, Video, MediaProductThrough, File, DocumentType
 from core.schema.multi_tenant.types.types import MultiTenantUserType
 from .filters import MediaFilter, ImageFilter, VideoFilter, \
-    MediaProductThroughFilter, FileFilter
+    MediaProductThroughFilter, FileFilter, DocumentTypeFilter
 from .ordering import MediaOrder, ImageOrder, VideoOrder, \
-    MediaProductThroughOrder, FileOrder
+    MediaProductThroughOrder, FileOrder, DocumentTypeOrder
 
 
 @type(Media, filters=MediaFilter, order=MediaOrder, pagination=True, fields="__all__")
 class MediaType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web: DjangoImageType | None
     image_web_url: str | None
+    document_image_thumbnail: DjangoImageType | None
+    document_image_thumbnail_url: str | None
     file_url: str | None
     onesila_thumbnail_url: str | None
     owner: Optional[MultiTenantUserType]
@@ -51,7 +53,17 @@ class VideoType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(File, filters=FileFilter, order=FileOrder, pagination=True, fields="__all__")
 class FileType(relay.Node, GetQuerysetMultiTenantMixin):
     owner: Optional[MultiTenantUserType]
+    image_web: DjangoImageType | None
+    image_web_url: str | None
+    document_image_thumbnail: DjangoImageType | None
+    document_image_thumbnail_url: str | None
     file_url: str | None
+    document_type: Optional[Annotated['DocumentTypeType', lazy("media.schema.types.types")]]
+
+
+@type(DocumentType, filters=DocumentTypeFilter, order=DocumentTypeOrder, pagination=True, fields="__all__")
+class DocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
+    pass
 
 
 @type(MediaProductThrough, filters=MediaProductThroughFilter,
