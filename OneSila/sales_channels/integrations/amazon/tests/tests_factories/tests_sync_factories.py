@@ -183,6 +183,37 @@ class AmazonSyncFactoriesTest(TestCase):
         rule_item.refresh_from_db()
         self.assertEqual(rule_item.type, ProductPropertiesRuleItem.REQUIRED)
 
+    def test_property_rule_item_sync_skips_product_type_property(self):
+        remote_property = AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product_type_property,
+            code="category",
+            type=Property.TYPES.SELECT,
+        )
+        amazon_rule = AmazonProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.rule,
+            product_type_code="CHAIR",
+        )
+        AmazonProductTypeItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_rule=amazon_rule,
+            remote_property=remote_property,
+            remote_type=ProductPropertiesRuleItem.REQUIRED,
+        )
+
+        AmazonPropertyRuleItemSyncFactory(remote_property).run()
+
+        self.assertFalse(
+            ProductPropertiesRuleItem.objects.filter(
+                rule=self.rule,
+                property=self.product_type_property,
+            ).exists()
+        )
+
 
     def test_property_select_values_sync_maps_duplicates(self):
         remote_property = AmazonProperty.objects.create(

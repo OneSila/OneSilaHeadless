@@ -427,6 +427,8 @@ def sales_channels__ebay_property__sync_rule_item(sender, instance: EbayProperty
         return
     if signal == post_create and not instance.local_instance:
         return
+    if instance.local_instance and instance.local_instance.is_product_type:
+        return
 
     factory = EbayPropertyRuleItemSyncFactory(instance)
     factory.run()

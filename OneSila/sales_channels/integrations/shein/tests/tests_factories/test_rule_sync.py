@@ -22,7 +22,7 @@ class SheinRuleSyncTests(TestCase):
             SheinSalesChannel,
             multi_tenant_company=self.multi_tenant_company,
         )
-        product_type_property = Property.objects.get(
+        self.product_type_property = Property.objects.get(
             multi_tenant_company=self.multi_tenant_company,
             type=Property.TYPES.SELECT,
             is_product_type=True,
@@ -30,7 +30,7 @@ class SheinRuleSyncTests(TestCase):
         product_type_value = baker.make(
             "properties.PropertySelectValue",
             multi_tenant_company=self.multi_tenant_company,
-            property=product_type_property,
+            property=self.product_type_property,
         )
         self.rule = ProductPropertiesRule.objects.get(
             multi_tenant_company=self.multi_tenant_company,
@@ -73,4 +73,30 @@ class SheinRuleSyncTests(TestCase):
         self.assertEqual(
             rule_item.type,
             ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+        )
+
+    def test_sync_skips_product_type_property(self) -> None:
+        shein_property = baker.make(
+            SheinProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product_type_property,
+        )
+        baker.make(
+            SheinProductTypeItem,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=self.product_type,
+            property=shein_property,
+            attribute_type=SheinProductTypeItem.AttributeType.SALES,
+            requirement=SheinProductTypeItem.Requirement.REQUIRED,
+        )
+
+        SheinPropertyRuleItemSyncFactory(shein_property=shein_property).run()
+
+        self.assertFalse(
+            ProductPropertiesRuleItem.objects.filter(
+                rule=self.rule,
+                property=self.product_type_property,
+            ).exists()
         )

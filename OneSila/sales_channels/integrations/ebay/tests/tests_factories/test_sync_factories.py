@@ -167,6 +167,39 @@ class EbaySyncFactoriesTest(TestCase):
         )
         self.assertEqual(rule_item.type, ProductPropertiesRuleItem.REQUIRED)
 
+    def test_property_rule_item_sync_skips_product_type_property(self) -> None:
+        remote_property = EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            localized_name="Category",
+            local_instance=self.product_type_property,
+        )
+        self._ensure_leaf_category(remote_id="124")
+        product_type = EbayProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            marketplace=self.view,
+            sales_channel=self.sales_channel,
+            remote_id="124",
+            local_instance=self.rule,
+        )
+        EbayProductTypeItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=product_type,
+            ebay_property=remote_property,
+            remote_type=ProductPropertiesRuleItem.REQUIRED,
+        )
+
+        EbayPropertyRuleItemSyncFactory(remote_property).run()
+
+        self.assertFalse(
+            ProductPropertiesRuleItem.objects.filter(
+                rule=self.rule,
+                property=self.product_type_property,
+            ).exists()
+        )
+
     @patch("llm.flows.remote_translations.RemotePropertyTranslationLLM")
     def test_translate_property_task_translates_when_languages_differ(self, mock_translator) -> None:
         mock_translator.return_value.translate.return_value = "Color"

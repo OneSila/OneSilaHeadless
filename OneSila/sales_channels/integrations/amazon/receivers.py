@@ -93,6 +93,8 @@ def sales_channels__amazon_property__sync_rule_item(sender, instance: AmazonProp
         return
     if signal == post_create and not instance.local_instance:
         return
+    if instance.local_instance and instance.local_instance.is_product_type:
+        return
 
     sync_factory = AmazonPropertyRuleItemSyncFactory(instance)
     sync_factory.run()

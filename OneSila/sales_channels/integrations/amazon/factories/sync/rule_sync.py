@@ -14,7 +14,8 @@ class AmazonPropertyRuleItemSyncFactory:
         self.amazon_property = amazon_property
 
     def run(self):
-        if not self.amazon_property.local_instance:
+        local_property = self.amazon_property.local_instance
+        if not local_property or local_property.is_product_type:
             return
 
         items = AmazonProductTypeItem.objects.filter(
@@ -30,7 +31,7 @@ class AmazonPropertyRuleItemSyncFactory:
             rule_item, created = ProductPropertiesRuleItem.objects.get_or_create(
                 multi_tenant_company=rule.multi_tenant_company,
                 rule=rule,
-                property=self.amazon_property.local_instance,
+                property=local_property,
                 defaults={
                     "type": item.remote_type or ProductPropertiesRuleItem.OPTIONAL,
                     "sort_order": max_sort + 1,
