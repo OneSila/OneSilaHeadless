@@ -21,6 +21,7 @@ from sales_channels.models import (
     RemoteProductContent,
     RemoteProductProperty,
     RemoteProperty,
+    RemoteDocumentType,
     RemotePropertySelectValue,
     RemoteVat,
     SalesChannel,
@@ -124,6 +125,11 @@ class RemoteProductPropertyOrder:
 
 @order(RemoteProperty)
 class RemotePropertyOrder:
+    id: auto
+
+
+@order(RemoteDocumentType)
+class RemoteDocumentTypeOrder:
     id: auto
 
 

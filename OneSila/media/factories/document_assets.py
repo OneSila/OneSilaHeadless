@@ -120,6 +120,8 @@ class DocumentAssetsFactory:
                 return output_buffer.read()
 
     def _generate_pdf_thumbnail(self):
+        if self.media_instance.is_document_image:
+            return
 
         if not self._is_pdf_file():
             return

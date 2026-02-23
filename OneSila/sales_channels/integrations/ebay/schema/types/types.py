@@ -23,6 +23,7 @@ from sales_channels.integrations.ebay.models import (
     EbaySalesChannelImport,
     EbaySalesChannelView,
     EbayCurrency,
+    EbayDocumentType,
 )
 from sales_channels.integrations.ebay.schema.types.filters import (
     EbayCategoryFilter,
@@ -37,6 +38,7 @@ from sales_channels.integrations.ebay.schema.types.filters import (
     EbaySalesChannelImportFilter,
     EbaySalesChannelViewFilter,
     EbayCurrencyFilter,
+    EbayDocumentTypeFilter,
 )
 from sales_channels.integrations.ebay.schema.types.ordering import (
     EbayCategoryOrder,
@@ -51,6 +53,7 @@ from sales_channels.integrations.ebay.schema.types.ordering import (
     EbaySalesChannelImportOrder,
     EbaySalesChannelViewOrder,
     EbayCurrencyOrder,
+    EbayDocumentTypeOrder,
 )
 
 
@@ -357,6 +360,24 @@ class EbayCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.schema.types.types import RemoteCurrencyType
 
         return to_base64(RemoteCurrencyType, self.pk)
+
+
+@type(
+    EbayDocumentType,
+    filters=EbayDocumentTypeFilter,
+    order=EbayDocumentTypeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayDocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'EbaySalesChannelType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'DocumentTypeType',
+        lazy("media.schema.types.types")
+    ]]
 
 
 @strawberry_type

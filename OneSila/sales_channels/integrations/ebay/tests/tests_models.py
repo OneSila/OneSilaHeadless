@@ -3,7 +3,13 @@ from model_bakery import baker
 
 from core.tests import TestCase
 from properties.models import Property
-from sales_channels.integrations.ebay.models import EbayInternalProperty, EbaySalesChannel
+from sales_channels.integrations.ebay.models import (
+    EbayInternalProperty,
+    EbaySalesChannel,
+    EbayCategory,
+    EbayDocumentType,
+    EbaySalesChannelView,
+)
 
 
 class EbayInternalPropertyModelTest(TestCase):
@@ -70,4 +76,84 @@ class EbayInternalPropertyModelTest(TestCase):
                 type=Property.TYPES.TEXT,
                 local_instance=local_property,
                 is_root=False,
+            )
+
+
+class EbayDocumentTypeModelTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = EbaySalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="ebay-doc-types.test",
+        )
+        self.view = EbaySalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="EBAY_US",
+            name="US",
+            default_category_tree_id="0",
+        )
+
+    def test_save_accepts_existing_category_remote_ids(self):
+        EbayCategory.objects.create(
+            marketplace_default_tree_id="0",
+            remote_id="100",
+            name="Leaf 100",
+            full_name="Leaf 100",
+            has_children=False,
+        )
+        EbayCategory.objects.create(
+            marketplace_default_tree_id="0",
+            remote_id="101",
+            name="Leaf 101",
+            full_name="Leaf 101",
+            has_children=False,
+        )
+
+        document_type = EbayDocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CERTIFICATE_OF_ANALYSIS",
+            name="Certificate of Analysis",
+            required_categories=["100"],
+            optional_categories=[{"remote_id": "101"}],
+        )
+
+        self.assertEqual(document_type.required_categories, ["100"])
+        self.assertEqual(document_type.optional_categories, ["101"])
+
+    def test_save_rejects_unknown_category_remote_ids(self):
+        EbayCategory.objects.create(
+            marketplace_default_tree_id="0",
+            remote_id="100",
+            name="Leaf 100",
+            full_name="Leaf 100",
+            has_children=False,
+        )
+
+        with self.assertRaises(ValidationError):
+            EbayDocumentType.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_id="CERTIFICATE_OF_CONFORMITY",
+                required_categories=["999"],
+                optional_categories=[],
+            )
+
+    def test_save_rejects_remote_ids_not_in_channel_tree(self):
+        EbayCategory.objects.create(
+            marketplace_default_tree_id="999",
+            remote_id="200",
+            name="Other Tree Leaf",
+            full_name="Other Tree Leaf",
+            has_children=False,
+        )
+
+        with self.assertRaises(ValidationError):
+            EbayDocumentType.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_id="DECLARATION_OF_CONFORMITY",
+                required_categories=["200"],
+                optional_categories=[],
             )

@@ -33,6 +33,9 @@ from sales_channels.integrations.ebay.models import (
 from sales_channels.integrations.ebay.flows.internal_properties import (
     ensure_internal_properties_flow,
 )
+from sales_channels.integrations.ebay.flows.document_types import (
+    ensure_ebay_document_types_flow,
+)
 from sales_channels.integrations.ebay.factories.sync import (
     EbayPropertyRuleItemSyncFactory,
 )
@@ -417,6 +420,7 @@ def sales_channels__ebay__handle_pull(sender, instance, **kwargs):
     currencies_factory.run()
 
     ensure_internal_properties_flow(instance)
+    ensure_ebay_document_types_flow(sales_channel=instance)
 
 
 @receiver(post_create, sender='ebay.EbayProperty')

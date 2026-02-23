@@ -1,5 +1,5 @@
 from media.models import Media, Image, MediaProductThrough, DocumentType
-from products.models import Product
+from products.models import Product, ConfigurableVariation
 from sales_channels.integrations.shein.models import SheinSalesChannel
 from sales_channels.models import SalesChannel
 from core.models import MultiTenantCompany
@@ -396,6 +396,142 @@ class MediaProductThroughManagerTestCase(TestCase):
                 sales_channel=None,
             ),
             default_through_one,
+        )
+
+
+class MediaProductThroughDocumentPropagationTestCase(TestCase):
+    def _create_configurable_product_with_children(self):
+        parent = baker.make(
+            Product,
+            type=Product.CONFIGURABLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        variation_one = baker.make(
+            Product,
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        variation_two = baker.make(
+            Product,
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ConfigurableVariation.objects.create(
+            parent=parent,
+            variation=variation_one,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=parent,
+            variation=variation_two,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        return parent, variation_one, variation_two
+
+    def test_file_assignment_on_configurable_is_propagated_to_children_for_same_sales_channel(self):
+        parent, variation_one, variation_two = self._create_configurable_product_with_children()
+        sales_channel_a = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://docs-a.test",
+        )
+        sales_channel_b = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://docs-b.test",
+        )
+        file_media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        MediaProductThrough.objects.create(
+            product=variation_one,
+            media=file_media,
+            sales_channel=sales_channel_b,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        MediaProductThrough.objects.create(
+            product=parent,
+            media=file_media,
+            sales_channel=sales_channel_a,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        propagated_ids = set(
+            MediaProductThrough.objects.filter(
+                product_id__in=[variation_one.id, variation_two.id],
+                media=file_media,
+                sales_channel=sales_channel_a,
+            ).values_list("product_id", flat=True)
+        )
+        self.assertSetEqual(propagated_ids, {variation_one.id, variation_two.id})
+
+        self.assertEqual(
+            MediaProductThrough.objects.filter(
+                product=variation_one,
+                media=file_media,
+                sales_channel=sales_channel_b,
+            ).count(),
+            1,
+        )
+
+    def test_file_assignment_delete_on_configurable_removes_children_only_for_same_sales_channel(self):
+        parent, variation_one, variation_two = self._create_configurable_product_with_children()
+        sales_channel_a = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://docs-delete-a.test",
+        )
+        sales_channel_b = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://docs-delete-b.test",
+        )
+        file_media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        parent_assignment = MediaProductThrough.objects.create(
+            product=parent,
+            media=file_media,
+            sales_channel=sales_channel_a,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        MediaProductThrough.objects.create(
+            product=variation_one,
+            media=file_media,
+            sales_channel=sales_channel_b,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        MediaProductThrough.objects.create(
+            product=variation_two,
+            media=file_media,
+            sales_channel=sales_channel_b,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        parent_assignment.delete()
+
+        self.assertFalse(
+            MediaProductThrough.objects.filter(
+                product_id__in=[variation_one.id, variation_two.id],
+                media=file_media,
+                sales_channel=sales_channel_a,
+            ).exists()
+        )
+        self.assertEqual(
+            MediaProductThrough.objects.filter(
+                product_id__in=[variation_one.id, variation_two.id],
+                media=file_media,
+                sales_channel=sales_channel_b,
+            ).count(),
+            2,
         )
 
 

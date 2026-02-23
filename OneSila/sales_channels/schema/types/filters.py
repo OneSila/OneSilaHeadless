@@ -28,6 +28,7 @@ from sales_channels.models import (
     RemoteProductProperty,
     SyncRequest,
     RemoteProperty,
+    RemoteDocumentType,
     RemotePropertySelectValue,
     RemoteVat,
     SalesChannel,
@@ -135,6 +136,13 @@ class RemoteProductPropertyFilter(SearchFilterMixin):
 class RemotePropertyFilter(SearchFilterMixin):
     id: auto
     local_instance: Optional[lazy['PropertyFilter', "properties.schema.types.filters"]]
+
+
+@filter(RemoteDocumentType)
+class RemoteDocumentTypeFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[lazy['SalesChannelFilter', "sales_channels.schema.types.filters"]]
+    local_instance: Optional[lazy['DocumentTypeFilter', "media.schema.types.filters"]]
 
 
 @filter(RemotePropertySelectValue)

@@ -17,6 +17,7 @@ from sales_channels.integrations.ebay.schema.types.input import (
     EbaySalesChannelImportPartialInput,
     EbaySalesChannelViewPartialInput,
     EbayCurrencyPartialInput,
+    EbayDocumentTypePartialInput,
 )
 from sales_channels.integrations.ebay.schema.types.types import (
     EbayProductCategoryType,
@@ -30,6 +31,7 @@ from sales_channels.integrations.ebay.schema.types.types import (
     EbaySalesChannelViewType,
     EbaySalesChannelImportType,
     EbayCurrencyType,
+    EbayDocumentTypeType,
     SuggestedEbayCategory,
     SuggestedEbayCategoryEntry,
 )
@@ -59,6 +61,7 @@ class EbaySalesChannelMutation:
     update_ebay_property_select_value: EbayPropertySelectValueType = update(EbayPropertySelectValuePartialInput)
     update_ebay_sales_channel_view: EbaySalesChannelViewType = update(EbaySalesChannelViewPartialInput)
     update_ebay_currency: EbayCurrencyType = update(EbayCurrencyPartialInput)
+    update_ebay_document_type: EbayDocumentTypeType = update(EbayDocumentTypePartialInput)
 
     create_ebay_import_process: EbaySalesChannelImportType = create(EbaySalesChannelImportInput)
     update_ebay_import_process: EbaySalesChannelImportType = update(EbaySalesChannelImportPartialInput)

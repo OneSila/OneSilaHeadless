@@ -15,6 +15,7 @@ from sales_channels.models import (
     RemoteProductContent,
     RemoteProductProperty,
     RemoteProperty,
+    RemoteDocumentType,
     RemotePropertySelectValue,
     RemoteVat,
     SalesChannel,
@@ -173,6 +174,11 @@ class RemotePropertyPartialInput(NodeInput):
     pass
 
 
+@partial(RemoteDocumentType, fields="__all__")
+class RemoteDocumentTypePartialInput(NodeInput):
+    pass
+
+
 @input(RemotePropertySelectValue, fields="__all__")
 class RemotePropertySelectValueInput:
     pass
@@ -251,4 +257,3 @@ class SalesChannelContentTemplatePartialInput(NodeInput):
 @partial(SalesChannelGptFeed, fields="__all__")
 class SalesChannelGptFeedPartialInput(NodeInput):
     pass
-

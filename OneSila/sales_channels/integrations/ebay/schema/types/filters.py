@@ -1,6 +1,6 @@
 from typing import Optional
 
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, lazy
 from core.schema.core.types.types import auto
 from sales_channels.integrations.ebay.models import (
     EbayCategory,
@@ -15,6 +15,7 @@ from sales_channels.integrations.ebay.models import (
     EbaySalesChannelImport,
     EbaySalesChannelView,
     EbayCurrency,
+    EbayDocumentType,
 )
 from currencies.schema.types.filters import CurrencyFilter
 from properties.schema.types.filters import (
@@ -170,3 +171,10 @@ class EbayCurrencyFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     sales_channel_view: Optional[SalesChannelViewFilter]
     local_instance: Optional[CurrencyFilter]
+
+
+@filter(EbayDocumentType)
+class EbayDocumentTypeFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[lazy['DocumentTypeFilter', "media.schema.types.filters"]]

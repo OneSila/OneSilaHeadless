@@ -22,6 +22,7 @@ from .types.types import (
     SalesChannelImportType,
     RemotePropertySelectValueMirrorType,
     RemotePropertyType,
+    RemoteDocumentTypeType,
     RemotePropertySelectValueType,
 )
 from .types.types import RemoteLogType, RemoteProductType, SalesChannelType, \
@@ -63,6 +64,8 @@ class SalesChannelsQuery:
 
     remote_property: RemotePropertyType = node()
     remote_properties: DjangoListConnection[RemotePropertyType] = connection()
+    remote_document_type: RemoteDocumentTypeType = node()
+    remote_document_types: DjangoListConnection[RemoteDocumentTypeType] = connection()
 
     integration: IntegrationType = node()
 
