@@ -10,7 +10,7 @@ def forwards_func(apps, schema_editor):
     RemoteProductCategory = apps.get_model("sales_channels", "RemoteProductCategory")
     ContentType = apps.get_model("contenttypes", "ContentType")
 
-    amazon_product_browse_node_new_ct = ContentType.objects.get(
+    amazon_product_browse_node_new_ct, _ = ContentType.objects.get_or_create(
         app_label="amazon",
         model="amazonproductbrowsenodenew",
     )
