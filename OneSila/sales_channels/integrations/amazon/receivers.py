@@ -254,7 +254,7 @@ def amazon__product_browse_node__propagate_to_variations(sender, instance, **kwa
             product=variation,
             sales_channel=instance.sales_channel,
             view=instance.view,
-            defaults={'recommended_browse_node_id': instance.recommended_browse_node_id},
+            defaults={'remote_id': instance.remote_id},
         )
 
 

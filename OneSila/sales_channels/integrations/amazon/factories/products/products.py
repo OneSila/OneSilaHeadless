@@ -108,7 +108,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.prices_data = {}
         self.external_product_id = self._get_external_product_id()
         self.ean_for_payload = self._get_ean_for_payload()
-        self.recommended_browse_node_id = self._get_recommended_browse_node_id()
+        self.browse_node_remote_id = self._get_browse_node_remote_id()
 
     def get_identifiers(self, *, fixing_caller: str = "run"):
         frame = inspect.currentframe()
@@ -536,7 +536,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
         return value
 
-    def _get_recommended_browse_node_id(self) -> str | None:
+    def _get_browse_node_remote_id(self) -> str | None:
         from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
 
         try:
@@ -556,7 +556,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     return None
             else:
                 return None
-        return obj.recommended_browse_node_id
+        return obj.remote_id
 
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
@@ -603,7 +603,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     # If GTIN exemption is claimed, drop EAN to avoid Amazon matching it to an existing ASIN.
                     attrs.pop("externally_assigned_product_identifier", None)
 
-        browse_node_id = self.recommended_browse_node_id
+        browse_node_id = self.browse_node_remote_id
         if browse_node_id:
             attrs["recommended_browse_nodes"] = [
                 {"value": browse_node_id, "marketplace_id": self.view.remote_id}

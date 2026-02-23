@@ -4,6 +4,7 @@ from core import models
 from products.models import Product
 from sales_channels.integrations.ebay.managers import EbayCategoryManager
 from sales_channels.models import SalesChannel, SalesChannelView
+from sales_channels.models.products import RemoteProductCategory
 
 
 class EbayCategory(models.SharedModel):
@@ -76,3 +77,7 @@ class EbayProductCategory(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class EbayProductCategoryNew(RemoteProductCategory):
+    pass

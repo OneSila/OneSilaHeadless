@@ -886,14 +886,14 @@ class ProductFilterIntegrationsQueryTestCase(ProductFilterQueryMixin, Transactio
             product=with_node,
             sales_channel=sales_channel,
             view=view,
-            recommended_browse_node_id=browse_node.remote_id,
+            remote_id=browse_node.remote_id,
             multi_tenant_company=self.multi_tenant_company,
         )
         AmazonProductBrowseNode.objects.create(
             product=without_node,
             sales_channel=sales_channel,
             view=view,
-            recommended_browse_node_id=other_browse_node.remote_id,
+            remote_id=other_browse_node.remote_id,
             multi_tenant_company=self.multi_tenant_company,
         )
 
@@ -935,14 +935,14 @@ class ProductFilterIntegrationsQueryTestCase(ProductFilterQueryMixin, Transactio
             product=with_node,
             sales_channel=sales_channel,
             view=view,
-            recommended_browse_node_id=browse_node.remote_id,
+            remote_id=browse_node.remote_id,
             multi_tenant_company=self.multi_tenant_company,
         )
         AmazonProductBrowseNode.objects.create(
             product=without_node,
             sales_channel=sales_channel,
             view=view,
-            recommended_browse_node_id=other_browse_node.remote_id,
+            remote_id=other_browse_node.remote_id,
             multi_tenant_company=self.multi_tenant_company,
         )
 

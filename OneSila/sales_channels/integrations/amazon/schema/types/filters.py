@@ -215,7 +215,7 @@ class AmazonProductBrowseNodeFilter(SearchFilterMixin):
     product: Optional[ProductFilter]
     sales_channel: Optional[SalesChannelFilter]
     view: Optional[SalesChannelViewFilter]
-    recommended_browse_node_id: auto
+    remote_id: auto
 
 
 @filter(AmazonExternalProductId)

@@ -505,7 +505,7 @@ class AmazonProductsImportProcessorBrowseNodeGtinTest(TestCase):
                 product=product,
                 sales_channel=self.sales_channel,
                 view=self.view,
-                recommended_browse_node_id="BN1",
+                remote_id="BN1",
             ).exists()
         )
 

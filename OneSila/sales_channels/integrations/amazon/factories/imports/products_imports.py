@@ -873,7 +873,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 sales_channel=self.sales_channel,
                 view=view,
                 multi_tenant_company=self.import_process.multi_tenant_company,
-                defaults={"recommended_browse_node_id": node_id},
+                defaults={"remote_id": node_id},
             )
         else:
             AmazonProductBrowseNode.objects.filter(

@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db.models import UniqueConstraint, Q, Index
 from django.db.utils import NotSupportedError
 from model_bakery.recipe import related
@@ -669,3 +670,92 @@ class RemoteEanCode(PolymorphicModel, RemoteObjectMixin, models.Model):
             else "N/A"
         )
         return f"Remote EAN Code {self.ean_code or 'N/A'} for {sales_channel}"
+
+
+class RemoteProductCategory(PolymorphicModel, RemoteObjectMixin, models.Model):
+    """Polymorphic category assignment for remote products."""
+
+    legacy_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Legacy row ID used during migration from old category-assignment models.",
+    )
+    product = models.ForeignKey(
+        "products.Product",
+        on_delete=models.CASCADE,
+        db_index=True,
+        help_text="Local product linked to the remote category assignment.",
+    )
+    view = models.ForeignKey(
+        "sales_channels.SalesChannelView",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Sales channel view/marketplace for view-specific category assignments.",
+    )
+    require_view = models.BooleanField(
+        default=True,
+        help_text="When true, the category assignment is scoped to a sales channel view.",
+    )
+
+    class Meta:
+        verbose_name = "Remote Product Category"
+        verbose_name_plural = "Remote Product Categories"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (Q(require_view=True) & Q(view__isnull=False))
+                    | (Q(require_view=False) & Q(view__isnull=True))
+                ),
+                name="remote_product_category_view_required_consistency",
+                violation_error_message=_("Store is required only when require_view is enabled."),
+            ),
+            UniqueConstraint(
+                fields=["product", "view", "require_view"],
+                condition=Q(require_view=True),
+                name="remote_product_category_unique_product_view_when_required",
+            ),
+            UniqueConstraint(
+                fields=["product", "sales_channel", "require_view"],
+                condition=Q(require_view=False),
+                name="remote_product_category_unique_product_channel_when_not_required",
+            ),
+        ]
+        indexes = [
+            Index(fields=["product", "view", "require_view"]),
+            Index(fields=["product", "sales_channel", "require_view"]),
+        ]
+        search_terms = ["remote_id", "product__sku", "product__name", "legacy_id"]
+
+    def clean(self):
+        super().clean()
+
+        errors = {}
+        if self.require_view and self.view_id is None:
+            errors["view"] = _("View is required when require_view is enabled.")
+        if not self.require_view and self.view_id is not None:
+            errors["view"] = _("View must be empty when require_view is disabled.")
+
+        if self.view_id and self.sales_channel_id:
+            view_sales_channel_id = (
+                self.view.sales_channel_id
+                if hasattr(self, "view") and self.view is not None
+                else None
+            )
+            if view_sales_channel_id is None:
+                view_sales_channel_id = (
+                    self.view.__class__.objects.filter(id=self.view_id)
+                    .values_list("sales_channel_id", flat=True)
+                    .first()
+                )
+            if view_sales_channel_id and view_sales_channel_id != self.sales_channel_id:
+                errors["sales_channel"] = _("Sales channel must match the selected view.")
+
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        scope = f"view:{self.view_id}" if self.require_view else "channel"
+        return f"{self.product_id} @ {self.sales_channel_id} ({scope})"

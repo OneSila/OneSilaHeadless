@@ -103,7 +103,7 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.view,
-            recommended_browse_node_id="1",
+            remote_id="1",
         )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,

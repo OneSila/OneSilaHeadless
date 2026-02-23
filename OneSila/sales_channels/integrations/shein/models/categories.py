@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from core import models
 from products.models import Product
 from sales_channels.models import SalesChannel
+from sales_channels.models.products import RemoteProductCategory
 
 
 class SheinCategory(models.Model):
@@ -219,3 +220,12 @@ class SheinProductCategory(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class SheinProductCategoryNew(RemoteProductCategory):
+    product_type_remote_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional Shein product type identifier for this category selection.",
+    )

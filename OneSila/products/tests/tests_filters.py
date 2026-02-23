@@ -40,7 +40,7 @@ class ProductFilterSalesChannelViewTestCase(TransactionTestCaseMixin, Transactio
             product=self.p1,
             sales_channel=self.sales_channel,
             view=self.view1,
-            recommended_browse_node_id="1",
+            remote_id="1",
             multi_tenant_company=self.multi_tenant_company,
         )
         SalesChannelViewAssign.objects.create(
@@ -54,7 +54,7 @@ class ProductFilterSalesChannelViewTestCase(TransactionTestCaseMixin, Transactio
             product=self.p3,
             sales_channel=self.sales_channel,
             view=self.view2,
-            recommended_browse_node_id="1",
+            remote_id="1",
             multi_tenant_company=self.multi_tenant_company,
         )
         SalesChannelViewAssign.objects.create(
