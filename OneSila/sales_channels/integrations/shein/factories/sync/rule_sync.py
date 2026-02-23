@@ -14,7 +14,8 @@ class SheinPropertyRuleItemSyncFactory:
         self.shein_property = shein_property
 
     def run(self) -> None:
-        if not self.shein_property.local_instance:
+        local_property = self.shein_property.local_instance
+        if not local_property or local_property.is_product_type:
             return
 
         items = SheinProductTypeItem.objects.filter(
@@ -26,7 +27,7 @@ class SheinPropertyRuleItemSyncFactory:
             rule = item.product_type.local_instance
             new_type = self._resolve_rule_item_type(
                 item=item,
-                local_property=self.shein_property.local_instance,
+                local_property=local_property,
             )
             if not new_type:
                 continue
@@ -37,7 +38,7 @@ class SheinPropertyRuleItemSyncFactory:
             rule_item, created = ProductPropertiesRuleItem.objects.get_or_create(
                 multi_tenant_company=rule.multi_tenant_company,
                 rule=rule,
-                property=self.shein_property.local_instance,
+                property=local_property,
                 defaults={
                     "type": new_type,
                     "sort_order": max_sort + 1,

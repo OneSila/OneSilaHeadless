@@ -13,7 +13,8 @@ class EbayPropertyRuleItemSyncFactory:
         self.ebay_property = ebay_property
 
     def run(self) -> None:
-        if not self.ebay_property.local_instance:
+        local_property = self.ebay_property.local_instance
+        if not local_property or local_property.is_product_type:
             return
 
         items = EbayProductTypeItem.objects.filter(
@@ -31,7 +32,7 @@ class EbayPropertyRuleItemSyncFactory:
             rule_item, created = ProductPropertiesRuleItem.objects.get_or_create(
                 multi_tenant_company=rule.multi_tenant_company,
                 rule=rule,
-                property=self.ebay_property.local_instance,
+                property=local_property,
                 defaults={
                     "type": item.remote_type or ProductPropertiesRuleItem.OPTIONAL,
                     "sort_order": max_sort + 1,
