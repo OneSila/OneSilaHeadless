@@ -207,7 +207,7 @@ class DuplicatePropertiesRuleMutationTestCase(TransactionTestCaseMixin, Transact
     def setUp(self):
         super().setUp()
 
-        self.product_type_property = Property.objects.create(
+        self.product_type_property = Property.objects.get(
             multi_tenant_company=self.multi_tenant_company,
             type=Property.TYPES.SELECT,
             is_product_type=True,
@@ -228,9 +228,8 @@ class DuplicatePropertiesRuleMutationTestCase(TransactionTestCaseMixin, Transact
             multi_tenant_company=self.multi_tenant_company,
         )
 
-        self.rule = ProductPropertiesRule.objects.create(
+        self.rule, c = ProductPropertiesRule.objects.get_or_create(
             product_type=self.product_type_value,
-            require_ean_code=True,
             multi_tenant_company=self.multi_tenant_company,
         )
         ProductPropertiesRuleItem.objects.create(
@@ -274,7 +273,7 @@ class DuplicatePropertiesRuleMutationTestCase(TransactionTestCaseMixin, Transact
 
         duplicated_rule_data = response.data["duplicatePropertiesRule"]
         duplicated_rule = ProductPropertiesRule.objects.get(
-            id=self.from_global_id(duplicated_rule_data["id"]),
+            id=self.from_global_id(duplicated_rule_data["id"])[1],
             multi_tenant_company=self.multi_tenant_company,
         )
 

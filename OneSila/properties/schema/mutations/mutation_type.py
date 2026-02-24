@@ -199,7 +199,6 @@ class PropertiesMutation:
         try:
             existing_rule = ProductPropertiesRule.objects.select_related(
                 "product_type__property",
-                "sales_channel",
             ).prefetch_related("items").get(
                 id=property_rule.id.node_id,
                 multi_tenant_company=multi_tenant_company,
@@ -232,5 +231,5 @@ class PropertiesMutation:
             duplicated_product_type,
             existing_rule.require_ean_code,
             duplicated_items,
-            sales_channel=existing_rule.sales_channel,
+            sales_channel=None, # we only duplicate as default
         )
