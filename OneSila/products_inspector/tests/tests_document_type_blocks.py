@@ -62,7 +62,7 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
             local_instance=required_document_type,
-            required_categories=["cat-required"],
+            required_categories=["cat-shared"],
             optional_categories=[],
         )
         RemoteDocumentType.objects.create(
@@ -70,20 +70,13 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             local_instance=optional_document_type,
             required_categories=[],
-            optional_categories=["cat-optional"],
+            optional_categories=["cat-shared"],
         )
 
         RemoteProductCategory.objects.create(
             product=product,
             sales_channel=self.sales_channel,
-            remote_id="cat-required",
-            require_view=False,
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        RemoteProductCategory.objects.create(
-            product=product,
-            sales_channel=self.sales_channel,
-            remote_id="cat-optional",
+            remote_id="cat-shared",
             require_view=False,
             multi_tenant_company=self.multi_tenant_company,
         )

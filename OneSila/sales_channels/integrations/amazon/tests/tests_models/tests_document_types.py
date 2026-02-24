@@ -103,7 +103,7 @@ class AmazonDocumentTypeModelTest(TestCase):
             marketplace_id=self.view.remote_id,
             name="Node 400",
         )
-        internal_document_type = DocumentType.objects.create(
+        internal_document_type = DocumentType.objects.get(
             multi_tenant_company=self.multi_tenant_company,
             name=DocumentType.INTERNAL_NAME,
             code=DocumentType.INTERNAL_CODE,
