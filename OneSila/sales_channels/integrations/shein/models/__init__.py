@@ -1,6 +1,6 @@
 """Model package for the Shein integration."""
 
-from .categories import SheinCategory, SheinProductCategory, SheinProductCategoryNew
+from .categories import SheinCategory, SheinProductCategoryOld, SheinProductCategory
 from .properties import (
     SheinProductType,
     SheinProductTypeItem,
@@ -32,7 +32,7 @@ from .documents import SheinDocumentType
 __all__ = [
     "SheinCategory",
     "SheinProductCategory",
-    "SheinProductCategoryNew",
+    "SheinProductCategoryOld",
     "SheinProductType",
     "SheinProductTypeItem",
     "SheinProperty",

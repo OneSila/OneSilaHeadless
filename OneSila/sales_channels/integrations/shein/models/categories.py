@@ -166,7 +166,7 @@ class SheinCategory(models.Model):
         return []
 
 
-class SheinProductCategory(models.Model):
+class SheinProductCategoryOld(models.Model):
     """Link a product to a recommended Shein category per sales channel."""
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
@@ -181,18 +181,30 @@ class SheinProductCategory(models.Model):
 
     class Meta:
         unique_together = ("product", "sales_channel")
-        verbose_name = "Shein Product Category"
-        verbose_name_plural = "Shein Product Categories"
         search_terms = ["remote_id", "product_type_remote_id", "product__sku"]
         indexes = [
             models.Index(fields=["product", "sales_channel"]),
         ]
+
+
+class SheinProductCategory(RemoteProductCategory):
+    product_type_remote_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional Shein product type identifier for this category selection.",
+    )
+
+    class Meta:
+        verbose_name = "Shein Product Category"
+        verbose_name_plural = "Shein Product Categories"
 
     def __str__(self) -> str:
         type_suffix = f" ({self.product_type_remote_id})" if self.product_type_remote_id else ""
         return f"{self.product} @ {self.sales_channel}: {self.remote_id}{type_suffix}"
 
     def clean(self):
+        self.require_view = False
         super().clean()
 
         remote_id = (self.remote_id or "").strip()
@@ -218,14 +230,6 @@ class SheinProductCategory(models.Model):
             raise ValidationError({"remote_id": "Only leaf Shein categories can be assigned."})
 
     def save(self, *args, **kwargs):
+        self.require_view = False
         self.full_clean()
         return super().save(*args, **kwargs)
-
-
-class SheinProductCategoryNew(RemoteProductCategory):
-    product_type_remote_id = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        help_text="Optional Shein product type identifier for this category selection.",
-    )
