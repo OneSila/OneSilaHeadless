@@ -36,6 +36,7 @@ class SheinDocumentTypeModelTest(TestCase):
             remote_id="101",
             name="Category 101",
             is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
         )
 
         document_type = SheinDocumentType.objects.create(
@@ -56,6 +57,7 @@ class SheinDocumentTypeModelTest(TestCase):
             remote_id="100",
             name="Category 100",
             is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
         )
 
         with self.assertRaises(ValidationError):
