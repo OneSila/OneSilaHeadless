@@ -8,7 +8,7 @@ from .fields import complete_create_product_properties_rule, complete_update_pro
     bulk_create_product_properties, create_property, create_property_select_value
 from ..types.types import PropertyType, PropertyTranslationType, PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, \
     PropertySelectValueTranslationType, ProductPropertiesRuleType, ProductPropertiesRuleItemType, PropertyDuplicatesType, PropertySelectValueDuplicatesType
-from properties.models import Property, PropertySelectValue, ProductProperty, ProductPropertyTextTranslation
+from properties.models import Property, PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, ProductPropertiesRule, PropertySelectValueTranslation
 from properties.tasks import merge_property_select_value_db_task
 from ..types.input import PropertyInput, PropertyTranslationInput, PropertySelectValueInput, ProductPropertyInput, \
     PropertyPartialInput, PropertyTranslationPartialInput, PropertySelectValuePartialInput, ProductPropertyPartialInput, ProductPropertyTextTranslationInput, \
@@ -185,4 +185,51 @@ class PropertiesMutation:
         return PropertySelectValueDuplicatesType(
             duplicate_found=duplicates.exists(),
             duplicates=list(duplicates),
+        )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def duplicate_properties_rule(
+        self,
+        info: Info,
+        name: str,
+        property_rule: ProductPropertiesRulePartialInput,
+    ) -> ProductPropertiesRuleType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        try:
+            existing_rule = ProductPropertiesRule.objects.select_related(
+                "product_type__property",
+            ).prefetch_related("items").get(
+                id=property_rule.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except ProductPropertiesRule.DoesNotExist:
+            raise PermissionError("Invalid company")
+
+        duplicated_product_type = PropertySelectValue.objects.create(
+            property=existing_rule.product_type.property,
+            multi_tenant_company=multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=duplicated_product_type,
+            language=multi_tenant_company.language,
+            value=name,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        duplicated_items = [
+            {
+                "property": item.property,
+                "type": item.type,
+                "sort_order": item.sort_order,
+            }
+            for item in existing_rule.items.all()
+        ]
+
+        return ProductPropertiesRule.objects.create_rule(
+            multi_tenant_company,
+            duplicated_product_type,
+            existing_rule.require_ean_code,
+            duplicated_items,
+            sales_channel=None, # we only duplicate as default
         )
