@@ -127,7 +127,6 @@ class AmazonProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
         browse_node_remote_id = "26595898031"
         baker.make(
             AmazonBrowseNode,
-            multi_tenant_company=self.multi_tenant_company,
             remote_id=browse_node_remote_id,
             marketplace_id=self.view.remote_id,
             has_children=False,

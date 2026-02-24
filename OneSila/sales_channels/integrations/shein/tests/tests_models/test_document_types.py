@@ -29,6 +29,7 @@ class SheinDocumentTypeModelTest(TestCase):
             remote_id="100",
             name="Category 100",
             is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
         )
         SheinCategory.objects.create(
             sales_channel=self.sales_channel,
@@ -72,6 +73,7 @@ class SheinDocumentTypeModelTest(TestCase):
             remote_id="200",
             name="Other Channel Category",
             is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
         )
 
         with self.assertRaises(ValidationError):
@@ -89,6 +91,7 @@ class SheinDocumentTypeModelTest(TestCase):
             remote_id="300",
             name="Category 300",
             is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
         )
 
         with self.assertRaises(ValidationError):
@@ -106,8 +109,9 @@ class SheinDocumentTypeModelTest(TestCase):
             remote_id="400",
             name="Category 400",
             is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
         )
-        internal_document_type = DocumentType.objects.create(
+        internal_document_type, _ = DocumentType.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             name=DocumentType.INTERNAL_NAME,
             code=DocumentType.INTERNAL_CODE,
