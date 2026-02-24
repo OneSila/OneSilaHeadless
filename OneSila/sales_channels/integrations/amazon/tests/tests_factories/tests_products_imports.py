@@ -357,6 +357,35 @@ class AmazonProductsImportProcessorRulePreserveTest(TestCase):
             self.assertEqual(called_rule, self.rule)
             self.assertTrue(mock_broken.called)
 
+    def test_get_product_rule_uses_lowest_id_when_code_is_duplicated(self):
+        duplicate_product_type_value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.product_type_property,
+        )
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=duplicate_product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+            value="Duplicate",
+        )
+        duplicate_rule, _ = ProductPropertiesRule.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_type=duplicate_product_type_value,
+        )
+        AmazonProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type_code="DEFAULT_CODE",
+            local_instance=duplicate_rule,
+        )
+
+        processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+
+        selected_rule = processor.get_product_rule(
+            {"summaries": [{"product_type": "DEFAULT_CODE"}]},
+        )
+
+        self.assertEqual(selected_rule, self.rule)
+
 
 class AmazonProductsImportProcessorImportDataTest(TestCase):
     def setUp(self):

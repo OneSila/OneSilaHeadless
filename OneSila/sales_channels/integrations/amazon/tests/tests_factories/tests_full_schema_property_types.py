@@ -6,7 +6,7 @@ from sales_channels.integrations.amazon.factories.sales_channels.full_schema imp
     AmazonProductTypeRuleFactory,
 )
 from sales_channels.integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelView
-from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from sales_channels.integrations.amazon.models.properties import AmazonProperty, AmazonProductType
 
 
 class AmazonSchemaPropertyTypeSyncTests(TestCase):
@@ -37,6 +37,26 @@ class AmazonSchemaPropertyTypeSyncTests(TestCase):
             ],
             is_required=False,
         )
+
+    def test_get_or_create_product_type_returns_oldest_when_duplicates_exist(self) -> None:
+        first = AmazonProductType.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            product_type_code="DUPLICATE_TYPE",
+        )
+        AmazonProductType.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            product_type_code="DUPLICATE_TYPE",
+        )
+
+        factory = AmazonProductTypeRuleFactory(
+            product_type_code="DUPLICATE_TYPE",
+            sales_channel=self.sales_channel,
+            api=object(),
+        )
+
+        self.assertEqual(factory.product_type.id, first.id)
 
     def test_create_remote_properties_does_not_override_existing_type(self) -> None:
         public_definition = self._build_public_definition(

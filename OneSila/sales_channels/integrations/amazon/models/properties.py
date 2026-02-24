@@ -239,14 +239,6 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
                 violation_error_message=_(
                     "An Amazon product type with this local rule already exists for this sales channel."
                 )
-            ),
-            UniqueConstraint(
-                fields=['product_type_code', 'sales_channel'],
-                condition=Q(product_type_code__isnull=False),
-                name='unique_amazonproducttype_code_sales_channel_not_null',
-                violation_error_message=_(
-                    "An Amazon product type with this product type code already exists for this sales channel."
-                )
             )
         ]
         verbose_name = 'Amazon Product Type'

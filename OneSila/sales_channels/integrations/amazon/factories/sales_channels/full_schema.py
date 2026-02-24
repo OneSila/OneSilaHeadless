@@ -465,11 +465,18 @@ class AmazonProductTypeRuleFactory(
             self.api = api
 
     def get_or_create_product_type(self):
-        product_type, _ = AmazonProductType.objects.get_or_create(
-            product_type_code=self.product_type_code,
-            sales_channel=self.sales_channel,
-            multi_tenant_company=self.multi_tenant_company
-        )
+        try:
+            product_type, _ = AmazonProductType.objects.get_or_create(
+                product_type_code=self.product_type_code,
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.multi_tenant_company
+            )
+        except AmazonProductType.MultipleObjectsReturned:
+            product_type = AmazonProductType.objects.filter(
+                product_type_code=self.product_type_code,
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+            ).order_by("id").first()
         return product_type
 
     def _download_json(self, url):

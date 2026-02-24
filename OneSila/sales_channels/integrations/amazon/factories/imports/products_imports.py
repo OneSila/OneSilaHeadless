@@ -434,7 +434,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             rule = AmazonProductType.objects.filter(
                 sales_channel=self.sales_channel,
                 product_type_code=product_type_code,
-            ).first()
+            ).order_by("id").first()
 
             if rule:
                 rule = rule.local_instance
