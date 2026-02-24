@@ -30,7 +30,7 @@ class EbaySalesChannelPartialInput(NodeInput):
     pass
 
 
-@input(EbayProductCategory, fields="__all__")
+@input(EbayProductCategory, exclude=['remoteproductcategory_ptr'])
 class EbayProductCategoryInput:
     pass
 

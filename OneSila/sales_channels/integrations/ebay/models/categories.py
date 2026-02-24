@@ -35,7 +35,7 @@ class EbayCategory(models.SharedModel):
         return f"{display_name} ({self.remote_id})"
 
 
-class EbayProductCategory(models.Model):
+class EbayProductCategoryOld(models.Model):
     """Link a product and view to a recommended eBay category."""
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
@@ -48,6 +48,14 @@ class EbayProductCategory(models.Model):
         indexes = [
             models.Index(fields=["product", "view"]),
         ]
+
+
+
+class EbayProductCategory(RemoteProductCategory):
+
+    class Meta:
+        verbose_name = "eBay Product Category"
+        verbose_name_plural = "eBay Product Categories"
 
     def __str__(self) -> str:
         return f"{self.product} @ {self.view}: {self.remote_id}"
@@ -77,7 +85,3 @@ class EbayProductCategory(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
-
-
-class EbayProductCategoryNew(RemoteProductCategory):
-    pass
