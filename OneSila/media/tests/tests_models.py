@@ -33,7 +33,7 @@ class MediaTestCase(CreateImageMixin, TestCase):
         return sum([multi_tenant_company_id, real_folder, complex_folder, filename])
 
     def test_image_web_url_none(self):
-        image = baker.make(Media, image=None)
+        image = baker.make(Media, image=None, multi_tenant_company=self.multi_tenant_company, type=Media.IMAGE)
         url = image.image_web_url
         self.assertTrue(url is None)
 
