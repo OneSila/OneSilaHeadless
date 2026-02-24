@@ -36,6 +36,12 @@ DUPLICATE_VARIATIONS_ERROR = 123
 NON_CONFIGURABLE_RULE_ERROR = 124
 AMAZON_VALIDATION_ISSUES_ERROR = 125 # deprecated (replaced by channel-specific issue dashboards)
 AMAZON_REMOTE_ISSUES_ERROR = 126 # deprecated (replaced by channel-specific issue dashboards)
+REQUIRED_DOCUMENT_TYPES_ERROR = 127
+OPTIONAL_DOCUMENT_TYPES_ERROR = 128
+DOCUMENT_TYPES_BLOCK_ERROR_CODES = (
+    REQUIRED_DOCUMENT_TYPES_ERROR,
+    OPTIONAL_DOCUMENT_TYPES_ERROR,
+)
 
 ERROR_TYPES = (
     (HAS_IMAGES_ERROR, _('Product is missing required images')),
@@ -54,6 +60,8 @@ ERROR_TYPES = (
     (VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, _('Variations have inspectors missing mandatory information')),
     (DUPLICATE_VARIATIONS_ERROR, _('Configurable product has duplicate variations')),
     (NON_CONFIGURABLE_RULE_ERROR, _('Configurable product has no applicable configurator rules')),
+    (REQUIRED_DOCUMENT_TYPES_ERROR, _('Product is missing required document types')),
+    (OPTIONAL_DOCUMENT_TYPES_ERROR, _('Product is missing optional document types')),
 )
 
 
@@ -218,6 +226,26 @@ non_configurable_rule_block = {
     'supplier_product_applicability': NONE,
 }
 
+required_document_types_block = {
+    'error_code': REQUIRED_DOCUMENT_TYPES_ERROR,
+    'simple_product_applicability': REQUIRED,
+    'configurable_product_applicability': NONE,
+    'manufacturable_product_applicability': REQUIRED,
+    'bundle_product_applicability': REQUIRED,
+    'dropship_product_applicability': REQUIRED,
+    'supplier_product_applicability': NONE,
+}
+
+optional_document_types_block = {
+    'error_code': OPTIONAL_DOCUMENT_TYPES_ERROR,
+    'simple_product_applicability': OPTIONAL,
+    'configurable_product_applicability': NONE,
+    'manufacturable_product_applicability': OPTIONAL,
+    'bundle_product_applicability': OPTIONAL,
+    'dropship_product_applicability': OPTIONAL,
+    'supplier_product_applicability': NONE,
+}
+
 
 blocks = [
     has_image_block,
@@ -236,4 +264,6 @@ blocks = [
     variations_missing_mandatory_information_block,
     duplicate_variations_block,
     non_configurable_rule_block,
+    required_document_types_block,
+    optional_document_types_block,
 ]

@@ -618,6 +618,8 @@ class InspectorBlockMissingPropertiesTest(TestCase):
         inspector_block.refresh_from_db()
 
         self.assertFalse(inspector_block.successfully_checked)
+        self.assertIn("add the following required properties to the product", (inspector_block.fixing_message or "").lower())
+        self.assertIn("color", (inspector_block.fixing_message or "").lower())
 
         # Now, add the required Color property to the product
         color_value = PropertySelectValue.objects.create(
@@ -637,6 +639,7 @@ class InspectorBlockMissingPropertiesTest(TestCase):
 
         # Now, the product should have the required Color property, so it should be successfully checked.
         self.assertTrue(inspector_block.successfully_checked)
+        self.assertIsNone(inspector_block.fixing_message)
 
     def test_inspector_block_missing_optional_property(self):
         # This test will check if the product is missing the optional property (Size)
@@ -647,6 +650,8 @@ class InspectorBlockMissingPropertiesTest(TestCase):
         inspector_block.refresh_from_db()
 
         self.assertFalse(inspector_block.successfully_checked)
+        self.assertIn("add the following optional properties to the product", (inspector_block.fixing_message or "").lower())
+        self.assertIn("size", (inspector_block.fixing_message or "").lower())
 
         # Now, add the optional Size property to the product
         size_value = PropertySelectValue.objects.create(
@@ -666,6 +671,7 @@ class InspectorBlockMissingPropertiesTest(TestCase):
 
         # The inspector block should remain successfully checked.
         self.assertTrue(inspector_block.successfully_checked)
+        self.assertIsNone(inspector_block.fixing_message)
 
 
 # class InspectorBlockMissingStockTest(TestCase):
@@ -1251,4 +1257,3 @@ class InspectorBlockDuplicateVariationsTest(TestCase):
 
         # The inspector block should now pass since there is only one variation left
         self.assertTrue(inspector_block.successfully_checked)
-

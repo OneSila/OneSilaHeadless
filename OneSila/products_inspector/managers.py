@@ -208,3 +208,21 @@ class NonConfigurableRuleInspectorBlockQuerySet(QuerySetProxyModelMixin, Inspect
 class NonConfigurableRuleInspectorBlockManager(InspectorBlockManager):
     def get_queryset(self):
         return NonConfigurableRuleInspectorBlockQuerySet(self.model, using=self._db)
+
+
+class RequiredDocumentTypesInspectorBlockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
+    pass
+
+
+class RequiredDocumentTypesInspectorBlockManager(InspectorBlockManager):
+    def get_queryset(self):
+        return RequiredDocumentTypesInspectorBlockQuerySet(self.model, using=self._db)
+
+
+class OptionalDocumentTypesInspectorBlockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
+    pass
+
+
+class OptionalDocumentTypesInspectorBlockManager(InspectorBlockManager):
+    def get_queryset(self):
+        return OptionalDocumentTypesInspectorBlockQuerySet(self.model, using=self._db)

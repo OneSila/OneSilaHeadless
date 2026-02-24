@@ -4,13 +4,14 @@ from core.decorators import trigger_signal_for_dirty_fields
 from core.schema.core.subscriptions import refresh_subscription_receiver
 from core.signals import post_create, post_update, mutation_update, mutation_create
 from eancodes.signals import ean_code_released_for_product
-from products.models import Product
 from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR, INACTIVE_BUNDLE_ITEMS_ERROR, \
     MISSING_BUNDLE_ITEMS_ERROR, MISSING_VARIATION_ERROR, MISSING_EAN_CODE_ERROR, \
     MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, \
     MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
-    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
+    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR, DOCUMENT_TYPES_BLOCK_ERROR_CODES
+from products_inspector.helpers import _refresh_document_type_blocks_for_products, _is_remote_product_category_instance, \
+    _is_remote_document_type_instance, _normalise_category_ids, _send_document_type_block_refresh
 from products_inspector.models import InspectorBlock, Inspector
 from products_inspector.signals import inspector_block_refresh, inspector_missing_info_detected, inspector_missing_info_resolved
 from properties.signals import product_properties_rule_created, product_properties_rule_updated
@@ -54,6 +55,20 @@ def products_inspector__inspector__inspector_sync_block_by_error_code(sender, in
 @receiver(post_delete, sender='media.MediaProductThrough')
 def products_inspector__inspector__trigger_block_has_images(sender, instance, **kwargs):
     inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=False)
+
+
+@receiver(post_create, sender='media.MediaProductThrough')
+@receiver(post_delete, sender='media.MediaProductThrough')
+def products_inspector__inspector__trigger_document_type_blocks_on_media_change(sender, instance, **kwargs):
+    from media.models import Media
+
+    if not hasattr(instance.product, "inspector"):
+        return
+
+    if instance.media.type != Media.FILE:
+        return
+
+    _send_document_type_block_refresh(product=instance.product)
 
 
 @receiver(post_create, sender='sales_channels.SalesChannelViewAssign')
@@ -363,3 +378,99 @@ def products_inspector__inspector__trigger_block_rule_deleted(sender, instance, 
     from .tasks import trigger_rule_dependent_inspector_blocks_delete_task
 
     trigger_rule_dependent_inspector_blocks_delete_task(instance)
+
+
+# REQUIRED_DOCUMENT_TYPES_ERROR -----------------------------------------------
+# OPTIONAL_DOCUMENT_TYPES_ERROR -----------------------------------------------
+
+@receiver(post_create)
+@receiver(post_delete)
+def products_inspector__inspector__trigger_document_types_on_remote_product_category_change(sender, instance, **kwargs):
+    if not _is_remote_product_category_instance(instance=instance):
+        return
+
+    _refresh_document_type_blocks_for_products(
+        product_ids={instance.product_id},
+        multi_tenant_company_id=instance.multi_tenant_company_id,
+    )
+
+
+@receiver(post_update)
+def products_inspector__inspector__trigger_document_types_on_remote_product_category_update(sender, instance, **kwargs):
+    if not _is_remote_product_category_instance(instance=instance):
+        return
+
+    product_ids = {instance.product_id}
+
+    if instance.is_dirty_field("product", check_relationship=True):
+        previous_product = instance.get_dirty_fields(check_relationship=True).get("product")
+        previous_product_id = getattr(previous_product, "pk", previous_product)
+        if previous_product_id:
+            product_ids.add(previous_product_id)
+
+    _refresh_document_type_blocks_for_products(
+        product_ids=product_ids,
+        multi_tenant_company_id=instance.multi_tenant_company_id,
+    )
+
+
+@receiver(post_update)
+def products_inspector__inspector__trigger_document_types_on_remote_document_type_update(sender, instance, **kwargs):
+    if not _is_remote_document_type_instance(instance=instance):
+        return
+
+    local_instance_dirty = instance.is_dirty_field("local_instance", check_relationship=True)
+    required_categories_dirty = instance.is_dirty_field("required_categories")
+    optional_categories_dirty = instance.is_dirty_field("optional_categories")
+
+    if not any([local_instance_dirty, required_categories_dirty, optional_categories_dirty]):
+        return
+
+    dirty_fields = instance.get_dirty_fields(check_relationship=True)
+    category_ids_to_refresh = set()
+
+    if local_instance_dirty:
+        category_ids_to_refresh.update(_normalise_category_ids(categories=instance.required_categories))
+        category_ids_to_refresh.update(_normalise_category_ids(categories=instance.optional_categories))
+
+        if required_categories_dirty:
+            category_ids_to_refresh.update(
+                _normalise_category_ids(categories=dirty_fields.get("required_categories"))
+            )
+        if optional_categories_dirty:
+            category_ids_to_refresh.update(
+                _normalise_category_ids(categories=dirty_fields.get("optional_categories"))
+            )
+    else:
+        if required_categories_dirty:
+            category_ids_to_refresh.update(_normalise_category_ids(categories=instance.required_categories))
+        if optional_categories_dirty:
+            category_ids_to_refresh.update(_normalise_category_ids(categories=instance.optional_categories))
+
+    product_ids = set()
+    if category_ids_to_refresh:
+        from sales_channels.models.products import RemoteProductCategory
+
+        product_ids.update(
+            RemoteProductCategory.objects.filter(
+                multi_tenant_company_id=instance.multi_tenant_company_id,
+                sales_channel_id=instance.sales_channel_id,
+                remote_id__in=category_ids_to_refresh,
+            ).values_list("product_id", flat=True)
+        )
+
+    product_ids.update(
+        InspectorBlock.objects.filter(
+            multi_tenant_company_id=instance.multi_tenant_company_id,
+            error_code__in=DOCUMENT_TYPES_BLOCK_ERROR_CODES,
+            successfully_checked=False,
+            inspector__product__remoteproductcategory__sales_channel_id=instance.sales_channel_id,
+        )
+        .values_list("inspector__product_id", flat=True)
+        .distinct()
+    )
+
+    _refresh_document_type_blocks_for_products(
+        product_ids=product_ids,
+        multi_tenant_company_id=instance.multi_tenant_company_id,
+    )
