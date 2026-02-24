@@ -1,6 +1,8 @@
 from django.test import TransactionTestCase
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from properties.models import (
+    ProductPropertiesRule,
+    ProductPropertiesRuleItem,
     ProductProperty,
     Property,
     PropertySelectValue,
@@ -199,3 +201,92 @@ class CheckPropertySelectValueForDuplicatesTestCase(TransactionTestCaseMixin, Tr
         data = resp.data["checkPropertySelectValueForDuplicates"]
         self.assertFalse(data["duplicateFound"])
         self.assertEqual(len(data["duplicates"]), 0)
+
+
+class DuplicatePropertiesRuleMutationTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+
+        self.product_type_property = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+            is_product_type=True,
+        )
+        self.required_property = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+
+        self.product_type_value = PropertySelectValue.objects.create(
+            property=self.product_type_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=self.product_type_value,
+            language=self.multi_tenant_company.language,
+            value="Original Type",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.rule = ProductPropertiesRule.objects.create(
+            product_type=self.product_type_value,
+            require_ean_code=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductPropertiesRuleItem.objects.create(
+            rule=self.rule,
+            property=self.required_property,
+            type=ProductPropertiesRuleItem.REQUIRED,
+            sort_order=7,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_duplicate_properties_rule(self):
+        mutation = """
+            mutation($name: String!, $propertyRule: ProductPropertiesRulePartialInput!) {
+              duplicatePropertiesRule(name: $name, propertyRule: $propertyRule) {
+                id
+                requireEanCode
+                productType {
+                  id
+                  value
+                }
+                items {
+                  property {
+                    id
+                  }
+                  type
+                  sortOrder
+                }
+              }
+            }
+        """
+
+        response = self.strawberry_test_client(
+            query=mutation,
+            variables={
+                "name": "Duplicated Type",
+                "propertyRule": {"id": self.to_global_id(self.rule)},
+            },
+        )
+
+        self.assertIsNone(response.errors)
+
+        duplicated_rule_data = response.data["duplicatePropertiesRule"]
+        duplicated_rule = ProductPropertiesRule.objects.get(
+            id=self.from_global_id(duplicated_rule_data["id"]),
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.assertNotEqual(duplicated_rule.id, self.rule.id)
+        self.assertEqual(duplicated_rule.require_ean_code, self.rule.require_ean_code)
+
+        duplicated_product_type = duplicated_rule.product_type
+        self.assertEqual(duplicated_product_type.property_id, self.product_type_property.id)
+        self.assertEqual(duplicated_product_type.value, "Duplicated Type")
+
+        duplicated_items = list(duplicated_rule.items.order_by("sort_order"))
+        self.assertEqual(len(duplicated_items), 1)
+        self.assertEqual(duplicated_items[0].property_id, self.required_property.id)
+        self.assertEqual(duplicated_items[0].type, ProductPropertiesRuleItem.REQUIRED)
+        self.assertEqual(duplicated_items[0].sort_order, 7)
