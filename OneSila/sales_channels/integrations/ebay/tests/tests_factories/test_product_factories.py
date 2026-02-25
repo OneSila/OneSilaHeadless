@@ -5,10 +5,12 @@ import json
 from unittest.mock import MagicMock, patch
 from typing import Dict
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from model_bakery import baker
 
 from currencies.models import Currency
 from ebay_rest.api.sell_inventory.rest import ApiException
+from media.models import DocumentType, Media, MediaProductThrough
 from products.models import ConfigurableVariation, Product, ProductTranslation
 from properties.models import (
     ProductProperty,
@@ -33,7 +35,12 @@ from sales_channels.integrations.ebay.factories.products import (
     EbayProductSyncFactory,
     EbayProductUpdateFactory,
 )
-from sales_channels.integrations.ebay.models import EbayProductCategory
+from sales_channels.integrations.ebay.models import (
+    EbayProductCategory,
+    EbayDocumentType,
+    EbayRemoteDocument,
+    EbayDocumentThroughProduct,
+)
 from sales_channels.integrations.ebay.models.properties import (
     EbayProductProperty,
     EbayInternalProperty,
@@ -1401,3 +1408,538 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(result["children"]["offers"][0]["error"], "Offer delete failed")
         self.assertEqual(result["children"]["offers"][1], {})
         logger_mock.error.assert_called_once()
+
+
+class EbayOfferDocumentPayloadFactoryTest(EbayProductPushFactoryTestBase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._fqdn_patcher = patch(
+            "get_absolute_url.helpers.get_fqdn",
+            return_value="localhost",
+        )
+        self._fqdn_patcher.start()
+        self.addCleanup(self._fqdn_patcher.stop)
+
+        self.currency, _ = Currency.objects.update_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={
+                "iso_code": "GBP",
+                "name": "Pound",
+                "symbol": "£",
+                "exchange_rate": 1,
+                "is_default_currency": True,
+            },
+        )
+        EbayCurrency.objects.update_or_create(
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
+            defaults={
+                "local_instance": self.currency,
+                "remote_code": self.currency.iso_code,
+                "multi_tenant_company": self.multi_tenant_company,
+            },
+        )
+        SalesPrice.objects.update_or_create(
+            product=self.product,
+            currency=self.currency,
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={"rrp": Decimal("120"), "price": Decimal("95")},
+        )
+
+        vat_rate = baker.make(
+            VatRate,
+            rate=Decimal("20"),
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.product.vat_rate = vat_rate
+        self.product.save(update_fields=["vat_rate"])
+
+        type(self.view).objects.filter(pk=self.view.pk).update(
+            fulfillment_policy_id="FULFILL-1",
+            payment_policy_id="PAY-1",
+            return_policy_id="RETURN-1",
+            merchant_location_key="LOC-1",
+        )
+        self.view.refresh_from_db()
+
+    def _build_create_factory(self, *, get_value_only: bool = False):
+        return EbayProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            view=self.view,
+            get_value_only=get_value_only,
+        )
+
+    def _create_mapped_document_assignment(
+        self,
+        *,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        language: str = "en",
+        remote_document_type_code: str = "USER_GUIDE_OR_MANUAL",
+    ):
+        document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Public Safety Document",
+        )
+        ebay_document_type = EbayDocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id=remote_document_type_code,
+            name=remote_document_type_code.title(),
+            local_instance=document_type,
+        )
+
+        media = Media.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.FILE,
+            file=SimpleUploadedFile(
+                name=filename,
+                content=content,
+                content_type=content_type,
+            ),
+            document_type=document_type,
+            document_language=language,
+        )
+        media_through = MediaProductThrough.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            media=media,
+        )
+        return media_through, ebay_document_type
+
+    def _create_unmapped_document_assignment(
+        self,
+        *,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        language: str = "en",
+    ):
+        document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Unmapped Public Document",
+        )
+        media = Media.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.FILE,
+            file=SimpleUploadedFile(
+                name=filename,
+                content=content,
+                content_type=content_type,
+            ),
+            document_type=document_type,
+            document_language=language,
+        )
+        return MediaProductThrough.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            media=media,
+        )
+
+    def _build_offer_payload(self, *, api_mock: MagicMock):
+        factory = self._build_create_factory(get_value_only=False)
+        factory.remote_product = self.remote_product
+        factory.api = api_mock
+        return factory.build_offer_payload()
+
+    @staticmethod
+    def _accept_wait_side_effect(*args, **kwargs):
+        remote_document = kwargs["remote_document"]
+        remote_document.status = EbayRemoteDocument.STATUS_ACCEPTED
+        remote_document.save(update_fields=["status"])
+        return remote_document
+
+    def test_offer_payload_includes_regulatory_documents(self) -> None:
+        """
+        Real scenario:
+        A mapped public document is present and accepted by eBay, so regulatory.documents must contain it.
+        """
+        media_through, ebay_document_type = self._create_mapped_document_assignment(
+            filename="safety-sheet.pdf",
+            content=b"%PDF-1.4 test content",
+            content_type="application/pdf",
+            language="de",
+            remote_document_type_code="SAFETY_DATA_SHEET",
+        )
+
+        api_mock = MagicMock()
+        api_mock.commerce_media_create_document_from_url.return_value = {"documentId": "DOC-100"}
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=self._accept_wait_side_effect,
+        ) as wait_mock:
+            payload = self._build_offer_payload(api_mock=api_mock)
+
+        self.assertEqual(payload["regulatory"]["documents"], [{"documentId": "DOC-100"}])
+        wait_mock.assert_called_once()
+
+        create_call = api_mock.commerce_media_create_document_from_url.call_args
+        self.assertEqual(create_call.kwargs["content_type"], "application/json")
+        self.assertEqual(create_call.kwargs["body"]["documentType"], ebay_document_type.remote_id)
+        self.assertEqual(create_call.kwargs["body"]["languages"], ["GERMAN"])
+        self.assertIn("http", create_call.kwargs["body"]["documentUrl"])
+        api_mock.commerce_media_get_document.assert_not_called()
+
+        remote_document = EbayRemoteDocument.objects.get(
+            local_instance=media_through.media,
+            sales_channel=self.sales_channel,
+            remote_document_type=ebay_document_type,
+        )
+        self.assertEqual(remote_document.remote_id, "DOC-100")
+        self.assertEqual(remote_document.status, EbayRemoteDocument.STATUS_ACCEPTED)
+        self.assertEqual(remote_document.remote_url, create_call.kwargs["body"]["documentUrl"])
+
+        self.assertTrue(
+            EbayDocumentThroughProduct.objects.filter(
+                local_instance=media_through,
+                remote_product=self.remote_product,
+                remote_document=remote_document,
+                sales_channel=self.sales_channel,
+            ).exists()
+        )
+
+    def test_offer_payload_raises_for_rejected_documents(self) -> None:
+        """
+        Real scenario:
+        eBay returns REJECTED during status processing, so product push must fail with PreFlightCheckError.
+        """
+        self._create_mapped_document_assignment(
+            filename="manual.pdf",
+            content=b"%PDF-1.4 test content",
+            content_type="application/pdf",
+            language="en",
+        )
+
+        api_mock = MagicMock()
+        api_mock.commerce_media_create_document_from_url.return_value = {"documentId": "DOC-REJECTED"}
+
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=PreFlightCheckError("Document status is REJECTED."),
+        ):
+            with self.assertRaises(PreFlightCheckError) as exc:
+                self._build_offer_payload(api_mock=api_mock)
+
+        self.assertIn("REJECTED", str(exc.exception))
+
+    def test_offer_payload_raises_for_expired_documents(self) -> None:
+        """
+        Real scenario:
+        eBay returns EXPIRED during status processing, so product push must fail with PreFlightCheckError.
+        """
+        self._create_mapped_document_assignment(
+            filename="manual-expired.pdf",
+            content=b"%PDF-1.4 test content",
+            content_type="application/pdf",
+            language="en",
+        )
+
+        api_mock = MagicMock()
+        api_mock.commerce_media_create_document_from_url.return_value = {"documentId": "DOC-EXPIRED"}
+
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=PreFlightCheckError("Document status is EXPIRED."),
+        ):
+            with self.assertRaises(PreFlightCheckError) as exc:
+                self._build_offer_payload(api_mock=api_mock)
+
+        self.assertIn("EXPIRED", str(exc.exception))
+
+    def test_offer_payload_raises_when_pending_for_too_long(self) -> None:
+        """
+        Real scenario:
+        eBay keeps the document in pending state past retry limit, so we fail early and ask for retry later.
+        """
+        self._create_mapped_document_assignment(
+            filename="manual-pending.pdf",
+            content=b"%PDF-1.4 test content",
+            content_type="application/pdf",
+            language="en",
+        )
+
+        api_mock = MagicMock()
+        api_mock.commerce_media_create_document_from_url.return_value = {"documentId": "DOC-PENDING"}
+
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=PreFlightCheckError("Document is still processing on eBay (SUBMITTED)."),
+        ):
+            with self.assertRaises(PreFlightCheckError) as exc:
+                self._build_offer_payload(api_mock=api_mock)
+
+        self.assertIn("processing", str(exc.exception).lower())
+
+    def test_offer_payload_skips_unmapped_document_types(self) -> None:
+        """
+        Real scenario:
+        Product has multiple public documents but only one local type is mapped to eBay; unmapped docs are silently skipped.
+        """
+        mapped_media_through, _ = self._create_mapped_document_assignment(
+            filename="mapped.pdf",
+            content=b"%PDF-1.4 mapped",
+            content_type="application/pdf",
+            language="en",
+            remote_document_type_code="USER_GUIDE_OR_MANUAL",
+        )
+        unmapped_media_through = self._create_unmapped_document_assignment(
+            filename="unmapped.pdf",
+            content=b"%PDF-1.4 unmapped",
+            content_type="application/pdf",
+            language="en",
+        )
+
+        api_mock = MagicMock()
+        api_mock.commerce_media_create_document_from_url.return_value = {"documentId": "DOC-MAPPED"}
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=self._accept_wait_side_effect,
+        ):
+            payload = self._build_offer_payload(api_mock=api_mock)
+
+        self.assertEqual(payload["regulatory"]["documents"], [{"documentId": "DOC-MAPPED"}])
+        self.assertTrue(
+            EbayRemoteDocument.objects.filter(
+                local_instance=mapped_media_through.media,
+                sales_channel=self.sales_channel,
+            ).exists()
+        )
+        self.assertFalse(
+            EbayRemoteDocument.objects.filter(
+                local_instance=unmapped_media_through.media,
+                sales_channel=self.sales_channel,
+            ).exists()
+        )
+        self.assertFalse(
+            EbayDocumentThroughProduct.objects.filter(
+                local_instance=unmapped_media_through,
+                sales_channel=self.sales_channel,
+                remote_product=self.remote_product,
+            ).exists()
+        )
+
+    def test_offer_payload_pending_remote_document_is_rechecked_and_accepted(self) -> None:
+        """
+        Real scenario:
+        Remote document already exists in pending status; next sync rechecks it and proceeds once accepted.
+        """
+        media_through, ebay_document_type = self._create_mapped_document_assignment(
+            filename="pending-existing.pdf",
+            content=b"%PDF-1.4 pending",
+            content_type="application/pdf",
+            language="en",
+        )
+        remote_document = EbayRemoteDocument.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media_through.media,
+            remote_document_type=ebay_document_type,
+            remote_id="DOC-PENDING-EXISTING",
+            status=EbayRemoteDocument.STATUS_SUBMITTED,
+        )
+        EbayDocumentThroughProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media_through,
+            remote_product=self.remote_product,
+            remote_document=remote_document,
+        )
+
+        api_mock = MagicMock()
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=self._accept_wait_side_effect,
+        ) as wait_mock:
+            payload = self._build_offer_payload(api_mock=api_mock)
+
+        self.assertEqual(payload["regulatory"]["documents"], [{"documentId": "DOC-PENDING-EXISTING"}])
+        wait_mock.assert_called_once()
+        api_mock.commerce_media_create_document_from_url.assert_not_called()
+        remote_document.refresh_from_db()
+        self.assertEqual(remote_document.status, EbayRemoteDocument.STATUS_ACCEPTED)
+
+    def test_offer_payload_recreates_remote_when_local_row_has_no_remote_id(self) -> None:
+        """
+        Real scenario:
+        Local remote-document row exists but remote_id is empty; sync retries remote creation and then continues.
+        """
+        media_through, ebay_document_type = self._create_mapped_document_assignment(
+            filename="missing-id.pdf",
+            content=b"%PDF-1.4 no id",
+            content_type="application/pdf",
+            language="en",
+        )
+        remote_document = EbayRemoteDocument.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media_through.media,
+            remote_document_type=ebay_document_type,
+            remote_id="",
+            status=EbayRemoteDocument.STATUS_PENDING_UPLOAD,
+        )
+        EbayDocumentThroughProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media_through,
+            remote_product=self.remote_product,
+            remote_document=remote_document,
+        )
+
+        api_mock = MagicMock()
+        api_mock.commerce_media_create_document_from_url.return_value = {"documentId": "DOC-RECREATED"}
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=self._accept_wait_side_effect,
+        ):
+            payload = self._build_offer_payload(api_mock=api_mock)
+
+        self.assertEqual(payload["regulatory"]["documents"], [{"documentId": "DOC-RECREATED"}])
+        remote_document.refresh_from_db()
+        self.assertEqual(remote_document.remote_id, "DOC-RECREATED")
+        self.assertEqual(remote_document.status, EbayRemoteDocument.STATUS_ACCEPTED)
+        api_mock.commerce_media_create_document_from_url.assert_called_once()
+
+    def test_offer_payload_creates_missing_assign_when_remote_document_exists(self) -> None:
+        """
+        Real scenario:
+        Remote document exists for media but product-association row is missing; sync must create association and include document.
+        """
+        media_through, ebay_document_type = self._create_mapped_document_assignment(
+            filename="existing-doc-no-assign.pdf",
+            content=b"%PDF-1.4 existing doc",
+            content_type="application/pdf",
+            language="en",
+        )
+        remote_document = EbayRemoteDocument.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media_through.media,
+            remote_document_type=ebay_document_type,
+            remote_id="DOC-EXISTS-NO-ASSIGN",
+            status=EbayRemoteDocument.STATUS_ACCEPTED,
+        )
+
+        api_mock = MagicMock()
+        payload = self._build_offer_payload(api_mock=api_mock)
+
+        self.assertEqual(payload["regulatory"]["documents"], [{"documentId": "DOC-EXISTS-NO-ASSIGN"}])
+        self.assertTrue(
+            EbayDocumentThroughProduct.objects.filter(
+                local_instance=media_through,
+                remote_product=self.remote_product,
+                remote_document=remote_document,
+                sales_channel=self.sales_channel,
+            ).exists()
+        )
+        api_mock.commerce_media_create_document_from_url.assert_not_called()
+
+    def test_offer_payload_includes_two_documents_when_two_types_are_mapped(self) -> None:
+        """
+        Real scenario:
+        Product has two mapped document types; both accepted documents must be included in regulatory payload.
+        """
+        self._create_mapped_document_assignment(
+            filename="guide.pdf",
+            content=b"%PDF-1.4 guide",
+            content_type="application/pdf",
+            language="en",
+            remote_document_type_code="USER_GUIDE_OR_MANUAL",
+        )
+        self._create_mapped_document_assignment(
+            filename="safety.pdf",
+            content=b"%PDF-1.4 safety",
+            content_type="application/pdf",
+            language="en",
+            remote_document_type_code="SAFETY_DATA_SHEET",
+        )
+
+        api_mock = MagicMock()
+        api_mock.commerce_media_create_document_from_url.side_effect = [
+            {"documentId": "DOC-1"},
+            {"documentId": "DOC-2"},
+        ]
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=self._accept_wait_side_effect,
+        ):
+            payload = self._build_offer_payload(api_mock=api_mock)
+
+        documents = payload["regulatory"]["documents"]
+        self.assertEqual(len(documents), 2)
+        self.assertEqual({item["documentId"] for item in documents}, {"DOC-1", "DOC-2"})
+
+    def test_offer_payload_reflects_local_media_through_deletion(self) -> None:
+        """
+        Real scenario:
+        Two mapped documents were synced, then one local MediaProductThrough is deleted; next payload must only include remaining one.
+        """
+        _, _ = self._create_mapped_document_assignment(
+            filename="first.pdf",
+            content=b"%PDF-1.4 first",
+            content_type="application/pdf",
+            language="en",
+            remote_document_type_code="USER_GUIDE_OR_MANUAL",
+        )
+        media_through_to_delete, _ = self._create_mapped_document_assignment(
+            filename="second.pdf",
+            content=b"%PDF-1.4 second",
+            content_type="application/pdf",
+            language="en",
+            remote_document_type_code="SAFETY_DATA_SHEET",
+        )
+
+        api_mock = MagicMock()
+        api_mock.commerce_media_create_document_from_url.side_effect = [
+            {"documentId": "DOC-FIRST"},
+            {"documentId": "DOC-SECOND"},
+        ]
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.documents."
+            "EbayRemoteDocumentFactoryBase._wait_until_document_is_accepted",
+            side_effect=self._accept_wait_side_effect,
+        ):
+            initial_payload = self._build_offer_payload(api_mock=api_mock)
+        self.assertEqual(len(initial_payload["regulatory"]["documents"]), 2)
+
+        media_through_to_delete.delete()
+
+        payload_after_delete = self._build_offer_payload(api_mock=api_mock)
+        self.assertEqual(len(payload_after_delete["regulatory"]["documents"]), 1)
+        self.assertEqual(
+            {item["documentId"] for item in payload_after_delete["regulatory"]["documents"]},
+            {"DOC-FIRST"},
+        )
+
+    def test_offer_payload_raises_for_unsupported_document_extension(self) -> None:
+        """
+        Real scenario:
+        A mapped document uses unsupported file extension for eBay media endpoint, so preflight must fail before upload.
+        """
+        self._create_mapped_document_assignment(
+            filename="safety-data.xlsx",
+            content=b"spreadsheet",
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            language="en",
+        )
+
+        api_mock = MagicMock()
+
+        factory = self._build_create_factory(get_value_only=False)
+        factory.remote_product = self.remote_product
+        factory.api = api_mock
+
+        with self.assertRaises(PreFlightCheckError) as exc:
+            self._build_offer_payload(api_mock=api_mock)
+
+        self.assertIn("unsupported file type", str(exc.exception).lower())
+        api_mock.commerce_media_create_document_from_url.assert_not_called()

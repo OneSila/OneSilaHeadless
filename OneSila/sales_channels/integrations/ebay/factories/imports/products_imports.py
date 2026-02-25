@@ -142,6 +142,9 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
     import_select_values = False
     import_rules = False
     import_products = True
+    # eBay Media API does not provide a document download endpoint/URL for imported listings.
+    # We intentionally keep this disabled to avoid creating partial local document records without files.
+    integration_has_documents = False
 
     ERROR_BROKEN_IMPORT_PROCESS = "BROKEN_IMPORT_PROCESS"
     ERROR_MISSING_MARKETPLACE = "MISSING_MARKETPLACE"
@@ -1758,6 +1761,7 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
             self.handle_translations(import_instance=instance)
             self.handle_prices(import_instance=instance)
             self.handle_images(import_instance=instance)
+            self.handle_documents(import_instance=instance)
 
         if parent_skus and is_variation:
             self.handle_variations(import_instance=instance, parent_skus=parent_skus)

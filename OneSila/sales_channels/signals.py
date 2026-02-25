@@ -25,6 +25,9 @@ update_remote_image_association = ModelSignal(use_caching=True)
 delete_remote_image_association = ModelSignal(use_caching=True)
 
 delete_remote_image = ModelSignal(use_caching=True)
+create_remote_document_association = ModelSignal(use_caching=True)
+delete_remote_document_association = ModelSignal(use_caching=True)
+delete_remote_document = ModelSignal(use_caching=True)
 
 refresh_website_pull_models = ModelSignal(use_caching=True)
 sales_channel_created = ModelSignal(use_caching=True)

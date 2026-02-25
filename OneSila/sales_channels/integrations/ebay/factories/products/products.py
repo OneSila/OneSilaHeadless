@@ -22,6 +22,11 @@ from sales_channels.integrations.ebay.factories.products.images import (
     EbayMediaProductThroughDeleteFactory,
     EbayMediaProductThroughUpdateFactory,
 )
+from sales_channels.integrations.ebay.factories.products.documents import (
+    EbayDocumentThroughProductCreateFactory,
+    EbayDocumentThroughProductDeleteFactory,
+    EbayDocumentThroughProductUpdateFactory,
+)
 from sales_channels.integrations.ebay.factories.products.mixins import (
     EbayInventoryItemPushMixin,
 )
@@ -42,6 +47,7 @@ from sales_channels.integrations.ebay.models.products import (
     EbayProduct,
     EbayProductContent,
 )
+from sales_channels.integrations.ebay.models.documents import EbayDocumentThroughProduct
 from sales_channels.integrations.ebay.models.properties import (
     EbayProductProperty,
     EbayInternalProperty,
@@ -59,6 +65,12 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
     remote_image_assign_create_factory = EbayMediaProductThroughCreateFactory
     remote_image_assign_update_factory = EbayMediaProductThroughUpdateFactory
     remote_image_assign_delete_factory = EbayMediaProductThroughDeleteFactory
+    integration_has_documents = True
+    remote_document_assign_model_class = EbayDocumentThroughProduct
+    remote_document_assign_create_factory = EbayDocumentThroughProductCreateFactory
+    remote_document_assign_update_factory = EbayDocumentThroughProductUpdateFactory
+    remote_document_assign_delete_factory = EbayDocumentThroughProductDeleteFactory
+    remote_document_sync_factory = EbayDocumentThroughProductUpdateFactory
 
     remote_product_property_class = EbayProductProperty
     remote_product_property_create_factory = EbayProductPropertyCreateFactory

@@ -2,6 +2,7 @@ from sales_channels.factories.task_queue import (
     ChannelScopedAddTask,
     GuardResult,
     ProductContentAddTask,
+    ProductDocumentsAddTask,
     ProductEanCodeAddTask,
     ProductImagesAddTask,
     ProductPriceAddTask,
@@ -12,6 +13,7 @@ from sales_channels.factories.task_queue import (
 )
 from sales_channels.integrations.ebay.models import (
     EbayProductCategory,
+    EbayDocumentType,
     EbayProperty,
     EbayPropertySelectValue,
     EbayProductType,
@@ -56,6 +58,34 @@ class EbayProductPriceAddTask(ProductPriceAddTask, EbayNonLiveMarketplaceViewAdd
 
 class EbayProductImagesAddTask(ProductImagesAddTask, EbayNonLiveMarketplaceViewAddTask):
     pass
+
+
+class EbayProductDocumentsAddTask(ProductDocumentsAddTask, EbayNonLiveMarketplaceViewAddTask):
+    def guard(self, *, target):
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
+
+        if self.local_instance is None:
+            return guard_result
+
+        media = getattr(self.local_instance, "media", None)
+        document_type_id = getattr(media, "document_type_id", None)
+        if not document_type_id:
+            return GuardResult(allowed=False, reason="document_type_missing")
+
+        is_mapped = (
+            EbayDocumentType.objects.filter(
+                sales_channel=target.sales_channel,
+                local_instance_id=document_type_id,
+            )
+            .exclude(remote_id__in=(None, ""))
+            .exists()
+        )
+        if not is_mapped:
+            return GuardResult(allowed=False, reason="ebay_document_type_not_mapped")
+
+        return guard_result
 
 
 class EbayProductPropertyAddTask(ProductPropertyAddTask, EbayNonLiveMarketplaceViewAddTask):

@@ -1,9 +1,43 @@
+import os
 from django.db import models
 
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from typing import Iterable, Optional
 
 from sales_channels.models import RemoteProduct
+
+
+def describe_document(*, media, media_through=None, remote_document_type=None) -> str:
+    """Return a user-facing description for a document preflight error."""
+
+    position = None
+    if media_through is not None:
+        try:
+            position = media_through.sales_channels_sort_order
+        except Exception:
+            position = None
+
+    source_name = ""
+    source = media.image if getattr(media, "is_document_image", False) else media.file
+    if source is not None:
+        source_name = getattr(source, "name", "") or ""
+
+    title = (
+        (getattr(media, "title", None) or "").strip()
+        or os.path.basename(source_name or "")
+        or f"Document {getattr(media, 'id', 'N/A')}"
+    )
+    document_type_label = (
+        getattr(remote_document_type, "name", None)
+        or getattr(remote_document_type, "remote_id", None)
+        or getattr(getattr(media, "document_type", None), "name", None)
+        or getattr(getattr(media, "document_type", None), "code", None)
+    )
+
+    prefix = f"Document #{position}" if position else "Document"
+    if document_type_label:
+        return f"{prefix} '{title}' (mapped as '{document_type_label}')"
+    return f"{prefix} '{title}'"
 
 
 def get_all_product_rules_for_sales_channel(*, sales_channel):

@@ -7,7 +7,9 @@ from sales_channels.integrations.amazon.factories.task_queue import AmazonProduc
 from sales_channels.integrations.amazon.models import AmazonProduct, AmazonSalesChannel
 from sales_channels.integrations.magento2.factories.task_queue import MagentoProductEanCodeAddTask
 from sales_channels.integrations.magento2.tests.mixins import MagentoSalesChannelTestMixin
-from sales_channels.integrations.magento2.factories.task_queue import MagentoProductImagesAddTask
+from sales_channels.integrations.magento2.factories.task_queue import (
+    MagentoProductImagesAddTask,
+)
 from sales_channels.integrations.magento2.models import MagentoEanCode, MagentoProduct, MagentoSalesChannel
 
 

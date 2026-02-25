@@ -26,6 +26,8 @@ class SalesChannelImportMixin(ImportMixin):
     - remote_ean_code_class
     - remote_product_content_class
     - remote_imageproductassociation_class
+    - remote_documentproductassociation_class (required when importing documents)
+    - remote_document_class (optional; required only when integration_has_documents=True and missing remote docs must be created)
     - remote_price_class
 
     Expected get_xxx methods:
@@ -86,6 +88,7 @@ class SalesChannelImportMixin(ImportMixin):
     import_select_values = True
     import_rules = True
     import_products = True
+    integration_has_documents = False
 
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, language)
@@ -209,6 +212,74 @@ class SalesChannelImportMixin(ImportMixin):
                     updated_fields.append("image_group_code")
                 if updated_fields:
                     image_association.save(update_fields=updated_fields)
+
+    def handle_documents(self, *, import_instance: ImportProductInstance):
+        if not hasattr(import_instance, 'documents'):
+            return
+
+        RemoteDocumentProductAssociationClass = self.get_remote_model_class('remote_documentproductassociation_class')
+        try:
+            RemoteDocumentClass = self.get_remote_model_class('remote_document_class')
+        except AttributeError:
+            RemoteDocumentClass = RemoteDocumentProductAssociationClass._meta.get_field("remote_document").remote_field.model
+        remote_id_map = import_instance.data.get('__document_index_to_remote_id', {})
+
+        for index, document_association in enumerate(import_instance.documents_associations_instances):
+            media = getattr(document_association, "media", None)
+            if media is None:
+                continue
+
+            remote_id = str(remote_id_map.get(str(index)) or "").strip()
+            remote_document = None
+
+            if self.integration_has_documents:
+                remote_document, _ = RemoteDocumentClass.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=media,
+                )
+            else:
+                if remote_id:
+                    remote_document = (
+                        RemoteDocumentClass.objects.filter(
+                            multi_tenant_company=self.import_process.multi_tenant_company,
+                            sales_channel=self.sales_channel,
+                            remote_id=remote_id,
+                        ).first()
+                    )
+
+                if remote_document is None:
+                    remote_document = (
+                        RemoteDocumentClass.objects.filter(
+                            multi_tenant_company=self.import_process.multi_tenant_company,
+                            sales_channel=self.sales_channel,
+                            local_instance=media,
+                        ).first()
+                    )
+
+                if remote_document is None:
+                    continue
+
+            remote_association, _ = RemoteDocumentProductAssociationClass.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                local_instance=document_association,
+                remote_product=import_instance.remote_instance,
+                remote_document=remote_document,
+            )
+
+            updated_fields: list[str] = []
+
+            if remote_id and not remote_document.remote_id:
+                remote_document.remote_id = remote_id
+                remote_document.save(update_fields=["remote_id"])
+
+            if remote_id and not remote_association.remote_id:
+                remote_association.remote_id = remote_id
+                updated_fields.append("remote_id")
+
+            if updated_fields:
+                remote_association.save(update_fields=updated_fields)
 
     def handle_prices(self, import_instance: ImportProductInstance):
         RemotePriceClass = self.get_remote_model_class('remote_price_class')

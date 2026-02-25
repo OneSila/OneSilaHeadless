@@ -135,10 +135,6 @@ class EbayMarketplaceSyncRequestTests(AddTaskSyncRequestTestMixin, TestCaseEbayM
         self.assertEqual(sync_request.task_kwargs.get("view_id"), self.view.id)
         self.assertEqual(sync_request.task_kwargs.get("remote_product_id"), self.remote_product.id)
 
-        for task in IntegrationTaskQueue.objects.filter(integration_id=self.sales_channel.id):
-            import pprint
-            pprint.pprint(task.__dict__)
-
         self.assertFalse(
             IntegrationTaskQueue.objects.filter(
                 integration_id=self.sales_channel.id,

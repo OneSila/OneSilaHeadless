@@ -327,3 +327,68 @@ def ebay__image__delete_db_task(
         context=context,
     )
 
+
+@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=0)
+@db_task()
+def ebay__document_assoc__create_db_task(
+    task_queue_item_id: int,
+    *,
+    sales_channel_id: int,
+    remote_product_id: int,
+    view_id: int | None = None,
+    sales_channel_view_id: int | None = None,
+    context: dict | None = None,
+) -> None:
+    _ebay_receiver_audit_execute(
+        task_queue_item_id,
+        event_name="ebay__document_assoc__create",
+        sales_channel_id=sales_channel_id,
+        remote_product_id=remote_product_id,
+        view_id=view_id,
+        sales_channel_view_id=sales_channel_view_id,
+        context=context,
+    )
+
+
+@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=0)
+@db_task()
+def ebay__document_assoc__delete_db_task(
+    task_queue_item_id: int,
+    *,
+    sales_channel_id: int,
+    remote_product_id: int,
+    view_id: int | None = None,
+    sales_channel_view_id: int | None = None,
+    context: dict | None = None,
+) -> None:
+    _ebay_receiver_audit_execute(
+        task_queue_item_id,
+        event_name="ebay__document_assoc__delete",
+        sales_channel_id=sales_channel_id,
+        remote_product_id=remote_product_id,
+        view_id=view_id,
+        sales_channel_view_id=sales_channel_view_id,
+        context=context,
+    )
+
+
+@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=0)
+@db_task()
+def ebay__document__delete_db_task(
+    task_queue_item_id: int,
+    *,
+    sales_channel_id: int,
+    remote_product_id: int,
+    view_id: int | None = None,
+    sales_channel_view_id: int | None = None,
+    context: dict | None = None,
+) -> None:
+    _ebay_receiver_audit_execute(
+        task_queue_item_id,
+        event_name="ebay__document__delete",
+        sales_channel_id=sales_channel_id,
+        remote_product_id=remote_product_id,
+        view_id=view_id,
+        sales_channel_view_id=sales_channel_view_id,
+        context=context,
+    )

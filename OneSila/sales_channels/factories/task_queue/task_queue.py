@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Iterable
-from media.models import MediaProductThrough
+from media.models import DocumentType, Media, MediaProductThrough
 from django.db import transaction
 import logging
 
@@ -810,6 +810,88 @@ class ProductImagesAddTask(ProductScopedAddTask):
             return GuardResult(
                 allowed=False,
                 reason="image_sales_channel_override_exists",
+            )
+
+        return guard_result
+
+
+class ProductDocumentsAddTask(ProductScopedAddTask):
+    sync_type = "documents"
+
+    def __init__(self, *, media_product_through_id=None, **kwargs):
+        self.media_product_through_id = media_product_through_id
+        super().__init__(**kwargs)
+        if media_product_through_id is not None:
+            self.set_extra_task_kwargs(media_product_through_id=media_product_through_id)
+
+    def set_local_instance(self):
+        if self.media_product_through_id is None:
+            self.local_instance = None
+            return
+        self.local_instance = MediaProductThrough.objects.get(id=self.media_product_through_id)
+
+    @staticmethod
+    def _get_document_type_code(*, media: Media) -> str | None:
+        document_type = getattr(media, "document_type", None)
+        code = getattr(document_type, "code", None)
+        if code:
+            return str(code)
+
+        document_type_id = getattr(media, "document_type_id", None)
+        if not document_type_id:
+            return None
+
+        return (
+            DocumentType.objects.filter(id=document_type_id)
+            .values_list("code", flat=True)
+            .first()
+        )
+
+    def guard(self, *, target: TaskTarget) -> GuardResult:
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
+
+        if self.local_instance is None:
+            return guard_result
+
+        media = getattr(self.local_instance, "media", None)
+        if media is None:
+            return GuardResult(
+                allowed=False,
+                reason="document_media_missing",
+            )
+
+        if media.type != Media.FILE:
+            return GuardResult(
+                allowed=False,
+                reason="document_media_not_file",
+            )
+
+        if self._get_document_type_code(media=media) == DocumentType.INTERNAL_CODE:
+            return GuardResult(
+                allowed=False,
+                reason="document_type_internal",
+            )
+
+        sales_channel = target.sales_channel
+        local_sales_channel = getattr(self.local_instance, "sales_channel", None)
+
+        if local_sales_channel is not None:
+            if local_sales_channel.id != sales_channel.id:
+                return GuardResult(
+                    allowed=False,
+                    reason="document_sales_channel_mismatch",
+                )
+            return guard_result
+
+        if MediaProductThrough.objects.filter(
+            product=self.local_instance.product,
+            sales_channel=sales_channel,
+        ).exists():
+            return GuardResult(
+                allowed=False,
+                reason="document_sales_channel_override_exists",
             )
 
         return guard_result

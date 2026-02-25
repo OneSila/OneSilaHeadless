@@ -44,6 +44,16 @@ class RemoteDocumentType(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name = "Remote Document Type"
         verbose_name_plural = "Remote Document Types"
         search_terms = ["remote_id", "name", "translated_name", "description"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sales_channel", "local_instance"],
+                condition=models.Q(local_instance__isnull=False),
+                name="unique_remote_document_type_mapping_per_channel",
+                violation_error_message=_(
+                    "A local document type can only be mapped once per sales channel."
+                ),
+            ),
+        ]
 
     def _extract_category_remote_id(self, *, value, field_name: str, index: int) -> str:
         remote_id = None
@@ -148,3 +158,103 @@ class RemoteDocumentType(PolymorphicModel, RemoteObjectMixin, models.Model):
     def __str__(self):
         label = self.name or self.translated_name or self.remote_id or "Remote document type"
         return f"{label} @ {self.sales_channel}"
+
+
+class RemoteDocument(PolymorphicModel, RemoteObjectMixin, models.Model):
+    """Polymorphic remote mirror of a local document media."""
+
+    local_instance = models.ForeignKey(
+        "media.Media",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Local media instance associated with this remote document.",
+    )
+    remote_document_type = models.ForeignKey(
+        "sales_channels.RemoteDocumentType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Mapped remote document type used to create this remote document.",
+    )
+    remote_url = models.URLField(
+        max_length=2048,
+        null=True,
+        blank=True,
+        help_text="Public source URL used to create or sync this remote document.",
+    )
+
+    class Meta:
+        unique_together = ("local_instance", "sales_channel", "remote_document_type")
+        verbose_name = "Remote Document"
+        verbose_name_plural = "Remote Documents"
+
+    @property
+    def frontend_name(self):
+        if self.remote_document_type:
+            return f"{self.remote_document_type} ({self.remote_id or 'pending'})"
+        return f"Document {self.remote_id or 'pending'}"
+
+    def clean(self):
+        super().clean()
+
+        if self.remote_document_type_id and self.sales_channel_id:
+            remote_document_type_channel_id = (
+                RemoteDocumentType.objects.filter(id=self.remote_document_type_id)
+                .values_list("sales_channel_id", flat=True)
+                .first()
+            )
+            if (
+                remote_document_type_channel_id is not None
+                and remote_document_type_channel_id != self.sales_channel_id
+            ):
+                raise ValidationError(
+                    {"remote_document_type": _("Remote document type must belong to the same sales channel.")}
+                )
+
+        if self.local_instance_id:
+            from media.models import Media
+
+            media_type = (
+                Media.objects.filter(id=self.local_instance_id)
+                .values_list("type", flat=True)
+                .first()
+            )
+            if media_type and media_type != Media.FILE:
+                raise ValidationError({"local_instance": _("Only FILE media can be mirrored as remote documents.")})
+
+    def __str__(self):
+        remote_id = self.remote_id or "pending"
+        return f"{self.remote_document_type or 'Document'} -> {remote_id}"
+
+
+class RemoteDocumentProductAssociation(PolymorphicModel, RemoteObjectMixin, models.Model):
+    """Polymorphic association of a remote document to a remote product."""
+
+    local_instance = models.ForeignKey(
+        "media.MediaProductThrough",
+        on_delete=models.CASCADE,
+        help_text="Local MediaProductThrough instance linked to this remote document association.",
+    )
+    remote_product = models.ForeignKey(
+        "sales_channels.RemoteProduct",
+        on_delete=models.CASCADE,
+        help_text="Remote product linked to this document association.",
+    )
+    remote_document = models.ForeignKey(
+        "sales_channels.RemoteDocument",
+        on_delete=models.CASCADE,
+        help_text="Remote document assigned to the remote product.",
+    )
+
+    class Meta:
+        unique_together = ("local_instance", "sales_channel", "remote_product", "remote_document")
+        verbose_name = "Remote Document Product Association"
+        verbose_name_plural = "Remote Document Product Associations"
+
+    @property
+    def frontend_name(self):
+        return f"{self.remote_document} for {self.remote_product}"
+
+    def __str__(self):
+        return f"{self.remote_document} associated with {self.remote_product}"

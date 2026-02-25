@@ -227,6 +227,7 @@ class SyncRequest(models.Model):
     TYPE_CONTENT = "content"
     TYPE_PRICE = "price"
     TYPE_IMAGES = "images"
+    TYPE_DOCUMENTS = "documents"
 
     TYPE_CHOICES = [
         (TYPE_PRODUCT, _("Product")),
@@ -234,6 +235,7 @@ class SyncRequest(models.Model):
         (TYPE_CONTENT, _("Content")),
         (TYPE_PRICE, _("Price")),
         (TYPE_IMAGES, _("Images")),
+        (TYPE_DOCUMENTS, _("Documents")),
     ]
 
     remote_product = models.ForeignKey(

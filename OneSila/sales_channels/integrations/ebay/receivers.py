@@ -22,6 +22,9 @@ from sales_channels.signals import (
     update_remote_image_association,
     delete_remote_image_association,
     delete_remote_image,
+    create_remote_document_association,
+    delete_remote_document_association,
+    delete_remote_document,
 )
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
@@ -395,6 +398,86 @@ def ebay__image__delete(sender, instance, **kwargs):
             },
         )
         task_runner.run()
+
+
+@receiver(create_remote_document_association, sender='media.MediaProductThrough')
+def ebay__document_assoc__create(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__document_assoc__create_db_task,
+    )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductDocumentsAddTask
+
+    product = instance.product
+    media = getattr(instance, "media", None)
+    task_runner = EbayProductDocumentsAddTask(
+        task_func=ebay__document_assoc__create_db_task,
+        product=product,
+        media_product_through_id=instance.id,
+        number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
+        context={
+            "media_product_through_id": instance.id,
+            "media_id": getattr(media, "id", None),
+            "media_type": getattr(media, "type", None),
+            "document_type_id": getattr(media, "document_type_id", None),
+        },
+    )
+    task_runner.run()
+
+
+@receiver(delete_remote_document_association, sender='media.MediaProductThrough')
+def ebay__document_assoc__delete(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__document_assoc__delete_db_task,
+    )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductDocumentsAddTask
+
+    product = instance.product
+    media = getattr(instance, "media", None)
+    task_runner = EbayProductDocumentsAddTask(
+        task_func=ebay__document_assoc__delete_db_task,
+        product=product,
+        media_product_through_id=instance.id,
+        number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
+        context={
+            "media_product_through_id": instance.id,
+            "media_id": getattr(media, "id", None),
+            "media_type": getattr(media, "type", None),
+            "document_type_id": getattr(media, "document_type_id", None),
+        },
+    )
+    task_runner.run()
+
+
+@receiver(delete_remote_document, sender='media.Media')
+def ebay__document__delete(sender, instance, **kwargs):
+    from products.models import Product
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__document__delete_db_task,
+    )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductDocumentsAddTask
+
+    product_ids = list(instance.products.values_list("id", flat=True))
+    products = Product.objects.filter(id__in=product_ids).only("id", "multi_tenant_company_id")
+
+    for product in products.iterator():
+        task_runner = EbayProductDocumentsAddTask(
+            task_func=ebay__document__delete_db_task,
+            product=product,
+            media_product_through_id=None,
+            number_of_remote_requests=0,
+        )
+        task_runner.set_extra_task_kwargs(
+            context={
+                "document_id": instance.id,
+                "product_id": product.id,
+            },
+        )
+        task_runner.run()
+
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='ebay.EbaySalesChannel')

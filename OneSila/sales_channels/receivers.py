@@ -40,6 +40,9 @@ from .signals import (
     update_remote_price, update_remote_product_content, remove_remote_product_variation, add_remote_product_variation,
     create_remote_image_association,
     update_remote_image_association, delete_remote_image_association, delete_remote_image, sales_channel_created,
+    create_remote_document_association,
+    delete_remote_document_association,
+    delete_remote_document,
     delete_remote_product,
     sales_view_assign_updated, create_remote_product, update_remote_product, sync_remote_product,
     update_remote_product_eancode, create_remote_vat_rate, update_remote_vat_rate,
@@ -86,6 +89,20 @@ def sales_channels__gpt_feed_flag__image_association(sender, instance, **kwargs)
 
 @receiver(delete_remote_image, sender='media.Media')
 def sales_channels__gpt_feed_flag__image_delete(sender, instance, **kwargs):
+    product_ids = list(
+        MediaProductThrough.objects.filter(media=instance).values_list("product_id", flat=True)
+    )
+    mark_remote_products_for_feed_updates(product_ids=product_ids)
+
+
+@receiver(create_remote_document_association, sender='media.MediaProductThrough')
+@receiver(delete_remote_document_association, sender='media.MediaProductThrough')
+def sales_channels__gpt_feed_flag__document_association(sender, instance, **kwargs):
+    mark_remote_products_for_feed_updates(product_ids=[getattr(instance, "product_id", None)])
+
+
+@receiver(delete_remote_document, sender='media.Media')
+def sales_channels__gpt_feed_flag__document_delete(sender, instance, **kwargs):
     product_ids = list(
         MediaProductThrough.objects.filter(media=instance).values_list("product_id", flat=True)
     )
@@ -725,10 +742,13 @@ def sales_channels__media_product_through__post_create_receiver(sender, instance
     Handles the creation of MediaProductThrough instances.
     Sends a create_remote_image_association signal if the media type is IMAGE.
     """
-    if instance.media.type != Media.IMAGE:
+    media_type = instance.media.type
+    if media_type == Media.IMAGE:
+        create_remote_image_association.send(sender=instance.__class__, instance=instance)
         return
 
-    create_remote_image_association.send(sender=instance.__class__, instance=instance)
+    if media_type == Media.FILE and not Media.objects.is_internal_document_media(media=instance.media):
+        create_remote_document_association.send(sender=instance.__class__, instance=instance)
 
 
 @receiver(post_update, sender='media.MediaProductThrough')
@@ -750,6 +770,13 @@ def sales_channels__media_product_through__post_delete_receiver(sender, instance
     """
     if instance.media.type == Media.IMAGE:
         delete_remote_image_association.send(sender=instance.__class__, instance=instance)
+        return
+
+    if instance.media.type != Media.FILE:
+        return
+    if Media.objects.is_internal_document_media(media=instance.media):
+        return
+    delete_remote_document_association.send(sender=instance.__class__, instance=instance)
 
 
 @receiver(post_delete, sender='media.Media')
@@ -760,6 +787,13 @@ def sales_channels__media__post_delete_receiver(sender, instance, **kwargs):
     """
     if instance.type == Media.IMAGE:
         delete_remote_image.send(sender=instance.__class__, instance=instance)
+        return
+
+    if instance.type != Media.FILE:
+        return
+    if Media.objects.is_internal_document_media(media=instance):
+        return
+    delete_remote_document.send(sender=instance.__class__, instance=instance)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR SALES CHANNEL
 

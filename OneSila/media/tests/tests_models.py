@@ -1,7 +1,12 @@
 from media.models import Media, Image, MediaProductThrough, DocumentType
 from products.models import Product, ConfigurableVariation
 from sales_channels.integrations.shein.models import SheinSalesChannel
-from sales_channels.models import SalesChannel
+from sales_channels.models import (
+    RemoteDocument,
+    RemoteDocumentProductAssociation,
+    RemoteProduct,
+    SalesChannel,
+)
 from core.models import MultiTenantCompany
 from core.tests import TestCase
 from model_bakery import baker
@@ -288,6 +293,94 @@ class MediaDocumentTypeTestCase(TestCase):
         self.assertTrue(media.is_document_image)
         self.assertIsNotNone(media.image)
 
+    def test_document_type_can_be_changed_when_no_remote_document_usage_exists(self):
+        media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        new_document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Public Safety Document",
+        )
+
+        media.document_type = new_document_type
+        media.save()
+        media.refresh_from_db()
+
+        self.assertEqual(media.document_type_id, new_document_type.id)
+
+    def test_document_type_change_is_blocked_when_remote_document_exists(self):
+        sales_channel = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://doc-guard-remote.test",
+        )
+        media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        new_document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Public Compliance Document",
+        )
+        RemoteDocument.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            local_instance=media,
+        )
+
+        media.document_type = new_document_type
+        with self.assertRaises(ValidationError):
+            media.save()
+
+    def test_document_type_change_is_blocked_when_remote_document_association_exists(self):
+        sales_channel = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://doc-guard-association.test",
+        )
+        product = baker.make(
+            Product,
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        new_document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Public User Guide Document",
+        )
+
+        media_through = MediaProductThrough.objects.create(
+            product=product,
+            media=media,
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        remote_product = RemoteProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            local_instance=product,
+        )
+        remote_document = RemoteDocument.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            local_instance=None,
+        )
+        RemoteDocumentProductAssociation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            local_instance=media_through,
+            remote_product=remote_product,
+            remote_document=remote_document,
+        )
+
+        media.document_type = new_document_type
+        with self.assertRaises(ValidationError):
+            media.save()
+
 
 class MediaProductThroughManagerTestCase(TestCase):
     def test_get_product_images_excludes_color_type(self):
@@ -397,6 +490,54 @@ class MediaProductThroughManagerTestCase(TestCase):
             ),
             default_through_one,
         )
+
+    def test_get_public_product_documents_excludes_internal_document_type(self):
+        product = baker.make(Product, type="SIMPLE", multi_tenant_company=self.multi_tenant_company)
+        sales_channel = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://documents.test",
+        )
+
+        internal_document_type = DocumentType.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            code=DocumentType.INTERNAL_CODE,
+        )
+        public_document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Safety Certificate",
+        )
+
+        internal_media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+            document_type=internal_document_type,
+        )
+        public_media = Media.objects.create(
+            type=Media.FILE,
+            multi_tenant_company=self.multi_tenant_company,
+            document_type=public_document_type,
+        )
+
+        MediaProductThrough.objects.create(
+            product=product,
+            media=internal_media,
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        public_assignment = MediaProductThrough.objects.create(
+            product=product,
+            media=public_media,
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        queryset = MediaProductThrough.objects.get_public_product_documents(
+            product=product,
+            sales_channel=sales_channel,
+        )
+
+        self.assertEqual(list(queryset.values_list("id", flat=True)), [public_assignment.id])
 
 
 class MediaProductThroughDocumentPropagationTestCase(TestCase):

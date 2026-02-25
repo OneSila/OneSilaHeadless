@@ -405,6 +405,30 @@ EBAY_DOCUMENT_TYPE_DEFAULTS = [
     },
 ]
 
+EBAY_DOCUMENT_ALLOWED_EXTENSIONS = (".pdf", ".jpg", ".jpeg", ".png")
+EBAY_DOCUMENT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+
+EBAY_DOCUMENT_LANGUAGE_BY_LOCAL_CODE = {
+    "en": "ENGLISH",
+    "en-us": "ENGLISH",
+    "en-gb": "ENGLISH",
+    "es": "SPANISH",
+    "es-es": "SPANISH",
+    "it": "ITALIAN",
+    "it-it": "ITALIAN",
+    "de": "GERMAN",
+    "de-de": "GERMAN",
+    "pl": "POLISH",
+    "pl-pl": "POLISH",
+    "nl": "DUTCH",
+    "nl-nl": "DUTCH",
+    "pt": "PORTUGUESE",
+    "pt-pt": "PORTUGUESE",
+    "pt-br": "PORTUGUESE",
+    "fr": "FRENCH",
+    "fr-fr": "FRENCH",
+}
+
 
 EBAY_INTERNAL_PROPERTY_DEFAULTS = [
     {

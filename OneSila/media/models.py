@@ -162,6 +162,12 @@ class Media(models.Model):
         null=True,
         blank=True,
     )
+    original_url = models.URLField(
+        max_length=2048,
+        null=True,
+        blank=True,
+        help_text="Original source URL used during imports, when available.",
+    )
     is_document_image = models.BooleanField(default=False)
     document_image_thumbnail = models.ImageField(
         _('Document image thumbnail'),
@@ -277,6 +283,36 @@ class Media(models.Model):
         image_filename = f"{file_base_name}.{file_extension}"
         self.image.save(image_filename, ContentFile(file_bytes), save=False)
 
+    def _validate_document_type_change_for_remote_usage(self):
+        if not self.pk:
+            return
+
+        if not self.is_dirty_field("document_type", check_relationship=True):
+            return
+
+        from sales_channels.models import (
+            RemoteDocument,
+            RemoteDocumentProductAssociation,
+        )
+
+        if RemoteDocument.objects.filter(local_instance_id=self.pk).exists():
+            raise ValidationError(
+                {
+                    "document_type": _(
+                        "Document type cannot be changed because this document is already used in remote integrations."
+                    )
+                }
+            )
+
+        if RemoteDocumentProductAssociation.objects.filter(local_instance__media_id=self.pk).exists():
+            raise ValidationError(
+                {
+                    "document_type": _(
+                        "Document type cannot be changed because this document is already used in remote integrations."
+                    )
+                }
+            )
+
     def clean(self):
         self._sync_document_image_from_file()
         super().clean()
@@ -292,6 +328,7 @@ class Media(models.Model):
 
     def save(self, *args, **kwargs):
         self._sync_document_image_from_file()
+        self._validate_document_type_change_for_remote_usage()
 
         if self.type == self.FILE and not self.document_type_id and self.multi_tenant_company_id:
             internal_document_type, _ = DocumentType.objects.create_internal_for_company(
@@ -358,7 +395,7 @@ class Media(models.Model):
 
     def get_real_document_file(self):
         if self.is_document_image and self.image:
-            return self.image_url()
+            return self.image_web_url
 
         return self.file_url()
 

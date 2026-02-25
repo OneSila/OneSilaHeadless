@@ -1,7 +1,12 @@
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from sales_channels.models.documents import RemoteDocumentType
+from core import models
+from sales_channels.models.documents import (
+    RemoteDocumentType,
+    RemoteDocument,
+    RemoteDocumentProductAssociation,
+)
 
 
 class EbayDocumentType(RemoteDocumentType):
@@ -121,3 +126,59 @@ class EbayDocumentType(RemoteDocumentType):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class EbayRemoteDocument(RemoteDocument):
+    STATUS_SUBMITTED = "SUBMITTED"
+    STATUS_ACCEPTED = "ACCEPTED"
+    STATUS_REJECTED = "REJECTED"
+    STATUS_PENDING_UPLOAD = "PENDING_UPLOAD"
+    STATUS_EXPIRED = "EXPIRED"
+
+    STATUS_CHOICES = (
+        (STATUS_SUBMITTED, _("Submitted")),
+        (STATUS_ACCEPTED, _("Accepted")),
+        (STATUS_REJECTED, _("Rejected")),
+        (STATUS_PENDING_UPLOAD, _("Pending Upload")),
+        (STATUS_EXPIRED, _("Expired")),
+    )
+
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = "eBay Remote Document"
+        verbose_name_plural = "eBay Remote Documents"
+        search_terms = ["remote_id", "status"]
+
+    def clean(self):
+        super().clean()
+
+        if not self.remote_document_type_id:
+            return
+
+        remote_document_type_id = (
+            EbayDocumentType.objects.filter(id=self.remote_document_type_id)
+            .values_list("id", flat=True)
+            .first()
+        )
+        if remote_document_type_id is None:
+            raise ValidationError(
+                {"remote_document_type": _("eBay remote documents must use an eBay document type mapping.")}
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class EbayDocumentThroughProduct(RemoteDocumentProductAssociation):
+    """eBay document assignment model."""
+
+    class Meta:
+        verbose_name = "eBay Document Through Product"
+        verbose_name_plural = "eBay Documents Through Products"

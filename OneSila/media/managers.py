@@ -8,7 +8,27 @@ from django.db import transaction, IntegrityError
 
 
 class MediaQuerySet(MultiTenantQuerySet):
-    pass
+    def is_internal_document_media(self, *, media):
+        from .models import DocumentType, Media
+
+        if media is None or getattr(media, "type", None) != Media.FILE:
+            return False
+
+        document_type = getattr(media, "document_type", None)
+        code = getattr(document_type, "code", None)
+        if code:
+            return code == DocumentType.INTERNAL_CODE
+
+        document_type_id = getattr(media, "document_type_id", None)
+        if not document_type_id:
+            return False
+
+        resolved_code = (
+            DocumentType.objects.filter(id=document_type_id)
+            .values_list("code", flat=True)
+            .first()
+        )
+        return resolved_code == DocumentType.INTERNAL_CODE
 
 
 class DocumentTypeQuerySet(MultiTenantQuerySet):
@@ -87,6 +107,14 @@ class MediaProductThroughQuerySet(MultiTenantQuerySet):
             .order_by("sort_order")
         )
 
+    def get_public_product_documents(self, *, product, sales_channel=None):
+        from media.models import DocumentType
+
+        return self.get_product_documents(
+            product=product,
+            sales_channel=sales_channel,
+        ).exclude(media__document_type__code=DocumentType.INTERNAL_CODE)
+
     def get_product_videos(self, *, product, sales_channel=None):
         from media.models import Media
 
@@ -113,6 +141,9 @@ class MediaProductThroughManager(MultiTenantManager):
     def get_product_documents(self, *, product, sales_channel=None):
         return self.get_queryset().get_product_documents(product=product, sales_channel=sales_channel)
 
+    def get_public_product_documents(self, *, product, sales_channel=None):
+        return self.get_queryset().get_public_product_documents(product=product, sales_channel=sales_channel)
+
     def get_product_videos(self, *, product, sales_channel=None):
         return self.get_queryset().get_product_videos(product=product, sales_channel=sales_channel)
 
@@ -120,6 +151,9 @@ class MediaProductThroughManager(MultiTenantManager):
 class MediaManager(MultiTenantManager):
     def get_queryset(self):
         return MediaQuerySet(self.model, using=self._db)
+
+    def is_internal_document_media(self, *, media):
+        return self.get_queryset().is_internal_document_media(media=media)
 
     @staticmethod
     def _decode_base64(image_raw_base64: bytes) -> bytes:

@@ -23,7 +23,13 @@ from sales_channels.content_templates import (
     get_sales_channel_content_template_iframe,
     render_sales_channel_content_template,
 )
-from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation, RemoteCurrency
+from sales_channels.models import (
+    RemoteCurrency,
+    RemoteDocumentProductAssociation,
+    RemoteImageProductAssociation,
+    RemoteLog,
+    SalesChannel,
+)
 from sales_channels.models.products import RemoteProductConfigurator, RemoteProduct
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
 
@@ -36,6 +42,11 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     remote_image_assign_create_factory = None
     remote_image_assign_update_factory = None
     remote_image_assign_delete_factory = None
+    integration_has_documents = False
+    remote_document_assign_model_class = RemoteDocumentProductAssociation
+    remote_document_assign_create_factory = None
+    remote_document_assign_update_factory = None
+    remote_document_assign_delete_factory = None
 
     remote_product_property_class = None
     remote_product_property_create_factory = None
@@ -860,6 +871,12 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         return medias
 
+    def get_documents(self):
+        return MediaProductThrough.objects.get_public_product_documents(
+            product=self.local_instance,
+            sales_channel=self.sales_channel,
+        )
+
     def assign_images(self):
         """
         Assigns images to the remote product.
@@ -892,6 +909,47 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         for remote_image in remote_images_to_delete:
             self.delete_image_assignment(remote_image.local_instance, remote_image)
+
+    def assign_documents(self):
+        """
+        Assigns public documents to the remote product when the integration supports it.
+        """
+        if not self.integration_has_documents:
+            return
+
+        if not self.remote_document_assign_model_class:
+            raise ConfigurationMissingError("remote_document_assign_model_class is required when integration_has_documents is enabled.")
+        if not self.remote_document_assign_create_factory:
+            raise ConfigurationMissingError("remote_document_assign_create_factory is required when integration_has_documents is enabled.")
+        if not self.remote_document_assign_update_factory:
+            raise ConfigurationMissingError("remote_document_assign_update_factory is required when integration_has_documents is enabled.")
+        if not self.remote_document_assign_delete_factory:
+            raise ConfigurationMissingError("remote_document_assign_delete_factory is required when integration_has_documents is enabled.")
+
+        document_throughs = self.get_documents()
+        existing_remote_document_ids = []
+
+        for media_through in document_throughs:
+            try:
+                remote_document_assoc = self.remote_document_assign_model_class.objects.get(
+                    local_instance=media_through,
+                    remote_product=self.remote_instance,
+                    sales_channel=self.sales_channel,
+                )
+                remote_document = self.update_document_assignment(media_through, remote_document_assoc)
+            except self.remote_document_assign_model_class.DoesNotExist:
+                remote_document = self.create_document_assignment(media_through)
+
+            if remote_document:
+                existing_remote_document_ids.append(remote_document.id)
+
+        remote_documents_to_delete = self.remote_document_assign_model_class.objects.filter(
+            remote_product=self.remote_instance,
+            sales_channel=self.sales_channel,
+        ).exclude(id__in=existing_remote_document_ids)
+
+        for remote_document_assoc in remote_documents_to_delete:
+            self.delete_document_assignment(remote_document_assoc.local_instance, remote_document_assoc)
 
     def create_image_assignment(self, media_through):
         """
@@ -934,6 +992,103 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             remote_product=self.remote_instance,
             api=self.api
         )
+        factory.run()
+        return True
+
+    def create_document_assignment(self, media_through):
+        remote_product = self.remote_instance or getattr(self, "remote_product", None)
+        factory_kwargs = {
+            "local_instance": media_through,
+            "sales_channel": self.sales_channel,
+            "skip_checks": True,
+            "remote_product": remote_product,
+            "api": self.api,
+            "get_value_only": getattr(self, "get_value_only", False),
+        }
+        if hasattr(self, "view"):
+            factory_kwargs["view"] = self.view
+
+        try:
+            factory = self.remote_document_assign_create_factory(**factory_kwargs)
+        except TypeError:
+            factory_kwargs.pop("get_value_only", None)
+            factory_kwargs.pop("view", None)
+            factory = self.remote_document_assign_create_factory(**factory_kwargs)
+
+        factory.run()
+        remote_instance = factory.remote_instance
+        if remote_instance is None:
+            return None
+
+        if hasattr(remote_instance, "remote_document_id"):
+            refreshed = (
+                remote_instance.__class__.objects.select_related("remote_document", "remote_document__remote_document_type")
+                .filter(pk=remote_instance.pk)
+                .first()
+            )
+            if refreshed is not None:
+                return refreshed
+
+        return remote_instance
+
+    def update_document_assignment(self, media_through, remote_document_assoc):
+        remote_product = self.remote_instance or getattr(self, "remote_product", None)
+        factory_kwargs = {
+            "local_instance": media_through,
+            "sales_channel": self.sales_channel,
+            "remote_instance": remote_document_assoc,
+            "skip_checks": True,
+            "remote_product": remote_product,
+            "api": self.api,
+            "get_value_only": getattr(self, "get_value_only", False),
+        }
+        if hasattr(self, "view"):
+            factory_kwargs["view"] = self.view
+
+        try:
+            factory = self.remote_document_assign_update_factory(**factory_kwargs)
+        except TypeError:
+            factory_kwargs.pop("get_value_only", None)
+            factory_kwargs.pop("view", None)
+            factory = self.remote_document_assign_update_factory(**factory_kwargs)
+
+        factory.run()
+        remote_instance = factory.remote_instance
+        if remote_instance is None:
+            return None
+
+        if hasattr(remote_instance, "remote_document_id"):
+            refreshed = (
+                remote_instance.__class__.objects.select_related("remote_document", "remote_document__remote_document_type")
+                .filter(pk=remote_instance.pk)
+                .first()
+            )
+            if refreshed is not None:
+                return refreshed
+
+        return remote_instance
+
+    def delete_document_assignment(self, media_through, remote_document_assoc):
+        remote_product = self.remote_instance or getattr(self, "remote_product", None)
+        factory_kwargs = {
+            "local_instance": media_through,
+            "sales_channel": self.sales_channel,
+            "remote_instance": remote_document_assoc,
+            "skip_checks": True,
+            "remote_product": remote_product,
+            "api": self.api,
+            "get_value_only": getattr(self, "get_value_only", False),
+        }
+        if hasattr(self, "view"):
+            factory_kwargs["view"] = self.view
+
+        try:
+            factory = self.remote_document_assign_delete_factory(**factory_kwargs)
+        except TypeError:
+            factory_kwargs.pop("get_value_only", None)
+            factory_kwargs.pop("view", None)
+            factory = self.remote_document_assign_delete_factory(**factory_kwargs)
+
         factory.run()
         return True
 
@@ -1129,7 +1284,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
             self.sanity_check()
 
-            self.precalculate_progress_step_increment(4)
+            progress_steps = 5 if self.integration_has_documents else 4
+            self.precalculate_progress_step_increment(progress_steps)
             self.set_local_assigns()
             self.validate() # it's important to set_local_assign first so we see the errors in the frontend
 
@@ -1151,6 +1307,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.update_progress()
             self.set_content_translations()
             self.assign_images()
+            self.assign_documents()
             self.update_progress()
             self.assign_ean_code()
             self.assign_saleschannels()

@@ -119,3 +119,29 @@ class AmazonDocumentTypeModelTest(TestCase):
                 required_categories=["400"],
                 optional_categories=[],
             )
+
+    def test_save_rejects_duplicate_local_mapping_per_sales_channel(self):
+        local_document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Compliance Document",
+            code="COMPLIANCE_DOCUMENT",
+        )
+
+        AmazonDocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_document_type,
+            remote_id="USER_GUIDE",
+            required_categories=[],
+            optional_categories=[],
+        )
+
+        with self.assertRaises(ValidationError):
+            AmazonDocumentType.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                local_instance=local_document_type,
+                remote_id="USER_MANUAL",
+                required_categories=[],
+                optional_categories=[],
+            )
