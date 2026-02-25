@@ -1552,12 +1552,14 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
                 if not aspect_name:
                     continue
 
-                if isinstance(values, str):
-                    values_list = [values]
-                elif isinstance(values, float):
-                    values_list = [str(values)]
+                if values in (None, ""):
+                    values_list = None
+
+                elif isinstance(values, Iterable) and not isinstance(values, (str, bytes)):
+                    values_list = [str(v) for v in values if v not in (None, "")] or None  # in case iterable becomes empty after filtering
+
                 else:
-                    values_list = [str(value) for value in values if value not in (None, "")]
+                    values_list = [str(values)]
 
                 if not values_list:
                     continue
