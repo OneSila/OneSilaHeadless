@@ -2,11 +2,27 @@
 
 import logging
 
+from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from products.product_types import CONFIGURABLE, SIMPLE
 from core.helpers import ensure_serializable
 
 
 logger = logging.getLogger(__name__)
+AMAZON_INTERNAL_PROPERTIES_SET = set(AMAZON_INTERNAL_PROPERTIES)
+
+
+def is_amazon_internal_property(*, code):
+    if code is None:
+        return False
+
+    normalized_code = str(code).strip()
+    if not normalized_code:
+        return False
+
+    return (
+        normalized_code in AMAZON_INTERNAL_PROPERTIES_SET
+        or normalized_code.startswith("image_locator_")
+    )
 
 
 def infer_product_type(data, is_variation) -> str:

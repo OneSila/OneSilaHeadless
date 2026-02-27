@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from core.tests import TestCase
 from imports_exports.models import Import
@@ -246,6 +246,36 @@ class AmazonProductsImportProcessorImagesTest(TestCase):
                 },
             ],
         )
+
+
+class AmazonProductsImportProcessorAttributesTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+    def test_parse_attributes_skips_dynamic_image_locator_properties(self):
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+
+        marketplace = MagicMock(api_region_code="EU")
+        attributes = {
+            "image_locator_usapf": [{"media_location": "https://example.com/usapf.jpg"}],
+        }
+
+        with patch.object(AmazonPublicDefinition.objects, "filter") as mock_filter:
+            attrs, mirror_map = processor._parse_attributes(
+                attributes=attributes,
+                product_type="ANY_TYPE",
+                marketplace=marketplace,
+            )
+
+        self.assertEqual(attrs, [])
+        self.assertEqual(mirror_map, {})
+        mock_filter.assert_not_called()
 
 
 class AmazonProductsImportProcessorRulePreserveTest(TestCase):

@@ -5,6 +5,30 @@ from sales_channels.models.documents import RemoteDocumentType
 
 
 class AmazonDocumentType(RemoteDocumentType):
+    # NOTE for next iteration (Amazon document/certificate coverage):
+    # 1) image_locator_**pf
+    # 2) image_locator_ps** (currently PS01-PS06)
+    # 3) safety_data_sheet_url
+    # 4) compliance_media[*].content_type
+    #
+    # compliance_media content_type values discovered so far:
+    # - application_guide
+    # - certificate_of_analysis
+    # - certificate_of_compliance
+    # - compatibility_guide
+    # - emergency_use_authorization
+    # - emergency_use_authorization_amendment
+    # - installation_manual
+    # - instructions_for_use
+    # - patient_fact_sheet
+    # - provider_fact_sheet
+    # - safety_data_sheet
+    # - safety_information
+    # - specification_sheet
+    # - troubleshooting_guide
+    # - user_guide
+    # - user_manual
+    # - warranty
     def _get_sales_channel_marketplace_ids(self) -> list[str]:
         if not self.sales_channel_id:
             return []

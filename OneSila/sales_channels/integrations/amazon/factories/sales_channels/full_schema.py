@@ -3,11 +3,11 @@ from typing import Optional
 from django.db.models import Max
 from django.utils import timezone
 from spapi import DefinitionsApi, ListingsApi
-from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
 )
+from sales_channels.integrations.amazon.helpers import is_amazon_internal_property
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelView,
     AmazonDefaultUnitConfigurator,
@@ -605,7 +605,7 @@ class AmazonProductTypeRuleFactory(
         public_def.name = schema_definition["title"] if "title" in schema_definition else f"{attr_code} {view.api_region_code}"
         public_def.raw_schema = schema_definition
         public_def.is_required = attr_code in required_properties
-        public_def.is_internal = attr_code in AMAZON_INTERNAL_PROPERTIES
+        public_def.is_internal = is_amazon_internal_property(code=attr_code)
 
         allowed = False
         if attr_code != "variation_theme" and self.product_type.variation_themes:

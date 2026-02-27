@@ -20,7 +20,7 @@ from media.models import Image
 from sales_channels.integrations.amazon.helpers import (
     infer_product_type,
     extract_description_and_bullets,
-    get_is_product_variation, extract_amazon_attribute_value,
+    get_is_product_variation, extract_amazon_attribute_value, is_amazon_internal_property,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonProduct,
@@ -35,7 +35,6 @@ from sales_channels.integrations.amazon.models import (
     AmazonImageProductAssociation,
 )
 
-from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign, SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPrice
@@ -269,7 +268,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         for code, values in product_attrs.items():
 
-            if code in AMAZON_INTERNAL_PROPERTIES:
+            if is_amazon_internal_property(code=code):
                 continue
 
             definition = AmazonPublicDefinition.objects.filter(
