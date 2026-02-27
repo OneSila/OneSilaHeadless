@@ -25,6 +25,27 @@ def is_amazon_internal_property(*, code):
     )
 
 
+def is_amazon_document_field(*, code):
+    if code is None:
+        return False
+
+    normalized_code = str(code).strip().lower()
+    if not normalized_code:
+        return False
+
+    if normalized_code == "compliance_media":
+        return True
+    if normalized_code == "safety_data_sheet_url":
+        return True
+    if normalized_code.startswith("image_locator_ps"):
+        suffix = normalized_code.replace("image_locator_ps", "", 1)
+        return suffix.isdigit()
+    if normalized_code.startswith("image_locator_") and normalized_code.endswith("pf"):
+        return True
+
+    return False
+
+
 def infer_product_type(data, is_variation) -> str:
     """Infer local product type from Amazon relationships data."""
 

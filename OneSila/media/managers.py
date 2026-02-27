@@ -104,7 +104,7 @@ class MediaProductThroughQuerySet(MultiTenantQuerySet):
         return (
             self.get_product_media(product=product, sales_channel=sales_channel)
             .filter(media__type=Media.FILE)
-            .order_by("sort_order")
+            .order_by("sort_order", "id")
         )
 
     def get_public_product_documents(self, *, product, sales_channel=None):

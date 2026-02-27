@@ -199,3 +199,14 @@ class SalesChannelViewAssignManager(PolymorphicManager, MultiTenantManager):
 
     def filter_by_status(self, *, status: str):
         return self.get_queryset().filter_by_status(status=status)
+
+
+class RemoteDocumentTypeQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
+    """QuerySet for :class:`RemoteDocumentType` with search and polymorphic support."""
+
+
+class RemoteDocumentTypeManager(PolymorphicManager, MultiTenantManager):
+    """Manager for :class:`RemoteDocumentType` with multitenancy + search support."""
+
+    def get_queryset(self):
+        return RemoteDocumentTypeQuerySet(self.model, using=self._db)

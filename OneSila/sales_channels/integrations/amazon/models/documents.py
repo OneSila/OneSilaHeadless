@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from sales_channels.models.documents import RemoteDocumentType
+from sales_channels.models.documents import RemoteDocumentProductAssociation, RemoteDocumentType
 
 
 class AmazonDocumentType(RemoteDocumentType):
@@ -97,3 +97,9 @@ class AmazonDocumentType(RemoteDocumentType):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class AmazonDocumentThroughProduct(RemoteDocumentProductAssociation):
+    """Amazon document assignment model."""
+
+    pass

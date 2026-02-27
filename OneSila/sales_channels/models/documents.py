@@ -3,12 +3,14 @@ from django.utils.translation import gettext_lazy as _
 from polymorphic.models import PolymorphicModel
 
 from core import models
+from sales_channels.managers import RemoteDocumentTypeManager
 from sales_channels.models.mixins import RemoteObjectMixin
 
 
 class RemoteDocumentType(PolymorphicModel, RemoteObjectMixin, models.Model):
     """Polymorphic remote document type model."""
     CATEGORY_ID_KEYS = ("remote_id", "id", "value", "category_id")
+    objects = RemoteDocumentTypeManager()
 
     local_instance = models.ForeignKey(
         "media.DocumentType",
@@ -177,13 +179,6 @@ class RemoteDocument(PolymorphicModel, RemoteObjectMixin, models.Model):
         blank=True,
         help_text="Mapped remote document type used to create this remote document.",
     )
-    remote_url = models.URLField(
-        max_length=2048,
-        null=True,
-        blank=True,
-        help_text="Public source URL used to create or sync this remote document.",
-    )
-
     class Meta:
         unique_together = ("local_instance", "sales_channel", "remote_document_type")
         verbose_name = "Remote Document"
@@ -244,17 +239,50 @@ class RemoteDocumentProductAssociation(PolymorphicModel, RemoteObjectMixin, mode
     remote_document = models.ForeignKey(
         "sales_channels.RemoteDocument",
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         help_text="Remote document assigned to the remote product.",
+    )
+    remote_url = models.URLField(
+        max_length=2048,
+        null=True,
+        blank=True,
+        help_text="Public source URL used for this remote document association sync.",
+    )
+    require_document = models.BooleanField(
+        default=True,
+        help_text="When enabled, a linked remote_document is required for this assignment.",
     )
 
     class Meta:
-        unique_together = ("local_instance", "sales_channel", "remote_product", "remote_document")
         verbose_name = "Remote Document Product Association"
         verbose_name_plural = "Remote Document Product Associations"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(require_document=True) & models.Q(remote_document__isnull=False))
+                    | (models.Q(require_document=False) & models.Q(remote_document__isnull=True))
+                ),
+                name="remote_document_product_assoc_require_document_consistency",
+                violation_error_message=_(
+                    "remote_document is required only when require_document is enabled."
+                ),
+            ),
+            models.UniqueConstraint(
+                fields=["local_instance", "sales_channel", "remote_product", "remote_document"],
+                condition=models.Q(require_document=True),
+                name="remote_document_product_assoc_unique_with_remote_document",
+            ),
+            models.UniqueConstraint(
+                fields=["local_instance", "sales_channel", "remote_product"],
+                condition=models.Q(require_document=False),
+                name="remote_document_product_assoc_unique_without_remote_document",
+            ),
+        ]
 
     @property
     def frontend_name(self):
-        return f"{self.remote_document} for {self.remote_product}"
+        return f"{self.remote_document or 'Document mapping'} for {self.remote_product}"
 
     def __str__(self):
-        return f"{self.remote_document} associated with {self.remote_product}"
+        return f"{self.remote_document or 'Document mapping'} associated with {self.remote_product}"

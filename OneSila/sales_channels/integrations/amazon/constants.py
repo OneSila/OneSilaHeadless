@@ -91,6 +91,7 @@ AMAZON_INTERNAL_PROPERTIES = [
     # Amazon-only compliance metadata (for now)
     'compliance_media', 'gpsr_safety_attestation', 'gpsr_manufacturer_reference',
     'dsa_responsible_party_address', 'epr_product_packaging', 'national_stock_number',
+    'safety_data_sheet_url',
     'ghs', 'ghs_chemical_h_code',
 
     # Fulfillment-specific (not PIM core)
@@ -109,8 +110,6 @@ AMAZON_PATCH_SKIP_KEYS = {
     # 'other_product_image_locator_3', 'other_product_image_locator_4', 'other_product_image_locator_5',
     # 'other_product_image_locator_6', 'other_product_image_locator_7', 'other_product_image_locator_8',
     # 'swatch_product_image_locator',
-    'image_locator_ps01', 'image_locator_ps02',
-    'image_locator_ps03', 'image_locator_ps04', 'image_locator_ps05', 'image_locator_ps06',
 }
 
 # Amazon property codes for which select value translations should be skipped

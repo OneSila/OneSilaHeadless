@@ -1590,16 +1590,13 @@ class EbayOfferDocumentPayloadFactoryTest(EbayProductPushFactoryTestBase):
         )
         self.assertEqual(remote_document.remote_id, "DOC-100")
         self.assertEqual(remote_document.status, EbayRemoteDocument.STATUS_ACCEPTED)
-        self.assertEqual(remote_document.remote_url, create_call.kwargs["body"]["documentUrl"])
-
-        self.assertTrue(
-            EbayDocumentThroughProduct.objects.filter(
-                local_instance=media_through,
-                remote_product=self.remote_product,
-                remote_document=remote_document,
-                sales_channel=self.sales_channel,
-            ).exists()
+        remote_association = EbayDocumentThroughProduct.objects.get(
+            local_instance=media_through,
+            remote_product=self.remote_product,
+            remote_document=remote_document,
+            sales_channel=self.sales_channel,
         )
+        self.assertEqual(remote_association.remote_url, create_call.kwargs["body"]["documentUrl"])
 
     def test_offer_payload_raises_for_rejected_documents(self) -> None:
         """

@@ -139,7 +139,7 @@ class RemotePropertyFilter(SearchFilterMixin):
 
 
 @filter(RemoteDocumentType)
-class RemoteDocumentTypeFilter(SearchFilterMixin):
+class RemoteDocumentTypeFilter:
     id: auto
     sales_channel: Optional[lazy['SalesChannelFilter', "sales_channels.schema.types.filters"]]
     local_instance: Optional[lazy['DocumentTypeFilter', "media.schema.types.filters"]]

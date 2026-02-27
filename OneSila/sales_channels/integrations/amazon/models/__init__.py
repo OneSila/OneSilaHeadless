@@ -19,4 +19,4 @@ from .imports import *
 from .logs import AmazonRemoteLog
 from .issues import AmazonProductIssue
 from .recommended_browse_nodes import AmazonBrowseNode, AmazonProductBrowseNode
-from .documents import AmazonDocumentType
+from .documents import AmazonDocumentType, AmazonDocumentThroughProduct

@@ -79,6 +79,7 @@ class AmazonPublicDefinitionInternalSwitchFactory:
         )
 
     def _is_default_view(self, view, sales_channel):
+        sales_channel = sales_channel.get_real_instance()
         language = view.remote_languages.first()
         remote_code = getattr(language, "remote_code", "") if language else ""
         return bool(remote_code and sales_channel.country and sales_channel.country in remote_code)
@@ -155,7 +156,6 @@ class AmazonPublicDefinitionInternalSwitchFactory:
             factory = AmazonProductTypeRuleFactory(
                 product_type_code=product_type.product_type_code,
                 sales_channel=product_type.sales_channel,
-                api=object(),
             )
             factory.product_type = product_type
 

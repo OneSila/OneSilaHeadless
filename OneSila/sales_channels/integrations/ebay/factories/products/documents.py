@@ -189,9 +189,6 @@ class EbayRemoteDocumentCreateFactory(EbayRemoteDocumentFactoryBase, RemoteDocum
         self._validated_document_url = self._get_validated_document_url()
 
     def sync_existing_remote_document(self):
-        if self._validated_document_url and self.remote_document.remote_url != self._validated_document_url:
-            self.remote_document.remote_url = self._validated_document_url
-            self.remote_document.save(update_fields=["remote_url"])
         return self.remote_document
 
     def create_remote_document(self):
@@ -223,8 +220,7 @@ class EbayRemoteDocumentCreateFactory(EbayRemoteDocumentFactoryBase, RemoteDocum
 
         self.remote_document.remote_id = document_id
         self.remote_document.status = EbayRemoteDocument.STATUS_SUBMITTED
-        self.remote_document.remote_url = document_url
-        self.remote_document.save(update_fields=["remote_id", "status", "remote_url"])
+        self.remote_document.save(update_fields=["remote_id", "status"])
         return self.remote_document
 
     def _extract_document_id(self, *, payload: Any) -> str | None:
@@ -367,7 +363,27 @@ class EbayDocumentThroughProductBase(EbayInventoryItemPushMixin):
         self.remote_instance_data["remote_product"] = self.remote_product
         if getattr(self, "remote_document_instance", None) is not None:
             self.remote_instance_data["remote_document"] = self.remote_document_instance
+        self.remote_instance_data["remote_url"] = self._get_local_document_url()
         return self.remote_instance_data
+
+    def _get_local_document_url(self):
+        media = getattr(self.local_instance, "media", None)
+        if media is None:
+            return None
+        return media.get_real_document_file()
+
+    def _sync_remote_url_on_remote_instance(self):
+        if self.remote_instance is None:
+            return
+
+        document_url = self._get_local_document_url()
+        if not document_url:
+            return
+        if self.remote_instance.remote_url == document_url:
+            return
+
+        self.remote_instance.remote_url = document_url
+        self.remote_instance.save(update_fields=["remote_url"])
 
 
 class EbayDocumentThroughProductCreateFactory(
@@ -390,6 +406,9 @@ class EbayDocumentThroughProductUpdateFactory(
 
     def needs_update(self):
         return True
+
+    def post_update_process(self):
+        self._sync_remote_url_on_remote_instance()
 
 
 class EbayDocumentThroughProductDeleteFactory(
