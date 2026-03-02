@@ -485,6 +485,76 @@ class SheinSignatureMixinTests(TestCase):
             },
         )
 
+    def test_get_certificate_rule_by_category_id_returns_records(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "data": [
+                    {
+                        "certificateTypeId": 100,
+                        "certificateTypeValue": "CPC",
+                        "isRequired": True,
+                    }
+                ]
+            },
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            records = self.factory.get_certificate_rule_by_category_id(category_id="1727")
+
+        post_mock.assert_called_once_with(
+            path="/open-api/goods/get-certificate-rule",
+            payload={"categoryId": 1727, "systemId": "spmp"},
+        )
+        self.assertEqual(
+            records,
+            [
+                {
+                    "certificateTypeId": 100,
+                    "certificateTypeValue": "CPC",
+                    "isRequired": True,
+                }
+            ],
+        )
+
+    def test_get_certificate_rule_by_product_spu_returns_records(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "data": {
+                    "records": [
+                        {
+                            "certificateTypeId": 200,
+                            "certificateTypeValue": "DoC",
+                            "isRequired": False,
+                        }
+                    ]
+                }
+            },
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            records = self.factory.get_certificate_rule_by_product_spu(spu_name="SPU-1")
+
+        post_mock.assert_called_once_with(
+            path="/open-api/goods/get-certificate-rule",
+            payload={"spuName": "SPU-1", "systemId": "spmp"},
+        )
+        self.assertEqual(
+            records,
+            [
+                {
+                    "certificateTypeId": 200,
+                    "certificateTypeValue": "DoC",
+                    "isRequired": False,
+                }
+            ],
+        )
+
     def test_get_total_product_count_returns_used_quota(self) -> None:
         response = Mock()
         response.json.return_value = {

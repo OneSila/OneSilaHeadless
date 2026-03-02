@@ -39,16 +39,20 @@ class SheinSchemaImportProcessorTest(TestCase):
 
         with patch(
             "sales_channels.integrations.shein.factories.imports.schema_imports.SheinCategoryTreeSyncFactory"
-        ) as mock_factory:
-            factory_instance = mock_factory.return_value
+        ) as mock_schema_factory:
+            schema_factory_instance = mock_schema_factory.return_value
+            schema_factory_instance.synced_document_rules = 3
+            schema_factory_instance.synced_document_types_created = 2
+            schema_factory_instance.synced_document_types_updated = 1
             processor.run()
 
-        mock_factory.assert_called_once_with(
+        mock_schema_factory.assert_called_once_with(
             sales_channel=self.sales_channel,
             language=None,
             import_process=self.import_process,
+            sync_document_types=True,
         )
-        factory_instance.run.assert_called_once_with()
+        schema_factory_instance.run.assert_called_once_with()
 
         self.import_process.refresh_from_db()
         self.assertEqual(self.import_process.status, SalesChannelImport.STATUS_SUCCESS)

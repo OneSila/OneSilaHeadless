@@ -1,9 +1,12 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
+from sales_channels.models.documents import RemoteDocumentType
 from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProperty
+from sales_channels.integrations.shein.models.documents import SheinDocumentType
 from sales_channels.integrations.shein.factories.sync.rule_sync import (
     SheinPropertyRuleItemSyncFactory,
 )
+from sales_channels.integrations.shein.tasks import shein_translate_document_type_task
 from sales_channels.signals import (
     create_remote_product,
     create_remote_product_property,
@@ -451,3 +454,28 @@ def sales_channels__shein_property__sync_rule_item(
         return
 
     SheinPropertyRuleItemSyncFactory(shein_property=instance).run()
+
+
+@receiver(post_create, sender="shein.SheinDocumentType")
+@receiver(post_update, sender="shein.SheinDocumentType")
+@receiver(post_create, sender="sales_channels.RemoteDocumentType")
+@receiver(post_update, sender="sales_channels.RemoteDocumentType")
+def sales_channels__shein_document_type__translate(
+    *,
+    sender,
+    instance: RemoteDocumentType,
+    **kwargs,
+):
+    instance = instance.get_real_instance()
+    if not isinstance(instance, SheinDocumentType):
+        return
+
+    translated_name = str(instance.translated_name or "").strip()
+    if translated_name:
+        return
+
+    remote_name = str(instance.name or instance.remote_id or "").strip()
+    if not remote_name:
+        return
+
+    shein_translate_document_type_task(document_type_id=instance.id)

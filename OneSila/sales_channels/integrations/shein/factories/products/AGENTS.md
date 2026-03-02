@@ -1219,3 +1219,187 @@ It does NOT mean:
 SPU = product idea  
 SKC = main visual option (usually color)  
 SKU = what the customer actually buys
+
+
+## Certificates
+
+/open-api/goods/get-certificate-rule returns
+
+```json
+{
+  "certificateDimension": {
+    "type": "integer",
+    "required": false,
+    "description": "Determine whether the certificate needs to be linked to the product; 1. Certificates at the product level require linking to skc; 2. Certificates at the store level do not need to be linked to skc products after uploading"
+  },
+  "certificateLabel": {
+    "type": "string",
+    "required": false,
+    "description": "Character identification: 0 normal type; 1 character type"
+  },
+  "certificateMissStatus": {
+    "type": "boolean",
+    "required": false,
+    "description": "Certificate type missing status (true: Certificate missing false: Certificate not missing)"
+  },
+  "certificatePoolList": {
+    "type": "array",
+    "required": false,
+    "description": "Certificate information collection",
+    "items": {
+      "type": "object",
+      "properties": {
+        "auditStatus": {
+          "type": "string",
+          "required": false,
+          "description": "Audit status 1 Pending, 2 Approved, 3 Rejected"
+        },
+        "certificateExpireStatus": {
+          "type": "string",
+          "required": false,
+          "description": "Certificate expiration status: 1: Normal (not expired), 2: Certificate will expire soon 3: Expired"
+        },
+        "certificatePoolFileList": {
+          "type": "array",
+          "required": false,
+          "description": "Certificate file collection",
+          "items": {
+            "type": "object",
+            "properties": {
+              "certificateUrl": {
+                "type": "string",
+                "required": false,
+                "description": "Certificate URL address"
+              },
+              "certificateUrlName": {
+                "type": "string",
+                "required": false,
+                "description": "Certificate URL name"
+              }
+            }
+          }
+        },
+        "certificatePoolId": {
+          "type": "int64",
+          "required": false,
+          "description": "Certificate pool id"
+        },
+        "expireTime": {
+          "type": "datetime",
+          "required": false,
+          "description": "Certificate expiration date (i.e., validity period) If it is 1970-01-01 00:00:00, it never expires"
+        },
+        "pqmsCertificateSn": {
+          "type": "string",
+          "required": false,
+          "description": "Certificate number sn"
+        }
+      }
+    }
+  },
+  "certificateTypeId": {
+    "type": "int64",
+    "required": false,
+    "description": "Certificate type ID"
+  },
+  "certificateTypeValue": {
+    "type": "string",
+    "required": false,
+    "description": "Certificate Type Name"
+  },
+  "fileModelUrl": {
+    "type": "string",
+    "required": false,
+    "description": "CPC certificate download template link"
+  },
+  "isRequired": {
+    "type": "boolean",
+    "required": false,
+    "description": "Whether certificate is required true: Required  false: Not required"
+  },
+  "mergeSiteInfoList": {
+    "type": "array",
+    "required": false,
+    "description": "Controlled site information collection",
+    "items": {
+      "type": "object",
+      "description": ""
+    }
+  },
+  "otherSourceCertInfoList": {
+    "type": "array",
+    "required": false,
+    "description": "Other system certificate collection",
+    "items": {
+      "type": "object",
+      "properties": {
+        "auditStatus": {
+          "type": "string",
+          "required": false,
+          "description": "Audit status 1 Pending, 2 Approved, 3 Rejected"
+        },
+        "certificateExpireStatus": {
+          "type": "string",
+          "required": false,
+          "description": "Certificate expiration status: 0: Normal (not expired), 1: Certificate will expire soon 2: Expired"
+        },
+        "certificatePoolFileList": {
+          "type": "array",
+          "required": false,
+          "description": "Certificate file collection",
+          "items": {
+            "type": "object",
+            "properties": {
+              "certificateUrl": {
+                "type": "string",
+                "required": false,
+                "description": "Certificate URL address"
+              },
+              "certificateUrlName": {
+                "type": "string",
+                "required": false,
+                "description": "Certificate URL name"
+              }
+            }
+          }
+        },
+        "expireTime": {
+          "type": "datetime",
+          "required": false,
+          "description": "Certificate expiration date (i.e., validity period) If it is 1970-01-01 00:00:00, it never expires"
+        },
+        "pqmsCertificateSn": {
+          "type": "string",
+          "required": false,
+          "description": "Certificate number sn"
+        },
+        "systemSource": {
+          "type": "string",
+          "required": false,
+          "description": "Source system"
+        }
+      }
+    }
+  },
+  "selfCertificateList": {
+    "type": "array",
+    "required": false,
+    "description": "字符声明类型下的普通证书类型信息",
+    "items": {
+      "type": "object",
+      "properties": {
+        "certificateTypeId": {
+          "type": "int64",
+          "required": false,
+          "description": "Certificate type id"
+        },
+        "certificateTypeName": {
+          "type": "string",
+          "required": false,
+          "description": "Certificate pool type name"
+        }
+      }
+    }
+  }
+}
+```

@@ -29,6 +29,8 @@ class SheinSignatureMixin:
     product_query_path = "/open-api/openapi-business-backend/product/query"
     product_info_path = "/open-api/goods/spu-info"
     store_info_path = "/open-api/openapi-business-backend/query-store-info"
+    certificate_rule_path = "/open-api/goods/get-certificate-rule"
+    certificate_rule_default_system_id = "spmp"
 
     def get_shein_open_key_id(self) -> str:
         open_key_id = self.sales_channel.open_key_id
@@ -404,6 +406,140 @@ class SheinSignatureMixin:
 
         info = body.get("info") or {}
         return info if isinstance(info, dict) else {}
+
+    def get_certificate_rule_by_category_id(
+        self,
+        *,
+        category_id,
+        attribute_list: Optional[list[dict[str, Any]]] = None,
+        certificate_pool_id_list: Optional[Iterable[int | str]] = None,
+        site_arr_list: Optional[Iterable[str]] = None,
+        system_id: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        category_numeric_id = self._safe_int_from_any(value=category_id)
+        if category_numeric_id is None:
+            raise ValueError(_("Shein categoryId is required and must be numeric."))
+
+        payload: dict[str, Any] = {
+            "categoryId": category_numeric_id,
+            "systemId": (system_id or self.certificate_rule_default_system_id),
+        }
+        self._add_optional_certificate_rule_payload_fields(
+            payload=payload,
+            attribute_list=attribute_list,
+            certificate_pool_id_list=certificate_pool_id_list,
+            site_arr_list=site_arr_list,
+        )
+
+        response = self.shein_post(path=self.certificate_rule_path, payload=payload)
+        return self._extract_certificate_rule_records_from_response(response=response)
+
+    def get_certificate_rule_by_product_spu(
+        self,
+        *,
+        spu_name: str,
+        attribute_list: Optional[list[dict[str, Any]]] = None,
+        certificate_pool_id_list: Optional[Iterable[int | str]] = None,
+        site_arr_list: Optional[Iterable[str]] = None,
+        system_id: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        normalized_spu_name = str(spu_name or "").strip()
+        if not normalized_spu_name:
+            raise ValueError(_("Shein spuName is required."))
+
+        payload: dict[str, Any] = {
+            "spuName": normalized_spu_name,
+            "systemId": (system_id or self.certificate_rule_default_system_id),
+        }
+        self._add_optional_certificate_rule_payload_fields(
+            payload=payload,
+            attribute_list=attribute_list,
+            certificate_pool_id_list=certificate_pool_id_list,
+            site_arr_list=site_arr_list,
+        )
+
+        response = self.shein_post(path=self.certificate_rule_path, payload=payload)
+        return self._extract_certificate_rule_records_from_response(response=response)
+
+    def _extract_certificate_rule_records_from_response(
+        self,
+        *,
+        response: requests.Response,
+    ) -> list[dict[str, Any]]:
+        try:
+            payload = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            logger.exception("Unable to decode Shein certificate rule response")
+            raise ValueError(_("Shein certificate rule returned invalid JSON.")) from exc
+
+        if not isinstance(payload, dict):
+            return []
+
+        code = payload.get("code")
+        if code is not None and str(code) != "0":
+            message = payload.get("msg") or "Unknown error"
+            raise SheinResponseException(
+                _("Failed to fetch Shein certificate rules: %(message)s (code %(code)s)")
+                % {"message": message, "code": code}
+            )
+
+        info = payload.get("info")
+        if not isinstance(info, dict):
+            return []
+
+        data = info.get("data")
+        if isinstance(data, list):
+            return [record for record in data if isinstance(record, dict)]
+
+        if isinstance(data, dict):
+            for key in ("records", "list", "data"):
+                nested = data.get(key)
+                if isinstance(nested, list):
+                    return [record for record in nested if isinstance(record, dict)]
+
+        return []
+
+    def _add_optional_certificate_rule_payload_fields(
+        self,
+        *,
+        payload: dict[str, Any],
+        attribute_list: Optional[list[dict[str, Any]]],
+        certificate_pool_id_list: Optional[Iterable[int | str]],
+        site_arr_list: Optional[Iterable[str]],
+    ) -> None:
+        if isinstance(attribute_list, list):
+            normalized_attribute_list = [
+                item for item in attribute_list
+                if isinstance(item, dict)
+            ]
+            if normalized_attribute_list:
+                payload["attributeList"] = normalized_attribute_list
+
+        if certificate_pool_id_list is not None:
+            normalized_certificate_pool_ids: list[int] = []
+            for value in certificate_pool_id_list:
+                numeric_value = self._safe_int_from_any(value=value)
+                if numeric_value is None:
+                    continue
+                normalized_certificate_pool_ids.append(numeric_value)
+            if normalized_certificate_pool_ids:
+                payload["certificatePoolId"] = normalized_certificate_pool_ids
+
+        if site_arr_list is not None:
+            normalized_site_arr_list = [
+                str(site_value).strip()
+                for site_value in site_arr_list
+                if str(site_value).strip()
+            ]
+            if normalized_site_arr_list:
+                payload["siteArrList"] = normalized_site_arr_list
+
+    @staticmethod
+    def _safe_int_from_any(*, value) -> Optional[int]:
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError, AttributeError):
+            return None
 
     def get_total_product_count(self) -> Optional[int]:
         """Return the total number of products for the Shein store."""

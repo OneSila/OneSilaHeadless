@@ -129,3 +129,51 @@ class SheinDocumentTypeModelTest(TestCase):
                 required_categories=["400"],
                 optional_categories=[],
             )
+
+    def test_add_required_category_appends_without_duplicates(self):
+        SheinCategory.objects.create(
+            sales_channel=self.sales_channel,
+            remote_id="500",
+            name="Category 500",
+            is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        document_type = SheinDocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CERT_A",
+            required_categories=[],
+            optional_categories=[],
+        )
+
+        first_changed = document_type.add_required_category(category_remote_id="500")
+        second_changed = document_type.add_required_category(category_remote_id="500")
+        document_type.refresh_from_db()
+
+        self.assertTrue(first_changed)
+        self.assertFalse(second_changed)
+        self.assertEqual(document_type.required_categories, ["500"])
+        self.assertEqual(document_type.optional_categories, [])
+
+    def test_add_optional_category_moves_value_out_of_required(self):
+        SheinCategory.objects.create(
+            sales_channel=self.sales_channel,
+            remote_id="600",
+            name="Category 600",
+            is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        document_type = SheinDocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CERT_B",
+            required_categories=["600"],
+            optional_categories=[],
+        )
+
+        changed = document_type.add_optional_category(category_remote_id="600")
+        document_type.refresh_from_db()
+
+        self.assertTrue(changed)
+        self.assertEqual(document_type.required_categories, [])
+        self.assertEqual(document_type.optional_categories, ["600"])

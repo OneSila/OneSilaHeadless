@@ -57,12 +57,19 @@ class SheinSchemaImportProcessor(ImportMixin):
             sales_channel=self.sales_channel,
             language=self.language,
             import_process=self.import_process,
+            sync_document_types=True,
         )
         factory.run()
 
         logger.info(
-            "Completed Shein schema import for channel=%s: %s categories, %s product types",
+            (
+                "Completed Shein schema import for channel=%s: "
+                "%s categories, %s product types, %s cert-rules, %s document types created, %s updated"
+            ),
             channel_id,
             len(factory.synced_categories),
             len(factory.synced_product_types),
+            factory.synced_document_rules,
+            factory.synced_document_types_created,
+            factory.synced_document_types_updated,
         )

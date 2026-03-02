@@ -113,6 +113,17 @@ def shein_map_perfect_match_properties_db_task(*, sales_channel_id: int):
     SheinPerfectMatchPropertyMappingFactory(sales_channel=sales_channel).run()
 
 
+@db_task()
+def shein_translate_document_type_task(*, document_type_id: int):
+    from sales_channels.integrations.shein.factories.sales_channels import (
+        SheinDocumentTypeTranslationFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinDocumentType
+
+    document_type = SheinDocumentType.objects.get(id=document_type_id)
+    SheinDocumentTypeTranslationFactory(document_type=document_type).run()
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_shein_product_db_task(

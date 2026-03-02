@@ -123,6 +123,76 @@ class RemoteDocumentType(PolymorphicModel, RemoteObjectMixin, models.Model):
             }
         )
 
+    @staticmethod
+    def _normalise_category_remote_id_for_append(*, category_remote_id) -> str:
+        return str(category_remote_id or "").strip()
+
+    @staticmethod
+    def _normalise_category_list_for_append(*, value) -> list[str]:
+        if not isinstance(value, list):
+            return []
+
+        seen: set[str] = set()
+        normalised: list[str] = []
+        for entry in value:
+            candidate = str(entry or "").strip()
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            normalised.append(candidate)
+        return normalised
+
+    def add_category(self, *, category_remote_id, required: bool, save: bool = True) -> bool:
+        normalized_category_remote_id = self._normalise_category_remote_id_for_append(
+            category_remote_id=category_remote_id
+        )
+        if not normalized_category_remote_id:
+            return False
+
+        required_categories = self._normalise_category_list_for_append(
+            value=getattr(self, "required_categories", []),
+        )
+        optional_categories = self._normalise_category_list_for_append(
+            value=getattr(self, "optional_categories", []),
+        )
+
+        target_categories = required_categories if required else optional_categories
+        other_categories = optional_categories if required else required_categories
+
+        changed = False
+        if normalized_category_remote_id in other_categories:
+            other_categories.remove(normalized_category_remote_id)
+            changed = True
+
+        if normalized_category_remote_id not in target_categories:
+            target_categories.append(normalized_category_remote_id)
+            changed = True
+
+        if not changed:
+            return False
+
+        self.required_categories = required_categories
+        self.optional_categories = optional_categories
+
+        if save:
+            self.save()
+
+        return True
+
+    def add_required_category(self, *, category_remote_id, save: bool = True) -> bool:
+        return self.add_category(
+            category_remote_id=category_remote_id,
+            required=True,
+            save=save,
+        )
+
+    def add_optional_category(self, *, category_remote_id, save: bool = True) -> bool:
+        return self.add_category(
+            category_remote_id=category_remote_id,
+            required=False,
+            save=save,
+        )
+
     def _validate_local_instance_is_mappable(self) -> None:
         if not self.local_instance_id:
             return
