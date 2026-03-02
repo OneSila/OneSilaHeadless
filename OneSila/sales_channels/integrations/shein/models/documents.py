@@ -1,7 +1,12 @@
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from sales_channels.models.documents import RemoteDocumentType
+from core import models
+from sales_channels.models.documents import (
+    RemoteDocument,
+    RemoteDocumentProductAssociation,
+    RemoteDocumentType,
+)
 
 
 class SheinDocumentType(RemoteDocumentType):
@@ -64,3 +69,59 @@ class SheinDocumentType(RemoteDocumentType):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class SheinDocument(RemoteDocument):
+    remote_url = models.URLField(
+        max_length=2048,
+        null=True,
+        blank=True,
+        help_text="Public URL of the certificate file mirrored on Shein.",
+    )
+    remote_filename = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Filename stored or returned by Shein for this document.",
+    )
+
+    class Meta:
+        verbose_name = "Shein Remote Document"
+        verbose_name_plural = "Shein Remote Documents"
+        search_terms = ["remote_id", "remote_url", "remote_filename"]
+
+    def clean(self):
+        super().clean()
+
+        if not self.remote_document_type_id:
+            return
+
+        remote_document_type_id = (
+            SheinDocumentType.objects.filter(id=self.remote_document_type_id)
+            .values_list("id", flat=True)
+            .first()
+        )
+        if remote_document_type_id is None:
+            raise ValidationError(
+                {"remote_document_type": _("Shein remote documents must use a Shein document type mapping.")}
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class SheinDocumentThroughProduct(RemoteDocumentProductAssociation):
+    expire_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Certificate expiration timestamp returned by Shein, when available.",
+    )
+    missing_status = models.BooleanField(
+        default=False,
+        help_text="Whether this certificate is currently marked as missing by Shein.",
+    )
+
+    class Meta:
+        verbose_name = "Shein Document Through Product"
+        verbose_name_plural = "Shein Documents Through Products"

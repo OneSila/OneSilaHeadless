@@ -27,7 +27,7 @@ from .products import (
     SheinProduct,
     SheinProductContent,
 )
-from .documents import SheinDocumentType
+from .documents import SheinDocument, SheinDocumentThroughProduct, SheinDocumentType
 
 __all__ = [
     "SheinCategory",
@@ -52,4 +52,6 @@ __all__ = [
     "SheinEanCode",
     "SheinImageProductAssociation",
     "SheinDocumentType",
+    "SheinDocument",
+    "SheinDocumentThroughProduct",
 ]
