@@ -69,6 +69,7 @@ class SalesChannelImportMixinDocumentHandlerTests(TestCase):
             import_process=self.import_process,
             sales_channel=self.sales_channel,
         )
+        processor.remote_documentproductassociation_class = RemoteDocumentProductAssociation
 
         import_instance = SimpleNamespace(
             documents=[{"document_url": "https://example.com/a.pdf"}],

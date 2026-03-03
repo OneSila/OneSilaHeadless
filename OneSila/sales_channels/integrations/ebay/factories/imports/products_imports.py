@@ -1761,7 +1761,6 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
             self.handle_translations(import_instance=instance)
             self.handle_prices(import_instance=instance)
             self.handle_images(import_instance=instance)
-            self.handle_documents(import_instance=instance)
 
         if parent_skus and is_variation:
             self.handle_variations(import_instance=instance, parent_skus=parent_skus)

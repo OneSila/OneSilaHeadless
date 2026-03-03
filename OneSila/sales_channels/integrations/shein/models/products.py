@@ -81,14 +81,66 @@ class SheinProduct(RemoteProduct):
             issue_states = []
 
         mapped = shein_aggregate_document_states_to_status(document_states=issue_states)
+        has_pending_documents = self._has_pending_document_associations()
         if mapped is not None:
+            if mapped == self.STATUS_COMPLETED and has_pending_documents:
+                return self.STATUS_PENDING_APPROVAL
             return mapped
+
+        if has_pending_documents:
+            return self.STATUS_PENDING_APPROVAL
 
         # After publishOrEdit, Shein products start in review; default to pending approval once we have an SPU.
         if (self.spu_name or self.remote_id):
             return self.STATUS_PENDING_APPROVAL
 
         return self.STATUS_COMPLETED
+
+    def _get_document_status_scope_remote_product_ids(self) -> list[int]:
+        if not self.pk:
+            return []
+
+        if self.is_variation and self.remote_parent_product_id:
+            return list(
+                SheinProduct.objects.filter(
+                    sales_channel=self.sales_channel,
+                    remote_parent_product_id=self.remote_parent_product_id,
+                    is_variation=True,
+                ).values_list("id", flat=True)
+            )
+
+        if self.is_variation:
+            return [self.pk]
+
+        variation_ids = list(
+            SheinProduct.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_parent_product=self,
+                is_variation=True,
+            ).values_list("id", flat=True)
+        )
+        if variation_ids:
+            return variation_ids
+
+        return [self.pk]
+
+    def _has_pending_document_associations(self) -> bool:
+        scope_remote_product_ids = self._get_document_status_scope_remote_product_ids()
+        if not scope_remote_product_ids:
+            return False
+
+        try:
+            from sales_channels.integrations.shein.models.documents import (
+                SheinDocumentThroughProduct,
+            )
+
+            return SheinDocumentThroughProduct.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_product_id__in=scope_remote_product_ids,
+                missing_status=SheinDocumentThroughProduct.STATUS_PENDING,
+            ).exists()
+        except Exception:
+            return False
 
 
 class SheinProductContent(RemoteProductContent):

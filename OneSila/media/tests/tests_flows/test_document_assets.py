@@ -28,7 +28,7 @@ class DocumentAssetsFlowTestCase(CreateImageMixin, TestCase):
         media.image.save("document_source.png", self.get_image_file("red.png"), save=False)
         media.save()
 
-        self.assertEqual(media.get_real_document_file(), media.image_url())
+        self.assertEqual(media.get_real_document_file(), media.image_web_url)
 
     def test_document_image_thumbnail_url_falls_back_to_onesila_thumbnail_for_document_images(self):
         media = Media(

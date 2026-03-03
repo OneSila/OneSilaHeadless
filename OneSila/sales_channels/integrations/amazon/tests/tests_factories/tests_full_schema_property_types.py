@@ -21,6 +21,9 @@ class AmazonSchemaPropertyTypeSyncTests(TestCase):
         self.view = AmazonSalesChannelView.objects.create(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
+            api_region_code="EU_GB",
+            remote_id="A1F83G8C2ARO7P",
+            name="UK Marketplace",
         )
         self.factory = AmazonProductTypeRuleFactory(
             product_type_code="TEST_PRODUCT_TYPE",

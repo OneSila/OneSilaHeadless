@@ -5,6 +5,14 @@ from .images import (
     SheinMediaProductThroughUpdateFactory,
     SheinMediaProductThroughDeleteFactory,
 )
+from .documents import (
+    SheinRemoteDocumentCreateFactory,
+    SheinRemoteDocumentUpdateFactory,
+    SheinRemoteDocumentDeleteFactory,
+    SheinDocumentThroughProductCreateFactory,
+    SheinDocumentThroughProductUpdateFactory,
+    SheinDocumentThroughProductDeleteFactory,
+)
 from .assigns import SheinSalesChannelAssignFactoryMixin
 from .products import SheinProductCreateFactory, SheinProductUpdateFactory
 from .products import SheinProductDeleteFactory
@@ -15,6 +23,12 @@ __all__ = [
     "SheinMediaProductThroughCreateFactory",
     "SheinMediaProductThroughUpdateFactory",
     "SheinMediaProductThroughDeleteFactory",
+    "SheinRemoteDocumentCreateFactory",
+    "SheinRemoteDocumentUpdateFactory",
+    "SheinRemoteDocumentDeleteFactory",
+    "SheinDocumentThroughProductCreateFactory",
+    "SheinDocumentThroughProductUpdateFactory",
+    "SheinDocumentThroughProductDeleteFactory",
     "SheinSalesChannelAssignFactoryMixin",
     "SheinProductCreateFactory",
     "SheinProductUpdateFactory",

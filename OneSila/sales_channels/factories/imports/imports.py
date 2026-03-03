@@ -214,7 +214,9 @@ class SalesChannelImportMixin(ImportMixin):
                     image_association.save(update_fields=updated_fields)
 
     def handle_documents(self, *, import_instance: ImportProductInstance):
-        if not hasattr(import_instance, 'documents'):
+        documents = getattr(import_instance, "documents", None)
+        document_associations = getattr(import_instance, "documents_associations_instances", None)
+        if not documents or not document_associations:
             return
 
         RemoteDocumentProductAssociationClass = self.get_remote_model_class('remote_documentproductassociation_class')
@@ -224,7 +226,7 @@ class SalesChannelImportMixin(ImportMixin):
             RemoteDocumentClass = RemoteDocumentProductAssociationClass._meta.get_field("remote_document").remote_field.model
         remote_id_map = import_instance.data.get('__document_index_to_remote_id', {})
 
-        for index, document_association in enumerate(import_instance.documents_associations_instances):
+        for index, document_association in enumerate(document_associations):
             media = getattr(document_association, "media", None)
             if media is None:
                 continue

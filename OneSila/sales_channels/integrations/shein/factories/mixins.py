@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import hmac
+import io
 import logging
 import secrets
 import string
@@ -30,6 +31,9 @@ class SheinSignatureMixin:
     product_info_path = "/open-api/goods/spu-info"
     store_info_path = "/open-api/openapi-business-backend/query-store-info"
     certificate_rule_path = "/open-api/goods/get-certificate-rule"
+    upload_certificate_file_path = "/open-api/goods/upload-certificate-file"
+    save_or_update_certificate_pool_path = "/open-api/goods/save-or-update-certificate-pool"
+    save_certificate_pool_skc_bind_path = "/open-api/goods/save-certificate-pool-skc-bind"
     certificate_rule_default_system_id = "spmp"
 
     def get_shein_open_key_id(self) -> str:
@@ -557,6 +561,121 @@ class SheinSignatureMixin:
             return None
 
         return max(total, 0)
+
+    def upload_certificate_file(
+        self,
+        *,
+        filename: str,
+        file_bytes: bytes,
+        content_type: str | None = None,
+        timeout: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        normalized_filename = str(filename or "").strip()
+        if not normalized_filename:
+            raise ValueError(_("Certificate filename is required for Shein upload."))
+
+        if not isinstance(file_bytes, (bytes, bytearray)) or not file_bytes:
+            raise ValueError(_("Certificate file content is empty."))
+
+        headers, _, _ = self.build_shein_headers(
+            path=self.upload_certificate_file_path,
+            add_language=False,
+            content_type="application/json",
+        )
+        headers.pop("Content-Type", None)
+
+        url = self._build_shein_url(path=self.upload_certificate_file_path)
+        request_timeout = timeout if timeout is not None else constants.DEFAULT_TIMEOUT
+        file_content_type = str(content_type or "application/octet-stream").strip() or "application/octet-stream"
+        files = {
+            "file": (
+                normalized_filename,
+                io.BytesIO(bytes(file_bytes)),
+                file_content_type,
+            )
+        }
+
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                files=files,
+                timeout=request_timeout,
+                verify=self.sales_channel.verify_ssl,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:  # pragma: no cover - network errors are mocked in tests
+            logger.exception("Shein certificate upload request failed")
+            raise ValueError(_("Shein certificate upload request failed.")) from exc
+
+        return self._extract_successful_shein_json(response=response, context="certificate upload")
+
+    def save_or_update_certificate_pool(
+        self,
+        *,
+        certificate_type_id: int,
+        certificate_url: str,
+        certificate_url_name: str,
+        certificate_pool_id: int | None = None,
+        certificate_relation_info_list: Optional[list[dict[str, Any]]] = None,
+        other_certificate_relation_info_list: Optional[list[dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "certificateTypeId": int(certificate_type_id),
+            "certificateUrl": str(certificate_url or "").strip(),
+            "certificateUrlName": str(certificate_url_name or "").strip(),
+        }
+        if certificate_pool_id is not None:
+            payload["certificatePoolId"] = int(certificate_pool_id)
+        if certificate_relation_info_list:
+            payload["certificateRelationInfoList"] = certificate_relation_info_list
+        if other_certificate_relation_info_list:
+            payload["otherCertificateRelationInfoList"] = other_certificate_relation_info_list
+
+        response = self.shein_post(
+            path=self.save_or_update_certificate_pool_path,
+            payload=payload,
+            add_language=False,
+        )
+        return self._extract_successful_shein_json(response=response, context="certificate pool save")
+
+    def save_certificate_pool_skc_bind(
+        self,
+        *,
+        skc_certificate_pool_relation_list: list[dict[str, Any]],
+    ) -> Dict[str, Any]:
+        payload = {"skcCertificatePoolRelationList": skc_certificate_pool_relation_list}
+        response = self.shein_post(
+            path=self.save_certificate_pool_skc_bind_path,
+            payload=payload,
+            add_language=False,
+        )
+        return self._extract_successful_shein_json(response=response, context="certificate pool bind")
+
+    def _extract_successful_shein_json(
+        self,
+        *,
+        response: requests.Response,
+        context: str,
+    ) -> Dict[str, Any]:
+        try:
+            body = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            logger.exception("Unable to decode Shein %s response", context)
+            raise ValueError(_("Shein %(context)s returned invalid JSON.") % {"context": context}) from exc
+
+        if not isinstance(body, dict):
+            raise ValueError(_("Shein %(context)s returned an invalid payload.") % {"context": context})
+
+        code = body.get("code")
+        if code is not None and str(code) != "0":
+            message = str(body.get("msg") or "Unknown error").strip()
+            raise SheinResponseException(
+                _("Shein %(context)s failed: %(message)s (code %(code)s)")
+                % {"context": context, "message": message, "code": code}
+            )
+
+        return body
 
     def _resolve_product_languages(
         self,

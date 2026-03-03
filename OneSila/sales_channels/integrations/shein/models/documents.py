@@ -112,14 +112,28 @@ class SheinDocument(RemoteDocument):
 
 
 class SheinDocumentThroughProduct(RemoteDocumentProductAssociation):
+    STATUS_NEW = "NEW"
+    STATUS_PENDING = "PENDING"
+    STATUS_ACCEPTED = "ACCEPTED"
+    STATUS_REJECTED = "REJECTED"
+
+    STATUS_CHOICES = (
+        (STATUS_NEW, _("New")),
+        (STATUS_PENDING, _("Pending")),
+        (STATUS_ACCEPTED, _("Accepted")),
+        (STATUS_REJECTED, _("Rejected")),
+    )
+
     expire_time = models.DateTimeField(
         null=True,
         blank=True,
         help_text="Certificate expiration timestamp returned by Shein, when available.",
     )
-    missing_status = models.BooleanField(
-        default=False,
-        help_text="Whether this certificate is currently marked as missing by Shein.",
+    missing_status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_NEW,
+        help_text="Current Shein certificate status for this product association.",
     )
 
     class Meta:

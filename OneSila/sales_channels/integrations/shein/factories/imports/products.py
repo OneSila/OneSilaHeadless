@@ -314,7 +314,7 @@ class SheinProductsImportProcessor(
             if remote_document_type is None or remote_document_type.local_instance is None:
                 continue
 
-            missing_status = bool(record.get("certificateMissStatus"))
+            certificate_missing = bool(record.get("certificateMissStatus"))
             sources: list[Mapping[str, Any]] = []
             pool_list = record.get("certificatePoolList")
             if isinstance(pool_list, list):
@@ -327,6 +327,11 @@ class SheinProductsImportProcessor(
                 certificate_pool_id = str(source.get("certificatePoolId") or "").strip()
                 pqms_certificate_sn = str(source.get("pqmsCertificateSn") or "").strip()
                 expire_time = source.get("expireTime")
+                audit_status = str(source.get("auditStatus") or "").strip()
+                association_status = self._resolve_document_association_status(
+                    certificate_missing=certificate_missing,
+                    audit_status=audit_status,
+                )
 
                 file_list = source.get("certificatePoolFileList")
                 if not isinstance(file_list, list):
@@ -361,7 +366,7 @@ class SheinProductsImportProcessor(
                         "__shein_certificate_pool_id": certificate_pool_id,
                         "__shein_pqms_certificate_sn": pqms_certificate_sn,
                         "__shein_expire_time": str(expire_time or "").strip(),
-                        "__shein_missing_status": missing_status,
+                        "__shein_missing_status": association_status,
                         "__shein_remote_url": document_url,
                         "__shein_remote_filename": remote_filename,
                     }
@@ -381,6 +386,17 @@ class SheinProductsImportProcessor(
         if timezone.is_naive(parsed):
             return timezone.make_aware(parsed, timezone.get_current_timezone())
         return parsed
+
+    @staticmethod
+    def _resolve_document_association_status(*, certificate_missing: bool, audit_status: str) -> str:
+        normalized_audit_status = str(audit_status or "").strip()
+        if normalized_audit_status == "3":
+            return SheinDocumentThroughProduct.STATUS_REJECTED
+
+        if certificate_missing:
+            return SheinDocumentThroughProduct.STATUS_NEW
+
+        return SheinDocumentThroughProduct.STATUS_ACCEPTED
 
     def _process_single_product_entry(
         self,
@@ -640,7 +656,9 @@ class SheinProductsImportProcessor(
             remote_association_update_fields: list[str] = []
             pqms_certificate_sn = str(document_payload.get("__shein_pqms_certificate_sn") or "").strip()
             expire_time = self._parse_shein_expire_time(value=document_payload.get("__shein_expire_time"))
-            missing_status = bool(document_payload.get("__shein_missing_status"))
+            missing_status = str(document_payload.get("__shein_missing_status") or "").strip()
+            if not missing_status:
+                missing_status = SheinDocumentThroughProduct.STATUS_NEW
 
             if remote_association.require_document is False:
                 remote_association.require_document = True

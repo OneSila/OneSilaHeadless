@@ -771,11 +771,51 @@ class SheinProductImportDocumentsTests(TestCase):
         remote_document = SheinDocument.objects.get(id=association.remote_document_id)
 
         self.assertEqual(association.remote_id, "GRC-POOL-SIMPLE-1")
-        self.assertFalse(association.missing_status)
+        self.assertEqual(association.missing_status, SheinDocumentThroughProduct.STATUS_ACCEPTED)
         self.assertEqual(association.remote_url, "https://files.example.com/cert-of-incorp.pdf")
         self.assertEqual(str(remote_document.remote_id), "987654")
         self.assertEqual(remote_document.remote_filename, "Cert of Incorp.pdf")
         self.assertEqual(remote_document.remote_url, "https://files.example.com/cert-of-incorp.pdf")
+
+    @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
+    @patch.object(SheinProductsImportProcessor, "get_certificate_rule_by_product_spu")
+    def test_import_marks_association_rejected_when_audit_status_is_rejected(self, mock_get_certificate_rules, _mock_download):
+        self._create_mapped_document_type(remote_id="340", local_name="UK Agent")
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateTypeId": 340,
+                "certificateDimension": 1,
+                "certificateMissStatus": False,
+                "certificatePoolList": [
+                    {
+                        "certificatePoolId": 987655,
+                        "pqmsCertificateSn": "GRC-POOL-SIMPLE-REJECTED-1",
+                        "auditStatus": 3,
+                        "expireTime": "2034-11-30 00:00:00",
+                        "certificatePoolFileList": [
+                            {
+                                "certificateUrlName": "Rejected Cert.pdf",
+                                "certificateUrl": "https://files.example.com/rejected-cert.pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        payload = self._build_simple_payload(spu_name="SPU-SIMPLE-REJECTED-1", supplier_sku="SHEIN-SIMPLE-REJECTED-1")
+        processor = SheinProductsImportProcessor(import_process=self.import_process, sales_channel=self.sales_channel)
+        processor.process_product_item(product_data=payload)
+
+        remote_product = SheinProduct.objects.get(sales_channel=self.sales_channel, remote_sku="SHEIN-SIMPLE-REJECTED-1")
+        association = SheinDocumentThroughProduct.objects.get(
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+        )
+
+        self.assertEqual(association.remote_id, "GRC-POOL-SIMPLE-REJECTED-1")
+        self.assertEqual(association.missing_status, SheinDocumentThroughProduct.STATUS_REJECTED)
+        self.assertEqual(association.remote_url, "https://files.example.com/rejected-cert.pdf")
 
     @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
     @patch.object(SheinProductsImportProcessor, "get_certificate_rule_by_product_spu")
@@ -937,7 +977,7 @@ class SheinProductImportDocumentsTests(TestCase):
         remote_document = SheinDocument.objects.get(id=association.remote_document_id)
 
         self.assertEqual(association.remote_id, "GRC-OTHER-SOURCE-1")
-        self.assertTrue(association.missing_status)
+        self.assertEqual(association.missing_status, SheinDocumentThroughProduct.STATUS_NEW)
         self.assertEqual(association.remote_url, "https://files.example.com/label.pdf")
         self.assertIsNone(remote_document.remote_id)
         self.assertEqual(remote_document.remote_filename, "Label.pdf")
