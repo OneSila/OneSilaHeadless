@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import inspect
 import json
 import logging
+from collections.abc import Mapping, Sequence
 from typing import Any, Dict, List, Optional
 
 from django.db import IntegrityError
@@ -278,12 +280,373 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
 
         return remote_children
 
+    def _get_remote_child_sku(self, *, remote_product: EbayProduct) -> str:
+        sku = (
+            getattr(remote_product, "remote_sku", None)
+            or getattr(remote_product, "remote_id", None)
+            or getattr(getattr(remote_product, "local_instance", None), "sku", None)
+        )
+        normalized_sku = str(sku).strip() if sku not in (None, "") else ""
+        if not normalized_sku:
+            raise EbayResponseException(
+                "Unable to recover configurable variation mismatch because the variation SKU could not be resolved."
+            )
+        return normalized_sku
+
+    @staticmethod
+    def _get_first_mapping_value(
+        *,
+        payload: Mapping[str, Any],
+        keys: Sequence[str],
+    ) -> Any:
+        for key in keys:
+            if key in payload:
+                return payload.get(key)
+        return None
+
+    @staticmethod
+    def _normalize_single_aspect_value(*, raw_value: Any) -> str:
+        if isinstance(raw_value, Sequence) and not isinstance(raw_value, (str, bytes)):
+            for value in raw_value:
+                if value in (None, ""):
+                    continue
+                normalized = str(value).strip()
+                if normalized:
+                    return normalized
+            return ""
+
+        if raw_value in (None, ""):
+            return ""
+
+        return str(raw_value).strip()
+
+    def _fetch_inventory_group_payload_from_server(self) -> Mapping[str, Any]:
+        group_key = self.get_parent_remote_sku()
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        try:
+            payload = api.sell_inventory_get_inventory_item_group(
+                inventory_item_group_key=group_key,
+            )
+        except Exception as exc:
+            raise EbayResponseException(
+                f"Unable to fetch inventory item group {group_key} for configurable mismatch recovery: {exc}"
+            ) from exc
+
+        if not isinstance(payload, Mapping):
+            raise EbayResponseException(
+                f"Invalid inventory item group payload received from eBay for group {group_key}."
+            )
+
+        return payload
+
+    def _fetch_inventory_item_payload_from_server(self, *, sku: str) -> Mapping[str, Any]:
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        try:
+            payload = api.sell_inventory_get_inventory_item(sku=sku)
+        except Exception as exc:
+            raise EbayResponseException(
+                f"Unable to fetch inventory item {sku} for configurable mismatch recovery: {exc}"
+            ) from exc
+
+        if not isinstance(payload, Mapping):
+            raise EbayResponseException(
+                f"Invalid inventory item payload received from eBay for SKU {sku}."
+            )
+
+        return payload
+
+    def _extract_variation_aspect_names_from_group_payload(
+        self,
+        *,
+        group_payload: Mapping[str, Any],
+    ) -> List[str]:
+        varies_by = self._get_first_mapping_value(
+            payload=group_payload,
+            keys=("variesBy", "varies_by"),
+        )
+        if not isinstance(varies_by, Mapping):
+            return []
+
+        names: List[str] = []
+        specifications = varies_by.get("specifications")
+        if isinstance(specifications, Sequence) and not isinstance(specifications, (str, bytes)):
+            for specification in specifications:
+                if not isinstance(specification, Mapping):
+                    continue
+                name = specification.get("name")
+                if name in (None, ""):
+                    continue
+                normalized = str(name).strip()
+                if normalized and normalized not in names:
+                    names.append(normalized)
+
+        if names:
+            return names
+
+        # Fallback only when specifications are missing/empty.
+        image_varies_by = self._get_first_mapping_value(
+            payload=varies_by,
+            keys=("aspectsImageVariesBy", "aspects_image_varies_by"),
+        )
+        if not isinstance(image_varies_by, Sequence) or isinstance(image_varies_by, (str, bytes)):
+            return []
+
+        for value in image_varies_by:
+            if value in (None, ""):
+                continue
+            normalized = str(value).strip()
+            if normalized and normalized not in names:
+                names.append(normalized)
+
+        return names
+
+    def _extract_group_variant_skus_from_payload(
+        self,
+        *,
+        group_payload: Mapping[str, Any],
+    ) -> List[str]:
+        raw_variant_skus = self._get_first_mapping_value(
+            payload=group_payload,
+            keys=("variantSKUs", "variant_skus"),
+        )
+        if not isinstance(raw_variant_skus, Sequence) or isinstance(raw_variant_skus, (str, bytes)):
+            return []
+
+        variant_skus: List[str] = []
+        for sku in raw_variant_skus:
+            if sku in (None, ""):
+                continue
+            normalized = str(sku).strip()
+            if normalized:
+                variant_skus.append(normalized)
+
+        return variant_skus
+
+    def _extract_sku_variation_state_from_inventory_item(
+        self,
+        *,
+        sku: str,
+        inventory_item_payload: Mapping[str, Any],
+        aspect_names: Sequence[str],
+    ) -> Dict[str, str]:
+        product_payload = inventory_item_payload.get("product")
+        if not isinstance(product_payload, Mapping):
+            raise EbayResponseException(
+                f"Inventory item {sku} is missing product payload while recovering configurable mismatch."
+            )
+
+        aspects_payload = product_payload.get("aspects")
+        if isinstance(aspects_payload, str):
+            parsed_aspects: Any = None
+            raw_aspects = aspects_payload.strip()
+            if raw_aspects:
+                try:
+                    parsed_aspects = json.loads(raw_aspects)
+                except (TypeError, ValueError):
+                    try:
+                        parsed_aspects = ast.literal_eval(raw_aspects)
+                    except (ValueError, SyntaxError):
+                        parsed_aspects = None
+
+            if isinstance(parsed_aspects, Mapping):
+                aspects_payload = parsed_aspects
+
+        if not isinstance(aspects_payload, Mapping):
+            raise EbayResponseException(
+                f"Inventory item {sku} is missing product aspects while recovering configurable mismatch."
+            )
+
+        casefold_aspects = {
+            str(key).strip().lower(): value
+            for key, value in aspects_payload.items()
+            if key not in (None, "")
+        }
+
+        state: Dict[str, str] = {}
+        for aspect_name in list(aspect_names):
+            normalized_name = str(aspect_name).strip()
+            if not normalized_name:
+                continue
+
+            raw_value = aspects_payload.get(normalized_name)
+            if raw_value is None:
+                raw_value = casefold_aspects.get(normalized_name.lower())
+
+            value = self._normalize_single_aspect_value(raw_value=raw_value)
+            if not value:
+                raise EbayResponseException(
+                    f"Inventory item {sku} is missing variation value for aspect '{normalized_name}' while recovering configurable mismatch."
+                )
+
+            state[normalized_name] = value
+
+        return state
+
+    def _build_variants_override_from_server_state(
+        self,
+        *,
+        sku_variation_state: Mapping[str, Mapping[str, str]],
+        aspect_names: Sequence[str],
+    ) -> tuple[List[str], List[Dict[str, Any]]]:
+        variant_skus: List[str] = []
+        collected_values: Dict[str, List[str]] = {
+            str(aspect_name).strip(): []
+            for aspect_name in list(aspect_names)
+            if str(aspect_name).strip()
+        }
+        seen_values: Dict[str, set[str]] = {
+            aspect_name: set()
+            for aspect_name in collected_values
+        }
+
+        for sku, aspect_state in sku_variation_state.items():
+            normalized_sku = str(sku).strip() if sku not in (None, "") else ""
+            if not normalized_sku:
+                continue
+
+            variant_skus.append(normalized_sku)
+            for aspect_name in collected_values:
+                value = ""
+                if isinstance(aspect_state, Mapping):
+                    raw_value = aspect_state.get(aspect_name)
+                    value = str(raw_value).strip() if raw_value not in (None, "") else ""
+                if not value:
+                    raise EbayResponseException(
+                        f"Unable to build configurable variation override: missing value for SKU {normalized_sku} and aspect '{aspect_name}'."
+                    )
+                if value not in seen_values[aspect_name]:
+                    seen_values[aspect_name].add(value)
+                    collected_values[aspect_name].append(value)
+
+        if not variant_skus:
+            raise EbayResponseException(
+                "Unable to build configurable variation override: no variant SKUs available."
+            )
+
+        specifications: List[Dict[str, Any]] = []
+        for aspect_name, values in collected_values.items():
+            if not values:
+                raise EbayResponseException(
+                    f"Unable to build configurable variation override: no values available for aspect '{aspect_name}'."
+                )
+            specifications.append({"name": aspect_name, "values": values})
+
+        return variant_skus, specifications
+
+    def _fetch_configurator_server_state(
+        self,
+    ) -> tuple[List[str], Dict[str, Dict[str, str]]]:
+        group_payload = self._fetch_inventory_group_payload_from_server()
+        aspect_names = self._extract_variation_aspect_names_from_group_payload(
+            group_payload=group_payload,
+        )
+        if not aspect_names:
+            raise EbayResponseException(
+                "Unable to recover configurable variation mismatch because group variation dimensions could not be resolved from eBay."
+            )
+
+        variant_skus = self._extract_group_variant_skus_from_payload(
+            group_payload=group_payload,
+        )
+        if not variant_skus:
+            raise EbayResponseException(
+                "Unable to recover configurable variation mismatch because group variation SKUs could not be resolved from eBay."
+            )
+
+        sku_variation_state: Dict[str, Dict[str, str]] = {}
+        for sku in variant_skus:
+            inventory_item_payload = self._fetch_inventory_item_payload_from_server(sku=sku)
+            sku_variation_state[sku] = self._extract_sku_variation_state_from_inventory_item(
+                sku=sku,
+                inventory_item_payload=inventory_item_payload,
+                aspect_names=aspect_names,
+            )
+
+        return aspect_names, sku_variation_state
+
+    def _refresh_variation_state_for_sku(
+        self,
+        *,
+        sku: str,
+        aspect_names: Sequence[str],
+    ) -> Dict[str, str]:
+        inventory_item_payload = self._fetch_inventory_item_payload_from_server(sku=sku)
+        return self._extract_sku_variation_state_from_inventory_item(
+            sku=sku,
+            inventory_item_payload=inventory_item_payload,
+            aspect_names=aspect_names,
+        )
+
+    def _recover_configurator_variation_mismatch(
+        self,
+        *,
+        remote_products: List[EbayProduct],
+    ) -> List[Any]:
+        if not remote_products:
+            return []
+
+        aspect_names, sku_variation_state = self._fetch_configurator_server_state()
+        recovered_inventory_responses: List[Any] = []
+        for remote_product in remote_products:
+            target_sku = self._get_remote_child_sku(remote_product=remote_product)
+            if target_sku not in sku_variation_state:
+                raise EbayResponseException(
+                    f"Unable to recover configurable variation mismatch because SKU {target_sku} is not present in the eBay inventory group state."
+                )
+
+            logger.warning(
+                "Recovering eBay configurable variation mismatch for SKU %s with server-state variation overrides.",
+                target_sku,
+            )
+
+            detached_variation_state = {
+                sku: state
+                for sku, state in sku_variation_state.items()
+                if sku != target_sku
+            }
+            detached_variant_skus, detached_specifications = self._build_variants_override_from_server_state(
+                sku_variation_state=detached_variation_state,
+                aspect_names=aspect_names,
+            )
+            self.send_inventory_payload_with_variants_override(
+                variant_skus=detached_variant_skus,
+                specifications=detached_specifications,
+            )
+
+            with self._use_remote_product(remote_product):
+                recovered_inventory_responses.append(self.send_inventory_payload())
+
+            sku_variation_state[target_sku] = self._refresh_variation_state_for_sku(
+                sku=target_sku,
+                aspect_names=aspect_names,
+            )
+            attached_variant_skus, attached_specifications = self._build_variants_override_from_server_state(
+                sku_variation_state=sku_variation_state,
+                aspect_names=aspect_names,
+            )
+            self.send_inventory_payload_with_variants_override(
+                variant_skus=attached_variant_skus,
+                specifications=attached_specifications,
+            )
+
+        return recovered_inventory_responses
+
     def _run_configurable_sequence(self) -> Dict[str, Any]:
         self._build_listing_policies()
         child_remotes = self._collect_child_remote_products()
+        inventory_responses, error_configurator_remote_products = self.send_bulk_inventory_payloads(
+            remote_products=child_remotes,
+        )
+        if error_configurator_remote_products:
+            recovered_inventory_responses = self._recover_configurator_variation_mismatch(
+                remote_products=error_configurator_remote_products,
+            )
+            inventory_responses.extend(recovered_inventory_responses)
 
         children_payloads = {
-            "inventory": self.send_bulk_inventory_payloads(remote_products=child_remotes),
+            "inventory": inventory_responses,
             "offers": self.send_bulk_offer_payloads(remote_products=child_remotes),
         }
 

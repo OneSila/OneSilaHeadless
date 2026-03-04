@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-from typing import Dict
+from typing import Any, Dict, List
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from model_bakery import baker
@@ -900,6 +901,16 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         )
         return child
 
+    @staticmethod
+    def _spec_map(*, specifications: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+        mapped: Dict[str, List[str]] = {}
+        for specification in specifications:
+            name = specification.get("name")
+            values = specification.get("values", [])
+            if isinstance(name, str):
+                mapped[name] = list(values) if isinstance(values, list) else []
+        return mapped
+
     def _prime_remote_state(self) -> None:
         api_mock = MagicMock()
         api_mock.sell_inventory_bulk_create_or_replace_inventory_item.return_value = {"responses": []}
@@ -1142,6 +1153,135 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         specs = varies_by.get("specifications") or []
         size_spec = next(spec for spec in specs if spec.get("name") == "Size")
         self.assertCountEqual(size_spec.get("values", []), ["L", "M"])
+
+    def test_recovery_keeps_size_value_when_other_sku_still_uses_it(self) -> None:
+        factory = EbayProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            view=self.view,
+        )
+        broken_remote_product = SimpleNamespace(remote_sku="SKU-S-GREEN")
+        server_state = {
+            "SKU-S-GREEN": {"Size": "S", "Color": "Green"},
+            "SKU-S-RED": {"Size": "S", "Color": "Red"},
+            "SKU-M-GREEN": {"Size": "M", "Color": "Green"},
+            "SKU-M-RED": {"Size": "M", "Color": "Red"},
+            "SKU-L-GREEN": {"Size": "L", "Color": "Green"},
+            "SKU-L-RED": {"Size": "L", "Color": "Red"},
+        }
+
+        with patch.object(
+            factory,
+            "_fetch_configurator_server_state",
+            return_value=(["Size", "Color"], server_state),
+        ), patch.object(
+            factory,
+            "_refresh_variation_state_for_sku",
+            return_value={"Size": "Small", "Color": "Green"},
+        ) as mock_refresh, patch.object(
+            factory,
+            "send_inventory_payload",
+            return_value={"sku": "SKU-S-GREEN"},
+        ) as mock_child_put, patch.object(
+            factory,
+            "send_inventory_payload_with_variants_override",
+            return_value={"status": "OK"},
+        ) as mock_group_put:
+            responses = factory._recover_configurator_variation_mismatch(
+                remote_products=[broken_remote_product],
+            )
+
+        self.assertEqual(responses, [{"sku": "SKU-S-GREEN"}])
+        self.assertEqual(mock_child_put.call_count, 1)
+        self.assertEqual(mock_group_put.call_count, 2)
+        mock_refresh.assert_called_once_with(
+            sku="SKU-S-GREEN",
+            aspect_names=["Size", "Color"],
+        )
+
+        first_override = mock_group_put.call_args_list[0].kwargs
+        second_override = mock_group_put.call_args_list[1].kwargs
+
+        self.assertNotIn("SKU-S-GREEN", first_override["variant_skus"])
+        self.assertCountEqual(
+            first_override["variant_skus"],
+            ["SKU-S-RED", "SKU-M-GREEN", "SKU-M-RED", "SKU-L-GREEN", "SKU-L-RED"],
+        )
+        first_spec_map = self._spec_map(specifications=first_override["specifications"])
+        self.assertCountEqual(first_spec_map["Size"], ["S", "M", "L"])
+        self.assertCountEqual(first_spec_map["Color"], ["Green", "Red"])
+
+        self.assertCountEqual(
+            second_override["variant_skus"],
+            ["SKU-S-GREEN", "SKU-S-RED", "SKU-M-GREEN", "SKU-M-RED", "SKU-L-GREEN", "SKU-L-RED"],
+        )
+        second_spec_map = self._spec_map(specifications=second_override["specifications"])
+        self.assertCountEqual(second_spec_map["Size"], ["Small", "S", "M", "L"])
+        self.assertCountEqual(second_spec_map["Color"], ["Green", "Red"])
+
+    def test_recovery_drops_size_value_when_no_other_sku_uses_it(self) -> None:
+        factory = EbayProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            view=self.view,
+        )
+        broken_remote_product = SimpleNamespace(remote_sku="SKU-S-GREEN")
+        server_state = {
+            "SKU-S-GREEN": {"Size": "S", "Color": "Green"},
+            "SKU-M-GREEN": {"Size": "M", "Color": "Green"},
+            "SKU-M-RED": {"Size": "M", "Color": "Red"},
+            "SKU-L-GREEN": {"Size": "L", "Color": "Green"},
+            "SKU-L-RED": {"Size": "L", "Color": "Red"},
+        }
+
+        with patch.object(
+            factory,
+            "_fetch_configurator_server_state",
+            return_value=(["Size", "Color"], server_state),
+        ), patch.object(
+            factory,
+            "_refresh_variation_state_for_sku",
+            return_value={"Size": "Small", "Color": "Green"},
+        ) as mock_refresh, patch.object(
+            factory,
+            "send_inventory_payload",
+            return_value={"sku": "SKU-S-GREEN"},
+        ) as mock_child_put, patch.object(
+            factory,
+            "send_inventory_payload_with_variants_override",
+            return_value={"status": "OK"},
+        ) as mock_group_put:
+            responses = factory._recover_configurator_variation_mismatch(
+                remote_products=[broken_remote_product],
+            )
+
+        self.assertEqual(responses, [{"sku": "SKU-S-GREEN"}])
+        self.assertEqual(mock_child_put.call_count, 1)
+        self.assertEqual(mock_group_put.call_count, 2)
+        mock_refresh.assert_called_once_with(
+            sku="SKU-S-GREEN",
+            aspect_names=["Size", "Color"],
+        )
+
+        first_override = mock_group_put.call_args_list[0].kwargs
+        second_override = mock_group_put.call_args_list[1].kwargs
+
+        self.assertNotIn("SKU-S-GREEN", first_override["variant_skus"])
+        self.assertCountEqual(
+            first_override["variant_skus"],
+            ["SKU-M-GREEN", "SKU-M-RED", "SKU-L-GREEN", "SKU-L-RED"],
+        )
+        first_spec_map = self._spec_map(specifications=first_override["specifications"])
+        self.assertCountEqual(first_spec_map["Size"], ["M", "L"])
+        self.assertCountEqual(first_spec_map["Color"], ["Green", "Red"])
+
+        self.assertCountEqual(
+            second_override["variant_skus"],
+            ["SKU-S-GREEN", "SKU-M-GREEN", "SKU-M-RED", "SKU-L-GREEN", "SKU-L-RED"],
+        )
+        second_spec_map = self._spec_map(specifications=second_override["specifications"])
+        self.assertCountEqual(second_spec_map["Size"], ["Small", "M", "L"])
+        self.assertCountEqual(second_spec_map["Color"], ["Green", "Red"])
 
     @patch(
         "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
