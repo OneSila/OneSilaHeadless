@@ -546,15 +546,6 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         sku_variation_state: Dict[str, Dict[str, str]] = {}
         for sku in variant_skus:
             inventory_item_payload = self._fetch_inventory_item_payload_from_server(sku=sku)
-            try:
-                payload_dump = json.dumps(inventory_item_payload, indent=2, sort_keys=True, default=str)
-            except TypeError:
-                payload_dump = str(inventory_item_payload)
-            logger.debug(
-                "EBAY_CONFIG_MISMATCH_RECOVERY inventory_item_payload for SKU %s:\n%s",
-                sku,
-                payload_dump,
-            )
             sku_variation_state[sku] = self._extract_sku_variation_state_from_inventory_item(
                 sku=sku,
                 inventory_item_payload=inventory_item_payload,
