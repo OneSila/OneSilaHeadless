@@ -228,6 +228,33 @@ def resync_shein_product_db_task(
     task.execute(actual_task)
 
 
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def delete_shein_product_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    remote_instance: int,
+):
+    """Run the Shein product delete factory."""
+    from sales_channels.integrations.shein.factories.products import (
+        SheinProductDeleteFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinSalesChannel
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        sales_channel = SheinSalesChannel.objects.get(id=sales_channel_id)
+        factory = SheinProductDeleteFactory(
+            sales_channel=sales_channel,
+            remote_instance=remote_instance,
+        )
+        factory.run()
+
+    task.execute(actual_task)
+
+
 @db_periodic_task(crontab(hour="0", minute="0"))
 def shein__tasks__refresh_product_issues__cronjob() -> None:
     """Fetch latest review issues for pending Shein products once per day."""

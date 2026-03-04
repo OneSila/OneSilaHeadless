@@ -2353,25 +2353,82 @@ class SheinProductDeleteFactory(SheinSignatureMixin, RemoteProductDeleteFactory)
     action_log = RemoteLog.ACTION_DELETE
     revoke_path = "/open-api/goods/revoke-product"
 
+    def get_delete_product_factory(self):
+        return SheinProductDeleteFactory
+
+    remote_delete_factory = property(get_delete_product_factory)
+
+    def get_api(self):
+        return getattr(self, "api", None)
+
+    def serialize_response(self, response):  # type: ignore[override]
+        if response is None:
+            return {}
+        if isinstance(response, dict):
+            return response
+        json_getter = getattr(response, "json", None)
+        if callable(json_getter):
+            try:
+                return json_getter() or {}
+            except Exception:
+                return {}
+        return {}
+
+    @staticmethod
+    def _extract_revoke_fail_messages(*, payload: dict[str, Any]) -> list[str]:
+        info = payload.get("info")
+        if not isinstance(info, dict):
+            return []
+
+        fail_list = info.get("failList")
+        if not isinstance(fail_list, list):
+            fail_list = []
+
+        fail_messages: list[str] = []
+        for item in fail_list:
+            if not isinstance(item, dict):
+                continue
+            message = str(item.get("msg") or "").strip() or "Unknown revoke failure"
+            document_sn = str(item.get("documentSn") or "").strip()
+            skc_name = str(item.get("skcName") or "").strip()
+            details: list[str] = []
+            if document_sn:
+                details.append(f"documentSn={document_sn}")
+            if skc_name:
+                details.append(f"skcName={skc_name}")
+            if details:
+                fail_messages.append(f"{message} ({', '.join(details)})")
+            else:
+                fail_messages.append(message)
+
+        fail_count_raw = info.get("failCount")
+        try:
+            fail_count = int(fail_count_raw or 0)
+        except (TypeError, ValueError):
+            fail_count = 0
+
+        if fail_count > 0 and not fail_messages:
+            fail_messages.append(f"Shein revoke returned failCount={fail_count}.")
+
+        return fail_messages
+
     def delete_remote(self):
         spu_name = getattr(self.remote_instance, "remote_id", None)
         if not spu_name:
             return {}
 
-        try:
-            response = self.shein_post(
-                path=self.revoke_path,
-                payload={"spuName": spu_name},
+        response = self.shein_post(
+            path=self.revoke_path,
+            payload={"spuName": spu_name},
+        )
+        payload = self._extract_successful_shein_json(
+            response=response,
+            context="product revoke",
+        )
+
+        fail_messages = self._extract_revoke_fail_messages(payload=payload)
+        if fail_messages:
+            raise SheinResponseException(
+                "Shein product revoke failed: " + "; ".join(fail_messages)
             )
-            return response.json() if hasattr(response, "json") else {}
-        except Exception as exc:
-            # Log as admin error but don't raise to allow local cleanup
-            self.remote_instance.add_admin_error(
-                action=self.action_log,
-                response=str(exc),
-                payload={"spuName": spu_name},
-                error_traceback="",
-                identifier=f"{self.__class__.__name__}:delete_remote",
-                remote_product=self.remote_instance,
-            )
-            return {}
+        return payload

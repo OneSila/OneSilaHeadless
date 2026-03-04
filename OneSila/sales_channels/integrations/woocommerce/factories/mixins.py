@@ -264,7 +264,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
     def get_serialised_woocommerce_value(self, prod_prop):
         value = prod_prop.get_serialised_value(language=self.sales_channel_assign_language)
         if prod_prop.property.type == Property.TYPES.BOOLEAN:
-            value = self.get_boolean_value(value)
+            value = self.get_boolean_value(value=value)
         return self._stringify_attribute_option(value)
 
     def get_common_properties(self):

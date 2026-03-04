@@ -12,6 +12,7 @@ from sales_channels.signals import (
     create_remote_product_property,
     delete_remote_image,
     delete_remote_image_association,
+    delete_remote_product,
     delete_remote_product_property,
     manual_sync_remote_product,
     add_remote_product_variation,
@@ -127,6 +128,45 @@ def shein__shein_product__manual_sync(
         view=view,
         **kwargs,
     )
+
+
+@receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
+def shein__product__delete_from_assign(*, sender, instance, **kwargs):
+    from sales_channels.integrations.shein.factories.task_queue import (
+        SheinProductDeleteFromAssignAddTask,
+    )
+    from sales_channels.integrations.shein.tasks import delete_shein_product_db_task
+
+    product = instance.product
+    sales_channel = instance.sales_channel.get_real_instance()
+
+
+    if not isinstance(sales_channel, SheinSalesChannel) or not sales_channel.active:
+        return
+
+    task_runner = SheinProductDeleteFromAssignAddTask(
+        task_func=delete_shein_product_db_task,
+        local_instance_id=product.id,
+        sales_channel=sales_channel,
+        is_variation=kwargs.get('is_variation', False),
+    )
+    task_runner.run()
+
+
+@receiver(delete_remote_product, sender='products.Product')
+def shein__product__delete_from_product(*, sender, instance, **kwargs):
+    from sales_channels.integrations.shein.factories.task_queue import (
+        SheinProductDeleteAddTask,
+    )
+    from sales_channels.integrations.shein.tasks import delete_shein_product_db_task
+
+    task_runner = SheinProductDeleteAddTask(
+        task_func=delete_shein_product_db_task,
+        local_instance_id=instance.id,
+        multi_tenant_company=instance.multi_tenant_company,
+        is_multiple=True,
+    )
+    task_runner.run()
 
 
 @receiver(update_remote_product, sender='products.Product')
