@@ -418,6 +418,100 @@ class SheinDocumentStateFactoryTests(TestCase):
         association.refresh_from_db()
         self.assertEqual(association.missing_status, SheinDocumentThroughProduct.STATUS_ACCEPTED)
 
+    @patch.object(SheinProductDocumentStateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductDocumentStateFactory, "fetch")
+    def test_certificate_rules_sync_marks_rejected_creates_issue_and_sets_status(
+        self,
+        fetch_mock,
+        get_certificate_rules_mock,
+    ) -> None:
+        local_document_type = baker.make(
+            DocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            name="UK Agent Rejected",
+        )
+        remote_document_type = baker.make(
+            SheinDocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_document_type,
+            remote_id="340",
+            name="UK Agent Rejected",
+            translated_name="UK Agent Rejected",
+        )
+        media = Media.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.FILE,
+            document_type=local_document_type,
+        )
+        media_through = MediaProductThrough.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=self.product,
+            media=media,
+        )
+        remote_document = baker.make(
+            SheinDocument,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media,
+            remote_document_type=remote_document_type,
+            remote_id="POOL-REJECT-100",
+            remote_url="https://files.example.com/rejected-cert.pdf",
+        )
+        association = baker.make(
+            SheinDocumentThroughProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media_through,
+            remote_product=self.remote_product,
+            remote_document=remote_document,
+            remote_id="PQMS-REJECT-100",
+            remote_url="https://files.example.com/rejected-cert.pdf",
+            missing_status=SheinDocumentThroughProduct.STATUS_PENDING,
+        )
+
+        fetch_mock.return_value = {"info": {"data": []}}
+        get_certificate_rules_mock.return_value = [
+            {
+                "certificateTypeId": 340,
+                "certificateDimension": 1,
+                "certificateMissStatus": True,
+                "certificatePoolList": [
+                    {
+                        "certificatePoolId": "POOL-REJECT-100",
+                        "pqmsCertificateSn": "PQMS-REJECT-100",
+                        "auditStatus": "3",
+                        "certificatePoolFileList": [
+                            {
+                                "certificateUrlName": "rejected-cert.pdf",
+                                "certificateUrl": "https://files.example.com/rejected-cert.pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        self.remote_product.status = RemoteProduct.STATUS_PENDING_APPROVAL
+        self.remote_product.save(update_fields=["status"])
+
+        factory = SheinProductDocumentStateFactory(
+            sales_channel=self.sales_channel,
+            remote_product=self.remote_product,
+        )
+        factory.run()
+
+        association.refresh_from_db()
+        self.assertEqual(association.missing_status, SheinDocumentThroughProduct.STATUS_REJECTED)
+
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, RemoteProduct.STATUS_APPROVAL_REJECTED)
+
+        issue = SheinProductIssue.objects.filter(remote_product=self.remote_product).order_by("-id").first()
+        self.assertIsNotNone(issue)
+        self.assertTrue(any("UK Agent Rejected" in str(message) for message in (issue.failed_reason or [])))
+
     def test_determine_status_keeps_pending_when_issue_completed_but_variation_document_pending(self) -> None:
         parent = baker.make(
             Product,
@@ -516,3 +610,102 @@ class SheinDocumentStateFactoryTests(TestCase):
         )
 
         self.assertEqual(parent_remote._determine_status(), RemoteProduct.STATUS_PENDING_APPROVAL)
+
+    def test_determine_status_returns_rejected_when_variation_document_rejected(self) -> None:
+        parent = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+            active=True,
+            sku="PARENT-DET-REJECT-1",
+        )
+        variation = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            active=True,
+            sku="VAR-DET-REJECT-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=parent,
+            variation=variation,
+        )
+
+        parent_remote = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent,
+            remote_sku=parent.sku,
+            remote_id="SPU-DET-REJECT-1",
+            spu_name="SPU-DET-REJECT-1",
+            syncing_current_percentage=100,
+        )
+        variation_remote = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=variation,
+            remote_parent_product=parent_remote,
+            is_variation=True,
+            remote_sku=variation.sku,
+            remote_id="SKU-DET-REJECT-1",
+            spu_name="SPU-DET-REJECT-1",
+            skc_name="SKC-DET-REJECT-1",
+            syncing_current_percentage=100,
+        )
+
+        local_document_type = baker.make(
+            DocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            name="UK Agent Rejected",
+        )
+        remote_document_type = baker.make(
+            SheinDocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_document_type,
+            remote_id="340",
+            name="UK Agent Rejected",
+            translated_name="UK Agent Rejected",
+        )
+        media = Media.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.FILE,
+            document_type=local_document_type,
+        )
+        media_through = MediaProductThrough.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=variation,
+            media=media,
+        )
+        remote_document = baker.make(
+            SheinDocument,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media,
+            remote_document_type=remote_document_type,
+            remote_id="POOL-DET-REJECT-1",
+        )
+        baker.make(
+            SheinDocumentThroughProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=media_through,
+            remote_product=variation_remote,
+            remote_document=remote_document,
+            missing_status=SheinDocumentThroughProduct.STATUS_REJECTED,
+        )
+        SheinProductIssue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=parent_remote,
+            version="V1",
+            document_sn="DOC-DET-REJECT-1",
+            skc_name="SKC-DET-REJECT-1",
+            document_state=2,
+            failed_reason=[],
+            is_active=False,
+        )
+
+        self.assertEqual(parent_remote._determine_status(), RemoteProduct.STATUS_APPROVAL_REJECTED)

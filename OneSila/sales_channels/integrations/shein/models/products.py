@@ -81,11 +81,17 @@ class SheinProduct(RemoteProduct):
             issue_states = []
 
         mapped = shein_aggregate_document_states_to_status(document_states=issue_states)
+        has_rejected_documents = self._has_rejected_document_associations()
         has_pending_documents = self._has_pending_document_associations()
         if mapped is not None:
+            if has_rejected_documents:
+                return self.STATUS_APPROVAL_REJECTED
             if mapped == self.STATUS_COMPLETED and has_pending_documents:
                 return self.STATUS_PENDING_APPROVAL
             return mapped
+
+        if has_rejected_documents:
+            return self.STATUS_APPROVAL_REJECTED
 
         if has_pending_documents:
             return self.STATUS_PENDING_APPROVAL
@@ -138,6 +144,24 @@ class SheinProduct(RemoteProduct):
                 sales_channel=self.sales_channel,
                 remote_product_id__in=scope_remote_product_ids,
                 missing_status=SheinDocumentThroughProduct.STATUS_PENDING,
+            ).exists()
+        except Exception:
+            return False
+
+    def _has_rejected_document_associations(self) -> bool:
+        scope_remote_product_ids = self._get_document_status_scope_remote_product_ids()
+        if not scope_remote_product_ids:
+            return False
+
+        try:
+            from sales_channels.integrations.shein.models.documents import (
+                SheinDocumentThroughProduct,
+            )
+
+            return SheinDocumentThroughProduct.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_product_id__in=scope_remote_product_ids,
+                missing_status=SheinDocumentThroughProduct.STATUS_REJECTED,
             ).exists()
         except Exception:
             return False

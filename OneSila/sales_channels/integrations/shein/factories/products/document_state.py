@@ -313,6 +313,56 @@ class SheinProductDocumentStateFactory(SheinSignatureMixin):
                 association.missing_status = target_status
                 association.save(update_fields=["missing_status"])
 
+            if target_status == SheinDocumentThroughProduct.STATUS_REJECTED:
+                self._upsert_rejected_document_issue(association=association)
+
+    def _build_document_rejection_label(self, *, association: SheinDocumentThroughProduct) -> str:
+        media_through = getattr(association, "local_instance", None)
+        media = getattr(media_through, "media", None)
+        local_document_type = getattr(media, "document_type", None)
+        local_document_type_name = str(getattr(local_document_type, "name", "") or "").strip()
+        if local_document_type_name:
+            return local_document_type_name
+
+        remote_document = getattr(association, "remote_document", None)
+        remote_document_type = getattr(remote_document, "remote_document_type", None)
+        remote_document_type_name = str(getattr(remote_document_type, "name", "") or "").strip()
+        if remote_document_type_name:
+            return remote_document_type_name
+
+        return "Document"
+
+    def _upsert_rejected_document_issue(self, *, association: SheinDocumentThroughProduct) -> None:
+        rejection_label = self._build_document_rejection_label(association=association)
+        reason = (
+            f"Document '{rejection_label}' was rejected by Shein. "
+            "Upload a valid replacement and retry sync."
+        )
+        record = {
+            "spuName": self.spu_name,
+            "version": self.version or "",
+            "skcName": str(getattr(getattr(association, "remote_product", None), "skc_name", "") or "").strip(),
+            "documentSn": str(getattr(association, "remote_id", "") or "").strip(),
+            "documentState": 3,
+            "failedReason": [reason],
+        }
+        if not record["documentSn"]:
+            record["documentSn"] = str(getattr(getattr(association, "remote_document", None), "remote_id", "") or "").strip()
+        if not record["documentSn"]:
+            record["documentSn"] = f"REJECTED:{association.id}"
+
+        try:
+            SheinProductIssue.upsert_from_document_state(
+                remote_product=self.remote_product,
+                record=record,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to upsert Shein rejected document issue for remote_product=%s association=%s",
+                getattr(self.remote_product, "id", None),
+                getattr(association, "id", None),
+            )
+
     def update_remote_product_status(self) -> None:
         document_states: list[int | None] = []
         for failure in self.failures:
@@ -323,15 +373,20 @@ class SheinProductDocumentStateFactory(SheinSignatureMixin):
                 document_states.append(None)
 
         override = shein_aggregate_document_states_to_status(document_states=document_states)
+        has_rejected_document_associations = bool(
+            getattr(self.remote_product, "_has_rejected_document_associations", lambda: False)()
+        )
         has_pending_document_associations = bool(
             getattr(self.remote_product, "_has_pending_document_associations", lambda: False)()
         )
-        if (
+        if has_rejected_document_associations:
+            override = RemoteProduct.STATUS_APPROVAL_REJECTED
+        elif (
             override == RemoteProduct.STATUS_COMPLETED
             and has_pending_document_associations
         ):
             override = RemoteProduct.STATUS_PENDING_APPROVAL
-        if not override and has_pending_document_associations:
+        elif not override and has_pending_document_associations:
             override = RemoteProduct.STATUS_PENDING_APPROVAL
         if not override:
             return
