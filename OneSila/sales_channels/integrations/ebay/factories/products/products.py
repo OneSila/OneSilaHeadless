@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import inspect
 import json
 import logging
@@ -425,6 +426,21 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
             )
 
         aspects_payload = product_payload.get("aspects")
+        if isinstance(aspects_payload, str):
+            parsed_aspects: Any = None
+            raw_aspects = aspects_payload.strip()
+            if raw_aspects:
+                try:
+                    parsed_aspects = json.loads(raw_aspects)
+                except (TypeError, ValueError):
+                    try:
+                        parsed_aspects = ast.literal_eval(raw_aspects)
+                    except (ValueError, SyntaxError):
+                        parsed_aspects = None
+
+            if isinstance(parsed_aspects, Mapping):
+                aspects_payload = parsed_aspects
+
         if not isinstance(aspects_payload, Mapping):
             raise EbayResponseException(
                 f"Inventory item {sku} is missing product aspects while recovering configurable mismatch."
