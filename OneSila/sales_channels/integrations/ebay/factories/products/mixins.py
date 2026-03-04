@@ -55,6 +55,10 @@ logger = logging.getLogger(__name__)
 
 _FALLBACK_DESCRIPTION_PATTERN = re.compile(r"<.*?>", flags=re.DOTALL)
 _FALLBACK_DESCRIPTION_LIMIT = 4000
+_EBAY_CONFIGURATOR_MISMATCH_ERROR = (
+    "Invalid data in the Inventory Item Group. Variation Specifics provided does not match "
+    "with the variation specifics of the variations on the item."
+)
 
 
 def _extract_ebay_api_error_message(*, exc: Exception) -> str:
@@ -2169,6 +2173,80 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
 
+    def send_inventory_payload_with_variants_override(
+        self,
+        *,
+        variant_skus: Sequence[str],
+        specifications: Sequence[Mapping[str, Any]],
+    ) -> Any:
+        if not self.is_configurable_parent():
+            raise EbayResponseException(
+                "Variant override inventory group update is only supported for configurable parent products."
+            )
+
+        payload = self._build_inventory_group_payload()
+        payload["variantSKUs"] = [
+            str(sku).strip()
+            for sku in list(variant_skus)
+            if sku not in (None, "") and str(sku).strip()
+        ]
+
+        varies_by_payload = payload.get("variesBy")
+        if not isinstance(varies_by_payload, Mapping):
+            varies_by_payload = {}
+        else:
+            varies_by_payload = dict(varies_by_payload)
+
+        normalized_specs: List[Dict[str, Any]] = []
+        aspect_names: List[str] = []
+        for spec in list(specifications):
+            if not isinstance(spec, Mapping):
+                continue
+
+            name = spec.get("name")
+            if name in (None, ""):
+                continue
+            normalized_name = str(name).strip()
+            if not normalized_name:
+                continue
+
+            raw_values = spec.get("values")
+            if isinstance(raw_values, Sequence) and not isinstance(raw_values, (str, bytes)):
+                values = [str(value) for value in raw_values if value not in (None, "") and str(value).strip()]
+            elif raw_values in (None, ""):
+                values = []
+            else:
+                value = str(raw_values).strip()
+                values = [value] if value else []
+
+            normalized_specs.append({"name": normalized_name, "values": values})
+            aspect_names.append(normalized_name)
+
+        varies_by_payload["specifications"] = normalized_specs
+        if aspect_names:
+            varies_by_payload["aspectsImageVariesBy"] = aspect_names
+        payload["variesBy"] = varies_by_payload
+        action = "create_or_replace_inventory_item_group"
+
+        if self.get_value_only:
+            return payload
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+
+        self._log_api_payload(action=action, payload=payload)
+
+        try:
+            return api.sell_inventory_create_or_replace_inventory_item_group(
+                body=payload,
+                content_language=self._get_content_language(),
+                content_type="application/json",
+                inventory_item_group_key=self.get_parent_remote_sku(),
+            )
+        except (EbayApiError, ApiException) as exc:
+            message = _extract_ebay_api_error_message(exc=exc)
+            raise EbayResponseException(message) from exc
+
     def _chunk_requests(self, requests: Sequence[Any]) -> List[List[Any]]:
         if not requests:
             return []
@@ -2184,25 +2262,37 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
                 requests.append(self.build_inventory_payload())
         return requests
 
-    def send_bulk_inventory_payloads(self, *, remote_products: Sequence[Any]) -> List[Any]:
+    def send_bulk_inventory_payloads(self, *, remote_products: Sequence[Any]) -> Tuple[List[Any], List[Any]]:
         remote_products = list(remote_products)
         if self.get_value_only:
             requests = self.build_bulk_inventory_requests(remote_products=remote_products)
             batches = self._chunk_requests(requests)
-            return [{"requests": batch} for batch in batches]
+            return [{"requests": batch} for batch in batches], []
 
         if not remote_products:
-            return []
+            return [], []
 
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
 
         responses: List[Any] = []
+        error_configurator_remote_products: List[Any] = []
         for remote_product in remote_products:
             with self._use_remote_product(remote_product):
-                responses.append(self.send_inventory_payload())
+                try:
+                    responses.append(self.send_inventory_payload())
+                except EbayResponseException as exc:
+                    if str(exc).strip() != _EBAY_CONFIGURATOR_MISMATCH_ERROR:
+                        raise
 
-        return responses
+                    sku = getattr(remote_product, "remote_sku", None)
+                    error_configurator_remote_products.append(remote_product)
+                    logger.warning(
+                        "Detected eBay configurable variation mismatch for SKU %s while syncing child inventory item.",
+                        sku or "<unknown>",
+                    )
+
+        return responses, error_configurator_remote_products
 
     def build_bulk_offer_requests(self, *, remote_products: Sequence[Any]) -> List[Dict[str, Any]]:
         requests: List[Dict[str, Any]] = []
