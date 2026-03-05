@@ -132,7 +132,11 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
 
     def test_creates_product_category_mapping_from_offer(self) -> None:
         category = self._create_leaf_category("123456")
-        offer_payload = {"category_id": category.remote_id}
+        secondary_category = self._create_leaf_category("654321")
+        offer_payload = {
+            "category_id": category.remote_id,
+            "secondaryCategoryId": secondary_category.remote_id,
+        }
 
         self.processor.handle_sales_channels_views(
             import_instance=self.import_instance,
@@ -146,12 +150,15 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
             view=self.view,
         )
         self.assertEqual(mapping.remote_id, category.remote_id)
+        self.assertEqual(mapping.secondary_category_id, secondary_category.remote_id)
         self.assertEqual(mapping.sales_channel_id, self.sales_channel.id)
         self.assertEqual(mapping.multi_tenant_company_id, self.multi_tenant_company.id)
 
     def test_updates_existing_product_category_when_offer_changes(self) -> None:
         old_category = self._create_leaf_category("111222")
         new_category = self._create_leaf_category("333444")
+        old_secondary_category = self._create_leaf_category("222111")
+        new_secondary_category = self._create_leaf_category("444333")
         mapping = baker.make(
             EbayProductCategory,
             product=self.local_product,
@@ -159,6 +166,37 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
             view=self.view,
             multi_tenant_company=self.multi_tenant_company,
             remote_id=old_category.remote_id,
+            secondary_category_id=old_secondary_category.remote_id,
+        )
+
+        offer_payload = {
+            "category_id": new_category.remote_id,
+            "secondary_category_id": new_secondary_category.remote_id,
+        }
+
+        self.processor.handle_sales_channels_views(
+            import_instance=self.import_instance,
+            structured_data={"__marketplace_id": self.view.remote_id},
+            view=self.view,
+            offer_data=offer_payload,
+        )
+
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.remote_id, new_category.remote_id)
+        self.assertEqual(mapping.secondary_category_id, new_secondary_category.remote_id)
+
+    def test_keeps_existing_secondary_category_when_offer_omits_secondary(self) -> None:
+        old_category = self._create_leaf_category("111222")
+        new_category = self._create_leaf_category("333444")
+        existing_secondary_category = self._create_leaf_category("222111")
+        mapping = baker.make(
+            EbayProductCategory,
+            product=self.local_product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id=old_category.remote_id,
+            secondary_category_id=existing_secondary_category.remote_id,
         )
 
         offer_payload = {"category_id": new_category.remote_id}
@@ -172,6 +210,7 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
 
         mapping.refresh_from_db()
         self.assertEqual(mapping.remote_id, new_category.remote_id)
+        self.assertEqual(mapping.secondary_category_id, existing_secondary_category.remote_id)
 
 
 @override_settings(**EBAY_TEST_SETTINGS)

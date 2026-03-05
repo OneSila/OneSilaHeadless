@@ -183,6 +183,20 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_ean_run: MagicMock,
         mock_content_run: MagicMock,
     ) -> None:
+        self.ensure_ebay_leaf_category(
+            remote_id="555555",
+            view=self.view,
+            name="Secondary",
+        )
+        EbayProductCategory.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            remote_id=str(self.ebay_product_type.remote_id),
+            secondary_category_id=" 555555 ",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
         api_mock = MagicMock()
         api_mock.sell_inventory_create_or_replace_inventory_item.return_value = {"sku": "TEST-SKU"}
         api_mock.sell_inventory_create_offer.return_value = {"offer_id": "NEW-OFFER"}
@@ -218,6 +232,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(offer_payload["sku"], "TEST-SKU")
         self.assertEqual(offer_payload["marketplaceId"], "EBAY_GB")
         self.assertEqual(offer_payload["categoryId"], self.ebay_product_type.remote_id)
+        self.assertEqual(offer_payload["secondaryCategoryId"], "555555")
         self.assertEqual(offer_payload["listingPolicies"], {
             "fulfillmentPolicyId": "FULFILL-1",
             "paymentPolicyId": "PAY-1",
@@ -623,6 +638,20 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_ean_run: MagicMock,
         mock_content_run: MagicMock,
     ) -> None:
+        self.ensure_ebay_leaf_category(
+            remote_id="555555",
+            view=self.view,
+            name="Secondary",
+        )
+        EbayProductCategory.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            remote_id=str(self.ebay_product_type.remote_id),
+            secondary_category_id="555555",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
         offer = EbayProductOffer.objects.get(
             remote_product=self.remote_product,
             sales_channel_view=self.view,
@@ -643,6 +672,10 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         api_mock.sell_inventory_update_offer.assert_called_once()
         update_call = api_mock.sell_inventory_update_offer.call_args
         self.assertEqual(update_call.kwargs.get("offer_id"), "EXISTING")
+        self.assertEqual(
+            update_call.kwargs.get("body", {}).get("secondaryCategoryId"),
+            "555555",
+        )
         api_mock.sell_inventory_publish_offer.assert_called_once_with(offer_id="UPDATED")
 
         offer.refresh_from_db()
@@ -657,11 +690,17 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
             view=self.view,
             name="Test",
         )
+        self.ensure_ebay_leaf_category(
+            remote_id="555555",
+            view=self.view,
+            name="Secondary",
+        )
         EbayProductCategory.objects.create(
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.view,
             remote_id=" 987654 ",
+            secondary_category_id=" 555555 ",
             multi_tenant_company=self.multi_tenant_company,
         )
 
@@ -669,6 +708,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         factory.remote_product = self.remote_product
 
         self.assertEqual(factory._get_category_id(), "987654")
+        self.assertEqual(factory._get_secondary_category_id(), "555555")
 
     def test_get_category_id_falls_back_to_product_type(self) -> None:
         factory = self._build_create_factory()

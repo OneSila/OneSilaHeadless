@@ -1453,6 +1453,24 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
 
         return None
 
+    def _extract_offer_secondary_category_id(self, *offer_payloads: Mapping[str, Any] | None) -> str | None:
+        """Return the normalized secondary category id from the first payload that declares it."""
+
+        for payload in offer_payloads:
+            if not isinstance(payload, Mapping):
+                continue
+
+            for key in ("secondary_category_id", "secondaryCategoryId"):
+                raw_value = payload.get(key)
+                if raw_value is None:
+                    continue
+
+                normalized = str(raw_value).strip()
+                if normalized:
+                    return normalized
+
+        return None
+
     def _sync_product_category(
         self,
         *,
@@ -1469,13 +1487,23 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
         if not category_id:
             return
 
+        secondary_category_id = self._extract_offer_secondary_category_id(*offer_payloads)
+        secondary_payload_declared = any(
+            isinstance(payload, Mapping)
+            and ("secondary_category_id" in payload or "secondaryCategoryId" in payload)
+            for payload in offer_payloads
+        )
+
         try:
             mapping, created = EbayProductCategory.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
                 product=product,
                 sales_channel=self.sales_channel,
                 view=view,
-                defaults={"remote_id": category_id},
+                defaults={
+                    "remote_id": category_id,
+                    "secondary_category_id": secondary_category_id,
+                },
             )
         except ValidationError as exc:
             self._add_broken_record(
@@ -1483,6 +1511,7 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
                 message="Invalid eBay category returned by offer",
                 data={
                     "category_id": category_id,
+                    "secondary_category_id": secondary_category_id,
                     "sku": getattr(product, "sku", None),
                 },
                 context={"product_id": getattr(product, "id", None), "view_id": view.id},
@@ -1490,18 +1519,32 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
             )
             return
 
-        if created or mapping.remote_id == category_id:
+        if created:
             return
 
-        mapping.remote_id = category_id
+        update_fields: list[str] = []
+        current_remote_id = str(mapping.remote_id or "").strip() or None
+        current_secondary_id = str(mapping.secondary_category_id or "").strip() or None
+
+        if current_remote_id != category_id:
+            mapping.remote_id = category_id
+            update_fields.append("remote_id")
+        if secondary_payload_declared and current_secondary_id != secondary_category_id:
+            mapping.secondary_category_id = secondary_category_id
+            update_fields.append("secondary_category_id")
+
+        if not update_fields:
+            return
+
         try:
-            mapping.save(update_fields=["remote_id"])
+            mapping.save(update_fields=update_fields)
         except ValidationError as exc:
             self._add_broken_record(
                 code=self.ERROR_INVALID_CATEGORY_ASSIGNMENT,
                 message="Invalid eBay category returned by offer",
                 data={
                     "category_id": category_id,
+                    "secondary_category_id": secondary_category_id,
                     "sku": getattr(product, "sku", None),
                 },
                 context={"product_id": getattr(product, "id", None), "view_id": view.id},

@@ -1702,38 +1702,39 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         self._listing_policies_cache = policies
         return dict(policies)
 
-    def _get_category_id(self) -> str | None:
+    def _get_category_ids(self) -> tuple[str | None, str | None]:
         product = getattr(self.remote_product, "local_instance", None)
         view = getattr(self, "view", None)
 
         if product is None or view is None:
-            return None
+            return None, None
 
-        direct_remote_id = (
+        direct_remote_category = (
             EbayProductCategory.objects.filter(
                 product=product,
                 sales_channel=self.sales_channel,
                 view=view,
             )
             .exclude(remote_id__in=(None, ""))
-            .values_list("remote_id", flat=True)
             .first()
         )
-        if direct_remote_id:
-            candidate = str(direct_remote_id).strip()
+
+        if direct_remote_category:
+            candidate = str(direct_remote_category.remote_id or "").strip() or None
+            secondary_candidate = str(direct_remote_category.secondary_category_id or "").strip() or None
             if candidate:
-                return candidate
+                return candidate, secondary_candidate
 
         if not hasattr(product, "get_product_rule"):
-            return None
+            return None, None
 
         try:
             rule = product.get_product_rule(sales_channel=self.sales_channel)
         except Exception:  # pragma: no cover - defensive guard
-            return None
+            return None, None
 
         if rule is None:
-            return None
+            return None, None
 
         product_type_remote_id = (
             EbayProductType.objects.filter(
@@ -1749,9 +1750,17 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         if product_type_remote_id:
             candidate = str(product_type_remote_id).strip()
             if candidate:
-                return candidate
+                return candidate, None
 
-        return None
+        return None, None
+
+    def _get_category_id(self) -> str | None:
+        category_id, _ = self._get_category_ids()
+        return category_id
+
+    def _get_secondary_category_id(self) -> str | None:
+        _, secondary_category_id = self._get_category_ids()
+        return secondary_category_id
 
     def _build_pricing_summary(self) -> Dict[str, Any]:
         product = getattr(self.remote_product, "local_instance", None)
@@ -1861,11 +1870,18 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         for key, value in metadata.items():
             self._apply_offer_section(payload=payload, key=key, value=value)
 
+        category_id, secondary_category_id = self._get_category_ids()
         self._apply_offer_section(
             payload=payload,
             key="categoryId",
-            value=self._get_category_id(),
+            value=category_id,
         )
+        if secondary_category_id:
+            self._apply_offer_section(
+                payload=payload,
+                key="secondaryCategoryId",
+                value=secondary_category_id,
+            )
         self._apply_offer_section(
             payload=payload,
             key="listingPolicies",

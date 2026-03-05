@@ -52,6 +52,7 @@ class EbayProductCategoryOld(models.Model):
 
 
 class EbayProductCategory(RemoteProductCategory):
+    secondary_category_id = models.CharField(max_length=50, null=True, blank=True)
 
     class Meta:
         verbose_name = "eBay Product Category"
@@ -63,24 +64,43 @@ class EbayProductCategory(RemoteProductCategory):
     def clean(self):
         super().clean()
 
-        remote_id = (self.remote_id or "").strip()
-        if not remote_id:
-            return
-
         tree_id = getattr(self.view, "default_category_tree_id", None)
-        categories = EbayCategory.objects.filter(remote_id=remote_id)
-        if tree_id:
-            categories = categories.filter(marketplace_default_tree_id=tree_id)
+        category_ids = {
+            field_name: (getattr(self, field_name, None) or "").strip()
+            for field_name in ("remote_id", "secondary_category_id")
+        }
+        errors = {}
+        for field_name, remote_id in category_ids.items():
+            if not remote_id:
+                continue
 
-        try:
-            category = categories.get()
-        except EbayCategory.DoesNotExist as exc:
-            raise ValidationError({"remote_id": "eBay category does not exist for the given remote ID."}) from exc
-        except EbayCategory.MultipleObjectsReturned as exc:
-            raise ValidationError({"remote_id": "Multiple eBay categories found for the given remote ID."}) from exc
+            categories = EbayCategory.objects.filter(remote_id=remote_id)
+            if tree_id:
+                categories = categories.filter(marketplace_default_tree_id=tree_id)
 
-        if category.has_children:
-            raise ValidationError({"remote_id": "Only leaf eBay categories can be assigned."})
+            try:
+                category = categories.get()
+            except EbayCategory.DoesNotExist:
+                errors[field_name] = "eBay category does not exist for the given remote ID."
+                continue
+            except EbayCategory.MultipleObjectsReturned:
+                errors[field_name] = "Multiple eBay categories found for the given remote ID."
+                continue
+
+            if category.has_children:
+                errors[field_name] = "Only leaf eBay categories can be assigned."
+
+        if (
+            category_ids["remote_id"]
+            and category_ids["secondary_category_id"]
+            and category_ids["remote_id"] == category_ids["secondary_category_id"]
+        ):
+            message = "Primary and secondary eBay categories cannot be the same."
+            errors.setdefault("remote_id", message)
+            errors.setdefault("secondary_category_id", message)
+
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.full_clean()
