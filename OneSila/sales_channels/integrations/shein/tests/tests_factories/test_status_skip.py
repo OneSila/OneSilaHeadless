@@ -58,6 +58,48 @@ class SheinPendingApprovalSkipTests(TestCase):
         self.assertIsNotNone(log)
         self.assertIn("pending approval", (log.response or "").lower())
 
+    @patch.object(SheinProductUpdateFactory, "final_process")
+    @patch.object(SheinProductUpdateFactory, "finalize_progress")
+    def test_update_skips_pending_approval_and_runs_skip_hook(
+        self,
+        _finalize_progress,
+        final_process_mock,
+    ) -> None:
+        factory = SheinProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+
+        factory.run()
+
+        final_process_mock.assert_called_once()
+
+    @patch.object(SheinProductUpdateFactory, "log_error")
+    @patch.object(SheinProductUpdateFactory, "final_process", side_effect=ValueError("skip-hook-failed"))
+    @patch.object(SheinProductUpdateFactory, "finalize_progress")
+    def test_update_skip_hook_error_is_logged_and_raised(
+        self,
+        _finalize_progress,
+        _final_process_mock,
+        log_error_mock,
+    ) -> None:
+        factory = SheinProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+
+        with self.assertRaises(ValueError) as raised:
+            factory.run()
+
+        self.assertIn("skip-hook-failed", str(raised.exception))
+        log_error_mock.assert_called_once()
+
     def test_skip_exception_is_registered_as_user_exception(self) -> None:
         self.assertIn(SkipSyncBecauseOfStatusException, self.sales_channel._meta.user_exceptions)
 

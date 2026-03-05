@@ -579,7 +579,7 @@ class SheinSignatureMixin:
 
         headers, _, _ = self.build_shein_headers(
             path=self.upload_certificate_file_path,
-            add_language=False,
+            add_language=True,
             content_type="application/json",
         )
         headers.pop("Content-Type", None)
@@ -635,7 +635,7 @@ class SheinSignatureMixin:
         response = self.shein_post(
             path=self.save_or_update_certificate_pool_path,
             payload=payload,
-            add_language=False,
+            add_language=True,
         )
         return self._extract_successful_shein_json(response=response, context="certificate pool save")
 
@@ -648,7 +648,7 @@ class SheinSignatureMixin:
         response = self.shein_post(
             path=self.save_certificate_pool_skc_bind_path,
             payload=payload,
-            add_language=False,
+            add_language=True,
         )
         return self._extract_successful_shein_json(response=response, context="certificate pool bind")
 

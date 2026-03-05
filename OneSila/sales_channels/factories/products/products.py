@@ -782,6 +782,13 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         pass
 
+    def run_on_skip_sync_status(self):
+        """
+        Hook executed when sync is skipped due to remote status constraints.
+        Override in integrations that still need partial side effects (e.g. post-sync document handling).
+        """
+        return
+
     def process_content_translation(self, short_description, description, url_key, remote_language):
         """
         Processes a single content translation. This method should be overridden in subclasses
@@ -1339,6 +1346,12 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                     remote_product=getattr(self, "remote_product", None),
                     error_message=str(skip),
                 )
+            try:
+                self.run_on_skip_sync_status()
+            except Exception as e:
+                run_succeeded = False
+                self.log_error(e, self.action_log, log_identifier, self.payload, fixing_identifier)
+                raise
             self.set_local_assigns()
             return
 
@@ -1426,6 +1439,12 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
                     remote_product=getattr(self, "remote_product", None),
                     error_message=str(skip),
                 )
+            try:
+                self.run_on_skip_sync_status()
+            except Exception as e:
+                run_succeeded = False
+                self.log_error(e, self.action_log, log_identifier, self.payload, fixing_identifier)
+                raise
             return
 
         except SwitchedToCreateException as stc:

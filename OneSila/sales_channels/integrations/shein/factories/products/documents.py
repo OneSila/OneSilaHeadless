@@ -196,12 +196,22 @@ class SheinRemoteDocumentCreateFactory(SheinRemoteDocumentFactoryBase, RemoteDoc
         if not uploaded_certificate_url:
             raise PreFlightCheckError(f"{self._document_label()} upload did not return a Shein certificate URL.")
 
+        certificate_pool_payload = {
+            "certificateTypeId": certificate_type_id,
+            "certificateUrl": uploaded_certificate_url,
+            "certificateUrlName": filename,
+            "certificatePoolId": self._resolve_existing_pool_id(),
+        }
+        # TODO: If expiration validation becomes an issue, send certificateRelationInfoList for expiry.
+        # Example: [{"certificateRelationNameId": 178, "certificateRelationValue": "1970-01-01 00:00:00"}]
+        # Shein docs note that 1970-01-01 00:00:00 means "never expires".
+        # where 178 is documented as "Certificate Expiration Date" for some Shein certificate presets.
         try:
             pool_payload = self.save_or_update_certificate_pool(
                 certificate_type_id=certificate_type_id,
                 certificate_url=uploaded_certificate_url,
                 certificate_url_name=filename,
-                certificate_pool_id=self._resolve_existing_pool_id(),
+                certificate_pool_id=certificate_pool_payload.get("certificatePoolId"),
             )
         except Exception as exc:
             raise PreFlightCheckError(f"{self._document_label()} failed to create/update Shein certificate pool: {exc}") from exc

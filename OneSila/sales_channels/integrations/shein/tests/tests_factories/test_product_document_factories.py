@@ -389,6 +389,127 @@ class SheinProductFinalDocumentSyncTests(TestCase):
     @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    def test_final_process_raises_when_required_document_type_is_not_mapped(
+        self,
+        mock_get_certificate_rules,
+        mock_sync_document_assignment,
+        _mock_delete_document_assignment,
+    ):
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            sku="SIMPLE-DOC-REQUIRED-NOT-MAPPED",
+        )
+        remote_product = baker.make(
+            SheinProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku=product.sku,
+            remote_id="SPU-SIMPLE-REQ-NOT-MAPPED",
+            spu_name="SPU-SIMPLE-REQ-NOT-MAPPED",
+            skc_name="SKC-SIMPLE-REQ-NOT-MAPPED",
+        )
+
+        self._create_document_media_through(
+            product=product,
+            document_type=self.local_document_type_a,
+            filename="mapped-a.pdf",
+        )
+        baker.make(
+            SheinDocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            remote_id="111",
+            name="Unmapped Required Type",
+            translated_name="Unmapped Required Type Translated",
+        )
+
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateDimension": 1,
+                "certificateTypeId": 111,
+                "isRequired": True,
+                "certificateTypeValue": "Rule Required Name",
+            },
+        ]
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_instance=remote_product,
+            skip_checks=True,
+        )
+
+        with self.assertRaises(PreFlightCheckError) as raised:
+            factory.final_process()
+
+        self.assertIn(
+            "Unmapped Required Type Translated (not mapped)",
+            str(raised.exception),
+        )
+        mock_sync_document_assignment.assert_not_called()
+
+    @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
+    @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
+    @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    def test_final_process_raises_when_required_document_type_is_missing_on_product(
+        self,
+        mock_get_certificate_rules,
+        mock_sync_document_assignment,
+        _mock_delete_document_assignment,
+    ):
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            sku="SIMPLE-DOC-REQUIRED-MISSING",
+        )
+        remote_product = baker.make(
+            SheinProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku=product.sku,
+            remote_id="SPU-SIMPLE-REQ-MISSING",
+            spu_name="SPU-SIMPLE-REQ-MISSING",
+            skc_name="SKC-SIMPLE-REQ-MISSING",
+        )
+
+        # Product includes only type A while required remote type below is mapped to local type B.
+        self._create_document_media_through(
+            product=product,
+            document_type=self.local_document_type_a,
+            filename="only-a.pdf",
+        )
+
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateDimension": 1,
+                "certificateTypeId": 599,
+                "isRequired": True,
+                "certificateTypeValue": "Rule Type B",
+            },
+        ]
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_instance=remote_product,
+            skip_checks=True,
+        )
+
+        with self.assertRaises(PreFlightCheckError) as raised:
+            factory.final_process()
+
+        self.assertIn("Type B (missing document)", str(raised.exception))
+        mock_sync_document_assignment.assert_not_called()
+
+    @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
+    @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
+    @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
     def test_final_process_configurable_targets_each_variation_remote_product(
         self,
         mock_get_certificate_rules,
