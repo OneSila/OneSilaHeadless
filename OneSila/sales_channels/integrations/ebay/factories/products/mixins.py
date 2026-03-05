@@ -45,6 +45,7 @@ from ebay_rest.api.sell_inventory.rest import ApiException
 from ebay_rest.error import Error as EbayApiError
 
 from sales_channels.integrations.ebay.exceptions import (
+    EbayMissingListingPoliciesError,
     EbayPropertyMappingMissingError,
     EbayResponseException,
 )
@@ -460,11 +461,17 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
                     continue
 
                 for remote_property in remote_properties:
-                    remote_values = self._render_property_value(
-                        product_property=product_property,
-                        remote_property=remote_property,
-                        language_code=language_code,
-                    )
+                    try:
+                        remote_values = self._render_property_value(
+                            product_property=product_property,
+                            remote_property=remote_property,
+                            language_code=language_code,
+                        )
+                    except (RemotePropertyValueNotMapped, EbayPropertyMappingMissingError) as exc:
+                        capture_method = getattr(self, "_capture_validation_common_exception", None)
+                        if callable(capture_method) and capture_method(exception=exc):
+                            continue
+                        raise
                     if remote_values in (None, ""):
                         continue
 
@@ -1539,11 +1546,17 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
                 continue
 
             for remote_property in remote_properties:
-                values = self._render_property_value(
-                    product_property=product_property,
-                    remote_property=remote_property,
-                    language_code=language_code,
-                )
+                try:
+                    values = self._render_property_value(
+                        product_property=product_property,
+                        remote_property=remote_property,
+                        language_code=language_code,
+                    )
+                except (RemotePropertyValueNotMapped, EbayPropertyMappingMissingError) as exc:
+                    capture_method = getattr(self, "_capture_validation_common_exception", None)
+                    if callable(capture_method) and capture_method(exception=exc):
+                        continue
+                    raise
                 if not values:
                     continue
 
@@ -1693,11 +1706,12 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
             missing.append("return policy")
 
         if missing:
-            raise PreFlightCheckError(
+            message = (
                 "Missing eBay listing policies ({}). Please configure the marketplace policies before pushing products.".format(
                     ", ".join(missing)
                 )
             )
+            raise EbayMissingListingPoliciesError(message)
 
         self._listing_policies_cache = policies
         return dict(policies)
@@ -2279,6 +2293,10 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
         else:
             payload = self.build_inventory_payload()
             action = "create_or_replace_inventory_item"
+
+        raise_method = getattr(self, "_raise_validation_common_errors_if_any", None)
+        if callable(raise_method):
+            raise_method()
 
         if self.get_value_only:
             return payload

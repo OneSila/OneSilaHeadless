@@ -31,7 +31,11 @@ from sales_channels.integrations.shein.exceptions import (
     SheinPreValidationError,
     SheinResponseException,
 )
-from sales_channels.exceptions import PreFlightCheckError, SkipSyncBecauseOfStatusException
+from sales_channels.exceptions import (
+    PreFlightCheckError,
+    RemotePropertyValueNotMapped,
+    SkipSyncBecauseOfStatusException,
+)
 from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinDocumentThroughProduct,
@@ -936,7 +940,12 @@ class SheinProductBaseFactory(
                     get_value_only=True,
                     skip_checks=True,
                 )
-                factory.run()
+                try:
+                    factory.run()
+                except RemotePropertyValueNotMapped as exc:
+                    if self._capture_validation_common_exception(exception=exc):
+                        continue
+                    raise
                 if not factory.remote_value:
                     continue
 
@@ -1543,7 +1552,12 @@ class SheinProductBaseFactory(
 
             payloads: list[dict[str, Any]] = []
             for _, product_property in sorted(seen.items(), key=sort_key):
-                payload = self._build_sale_attribute_payload(product_property=product_property)
+                try:
+                    payload = self._build_sale_attribute_payload(product_property=product_property)
+                except RemotePropertyValueNotMapped as exc:
+                    if self._capture_validation_common_exception(exception=exc):
+                        continue
+                    raise
                 if payload:
                     payloads.append(payload)
 
@@ -1736,7 +1750,12 @@ class SheinProductBaseFactory(
                 raise PreFlightCheckError(
                     f"Missing primary configurator attribute for variation {variation.sku}."
                 )
-            sale_attr = self._build_sale_attribute_payload(product_property=primary_prop)
+            try:
+                sale_attr = self._build_sale_attribute_payload(product_property=primary_prop)
+            except RemotePropertyValueNotMapped as exc:
+                if self._capture_validation_common_exception(exception=exc):
+                    continue
+                raise
             if not sale_attr:
                 raise PreFlightCheckError(f"Unable to build Shein sale attribute for variation {variation.sku}.")
             key = json.dumps(sale_attr, sort_keys=True)
@@ -1765,7 +1784,12 @@ class SheinProductBaseFactory(
                         raise PreFlightCheckError(
                             f"Missing SKU-level configurator attribute for variation {variation.sku}."
                         )
-                    secondary_attr = self._build_sale_attribute_payload(product_property=secondary_prop)
+                    try:
+                        secondary_attr = self._build_sale_attribute_payload(product_property=secondary_prop)
+                    except RemotePropertyValueNotMapped as exc:
+                        if self._capture_validation_common_exception(exception=exc):
+                            continue
+                        raise
                     if secondary_attr:
                         sku_sale_attributes.append(secondary_attr)
 

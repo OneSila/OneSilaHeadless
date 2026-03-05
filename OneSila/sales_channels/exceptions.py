@@ -48,3 +48,21 @@ class RemotePropertyValueNotMapped(Exception):
 class SkipSyncBecauseOfStatusException(Exception):
     """Raised when a remote product is in a status that should skip sync/update/create flows."""
     pass
+
+
+class CombinedProductValidationError(Exception):
+    """Raised when multiple user-fixable validation errors are collected in one pass."""
+
+    def __init__(self, *, errors):
+        normalized_errors = []
+        for error in errors or []:
+            text = str(error).strip()
+            if text:
+                normalized_errors.append(text)
+
+        if not normalized_errors:
+            normalized_errors = ["Product validation failed."]
+
+        self.errors = normalized_errors
+        message = "Product validation errors:\n" + "\n".join(normalized_errors)
+        super().__init__(message)

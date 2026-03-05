@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from django.db import IntegrityError
 
+from sales_channels.exceptions import RemotePropertyValueNotMapped
 from sales_channels.factories.products.products import RemoteProductSyncFactory
 from properties.models import ProductProperty
 from products.models import ConfigurableVariation
@@ -35,6 +36,7 @@ from sales_channels.integrations.ebay.factories.products.mixins import (
 from sales_channels.integrations.ebay.exceptions import (
     EbayMissingListingPoliciesError,
     EbayMissingProductMappingError,
+    EbayPropertyMappingMissingError,
     EbayMissingVariationMappingsError,
     EbayResponseException,
 )
@@ -157,11 +159,12 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
             missing.append("return policy")
 
         if missing:
-            raise EbayMissingListingPoliciesError(
+            message = (
                 "Missing eBay listing policies ({}). Please configure the marketplace policies before pushing products.".format(
                     ", ".join(missing)
                 )
             )
+            raise EbayMissingListingPoliciesError(message)
 
         product_rule = product.get_product_rule(sales_channel=self.sales_channel)
         has_type_mapping = False
@@ -769,10 +772,12 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         price.save()
 
     def _post_inventory_push(self) -> None:
+        properties_result = self._sync_properties()
+        self._raise_validation_common_errors_if_any()
         return {
             key: value
             for key, value in {
-                "properties": self._sync_properties(),
+                "properties": properties_result,
                 "content": self._trigger_content_update(),
                 "price": self._trigger_price_update(),
                 "ean": self._trigger_ean_update(),
@@ -833,10 +838,15 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
                     else:
                         values[str(product_property.property_id)] = str(value)
                     continue
-                values[str(product_property.property_id)] = self._prepare_property_remote_value(
-                    product_property=product_property,
-                    remote_property=remote_property,
-                )
+                try:
+                    values[str(product_property.property_id)] = self._prepare_property_remote_value(
+                        product_property=product_property,
+                        remote_property=remote_property,
+                    )
+                except (RemotePropertyValueNotMapped, EbayPropertyMappingMissingError) as exc:
+                    if self._capture_validation_common_exception(exception=exc):
+                        continue
+                    raise
             return values
 
         for product_property in product_properties:
@@ -869,10 +879,15 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
                 remote_instance.remote_property = remote_property
                 updates.append("remote_property")
 
-            remote_value = self._prepare_property_remote_value(
-                product_property=product_property,
-                remote_property=remote_property,
-            )
+            try:
+                remote_value = self._prepare_property_remote_value(
+                    product_property=product_property,
+                    remote_property=remote_property,
+                )
+            except (RemotePropertyValueNotMapped, EbayPropertyMappingMissingError) as exc:
+                if self._capture_validation_common_exception(exception=exc):
+                    continue
+                raise
             if remote_instance.remote_value != remote_value:
                 remote_instance.remote_value = remote_value
                 updates.append("remote_value")

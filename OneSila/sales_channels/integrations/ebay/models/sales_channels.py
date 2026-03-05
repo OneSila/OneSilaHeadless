@@ -1,6 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
 from sales_channels.exceptions import (
+    CombinedProductValidationError,
     InspectorMissingInformationError,
     PreFlightCheckError,
     RemotePropertyValueNotMapped,
@@ -82,6 +83,7 @@ class EbaySalesChannel(SalesChannel):
         verbose_name_plural = "eBay Sales Channels"
         user_exceptions = (
             EbayResponseException,
+            CombinedProductValidationError,
             PreFlightCheckError,
             RemotePropertyValueNotMapped,
             EbayPropertyMappingMissingError,

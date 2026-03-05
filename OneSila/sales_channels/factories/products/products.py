@@ -6,6 +6,7 @@ from properties.models import ProductProperty
 from django.template import TemplateSyntaxError
 from django.db.models import Q
 from sales_channels.exceptions import (
+    CombinedProductValidationError,
     SwitchedToSyncException,
     SwitchedToCreateException,
     ConfigurationMissingError,
@@ -96,6 +97,42 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self._content_template_media_assignments = None
         self._content_template_cache = {}
         self.successfully_created = True
+        self.validation_common_errors: list[str] = []
+
+    def _reset_validation_common_errors(self) -> None:
+        self.validation_common_errors = []
+
+    def _get_validation_common_exception_classes(self):
+        from sales_channels.exceptions import RemotePropertyValueNotMapped
+        from sales_channels.integrations.amazon.exceptions import (
+            AmazonDescriptionTooShortError,
+            AmazonTitleTooShortError,
+        )
+        from sales_channels.integrations.ebay.exceptions import (
+            EbayMissingListingPoliciesError,
+            EbayPropertyMappingMissingError,
+        )
+
+        return (
+            AmazonTitleTooShortError,
+            AmazonDescriptionTooShortError,
+            RemotePropertyValueNotMapped,
+            EbayPropertyMappingMissingError,
+            EbayMissingListingPoliciesError,
+        )
+
+    def _capture_validation_common_exception(self, *, exception: Exception) -> bool:
+        if not isinstance(exception, self._get_validation_common_exception_classes()):
+            return False
+
+        message = str(exception).strip() or exception.__class__.__name__
+        self.validation_common_errors.append(message)
+        return True
+
+    def _raise_validation_common_errors_if_any(self) -> None:
+        if not self.validation_common_errors:
+            return
+        raise CombinedProductValidationError(errors=self.validation_common_errors)
 
     def _set_successfully_created(self, *, value: bool) -> None:
         remote_instance = getattr(self, "remote_instance", None)
@@ -317,7 +354,15 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         for product_property in self.product_properties:
             # Attempt to process the product property
-            remote_property_id = self.process_single_property(product_property, skip_remote_mirror=skip_remote_mirror)
+            try:
+                remote_property_id = self.process_single_property(
+                    product_property,
+                    skip_remote_mirror=skip_remote_mirror,
+                )
+            except Exception as exc:
+                if self._capture_validation_common_exception(exception=exc):
+                    continue
+                raise
 
             # in the marketplaces some might be skipped if not mapped
             if not skip_remote_mirror and remote_property_id:
@@ -717,7 +762,12 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         for field in self.field_mapping:
             setter_method = getattr(self, f"set_{field}", None)
             if setter_method:
-                setter_method()
+                try:
+                    setter_method()
+                except Exception as exc:
+                    if self._capture_validation_common_exception(exception=exc):
+                        continue
+                    raise
             else:
                 logger.warning(f"Setter method set_{field} not found.")
 
@@ -1264,6 +1314,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def run(self):
         run_succeeded = None
+        self._reset_validation_common_errors()
 
         if not self.preflight_check():
             logger.debug(f"Preflight check failed for {self.sales_channel}.")
@@ -1293,6 +1344,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.set_product_properties()
             self.build_payload()
             self.process_product_properties()
+            self._raise_validation_common_errors_if_any()
 
             if self.local_type == Product.CONFIGURABLE:
                 self.set_remote_configurator()
@@ -1384,6 +1436,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
     # this will be the same with the Sync but the run will be slightly changed to perform only the product related changes
     def run(self):
         run_succeeded = None
+        self._reset_validation_common_errors()
         if not self.preflight_check():
             logger.debug(f"Preflight check failed for {self.sales_channel}.")
             return
@@ -1402,6 +1455,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
             self.precalculate_progress_step_increment(2)
             self.set_rule()
             self.build_payload()
+            self._raise_validation_common_errors_if_any()
             self.customize_payload()
             self.pre_action_process()
             self.update_progress()

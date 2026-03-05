@@ -58,7 +58,11 @@ from sales_channels.integrations.amazon.models.properties import (
 )
 from sales_channels.integrations.amazon.models.documents import AmazonDocumentThroughProduct
 from sales_channels.integrations.amazon.models import AmazonCurrency
-from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
+from sales_channels.exceptions import (
+    RemotePropertyValueNotMapped,
+    SwitchedToCreateException,
+    SwitchedToSyncException,
+)
 from sales_channels.exceptions import SkipSyncBecauseOfStatusException
 from spapi import ListingsApi
 
@@ -375,18 +379,22 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         min_description_length = getattr(sales_channel, "min_description_length", 0)
 
         if min_name_length and title_length < min_name_length:
-            raise AmazonTitleTooShortError(
+            exception = AmazonTitleTooShortError(
                 "Amazon titles must have at least {} characters for the selected marketplace. Current length: {}.".format(
                     min_name_length, title_length
                 )
             )
+            if not self._capture_validation_common_exception(exception=exception):
+                raise exception
 
         if min_description_length and description_length < min_description_length:
-            raise AmazonDescriptionTooShortError(
+            exception = AmazonDescriptionTooShortError(
                 "Amazon descriptions must have at least {} characters for the selected marketplace. Current length: {}.".format(
                     min_description_length, description_length
                 )
             )
+            if not self._capture_validation_common_exception(exception=exception):
+                raise exception
 
         has_ean_code = bool(product.ean_code)
         is_configurable = product.is_configurable()
@@ -992,6 +1000,10 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     # because we are getting all the properties we might get properties that are not designed for this
                     # product type. We will just skip those
                     pass
+                except RemotePropertyValueNotMapped as exc:
+                    if self._capture_validation_common_exception(exception=exc):
+                        continue
+                    raise
 
     def build_variation_attributes(self):
         attrs = {}

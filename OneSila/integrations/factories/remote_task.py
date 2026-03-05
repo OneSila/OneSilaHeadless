@@ -2,6 +2,7 @@ import logging
 import traceback
 from integrations.models import IntegrationTaskQueue
 from sales_channels.exceptions import (
+    CombinedProductValidationError,
     ConfiguratorPropertyNotFilterable,
     InspectorMissingInformationError,
     PreFlightCheckError,
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 NON_RETRYABLE_EXCEPTIONS = (
     InspectorMissingInformationError,
+    CombinedProductValidationError,
     PreFlightCheckError,
     SheinPreValidationError,
     SheinConfiguratorAttributesLimitError,
