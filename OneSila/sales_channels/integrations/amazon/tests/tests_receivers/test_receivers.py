@@ -59,6 +59,7 @@ class AmazonProductTypeReceiversTest(TestCase):
         task_func.assert_called_once_with(
             product_type_code=pt.product_type_code,
             sales_channel_id=pt.sales_channel_id,
+            product_type_id=pt.id,
         )
 
 

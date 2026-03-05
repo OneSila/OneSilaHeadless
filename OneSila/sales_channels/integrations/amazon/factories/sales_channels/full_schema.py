@@ -505,10 +505,12 @@ class AmazonProductTypeRuleFactory(
         self,
         product_type_code,
         sales_channel,
+        product_type_id=None,
         api=None,
         language=None,
     ):
         self.product_type_code = product_type_code
+        self.product_type_id = product_type_id
         self.sales_channel = sales_channel
         self.language = language or sales_channel.multi_tenant_company.language
         self.multi_tenant_company = sales_channel.multi_tenant_company
@@ -521,6 +523,13 @@ class AmazonProductTypeRuleFactory(
             self.api = api
 
     def get_or_create_product_type(self):
+        if self.product_type_id is not None:
+            return AmazonProductType.objects.get(
+                id=self.product_type_id,
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
         try:
             product_type, _ = AmazonProductType.objects.get_or_create(
                 product_type_code=self.product_type_code,

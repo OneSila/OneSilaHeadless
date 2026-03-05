@@ -64,6 +64,27 @@ class AmazonSchemaPropertyTypeSyncTests(TestCase):
 
         self.assertEqual(factory.product_type.id, first.id)
 
+    def test_get_or_create_product_type_uses_explicit_id_when_provided(self) -> None:
+        AmazonProductType.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            product_type_code="DUPLICATE_TYPE_WITH_ID",
+        )
+        selected = AmazonProductType.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            product_type_code="DUPLICATE_TYPE_WITH_ID",
+        )
+
+        factory = AmazonProductTypeRuleFactory(
+            product_type_code="DUPLICATE_TYPE_WITH_ID",
+            sales_channel=self.sales_channel,
+            product_type_id=selected.id,
+            api=object(),
+        )
+
+        self.assertEqual(factory.product_type.id, selected.id)
+
     def test_create_remote_properties_does_not_override_existing_type(self) -> None:
         public_definition = self._build_public_definition(
             code="material__value",
