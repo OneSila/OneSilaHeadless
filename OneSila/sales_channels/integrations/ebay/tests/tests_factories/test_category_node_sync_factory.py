@@ -167,3 +167,39 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
                 }
             ],
         )
+
+    @patch("sales_channels.integrations.ebay.factories.sales_channels.categories.GetEbayAPIMixin.get_api")
+    def test_suggestion_factory_fetches_snake_case_remote_suggestions(self, mock_get_api: Mock) -> None:
+        payload = {
+            "category_tree_id": "3",
+            "category_suggestions": [
+                {
+                    "category": {"category_id": "52762", "category_name": "Men's Fancy Dress"},
+                    "category_tree_node_ancestors": [
+                        {"category_id": "175648", "category_name": "Fancy Dress"},
+                        {"category_id": "163147", "category_name": "Fancy Dress & Period Costume"},
+                    ],
+                }
+            ],
+        }
+        api = SimpleNamespace(
+            commerce_taxonomy_get_category_suggestions=Mock(return_value=payload),
+        )
+        mock_get_api.return_value = api
+
+        factory = EbayCategorySuggestionFactory(view=self.view, query=" Fancy Dress ")
+        factory.run()
+
+        mock_get_api.assert_called_once_with()
+        self.assertEqual(factory.category_tree_id, "3")
+        self.assertEqual(
+            factory.categories,
+            [
+                {
+                    "category_id": "52762",
+                    "category_name": "Men's Fancy Dress",
+                    "category_path": "Fancy Dress > Fancy Dress & Period Costume > Men's Fancy Dress",
+                    "leaf": True,
+                }
+            ],
+        )
