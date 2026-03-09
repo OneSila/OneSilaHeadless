@@ -209,7 +209,7 @@ def shein_product_document_audit_status_notice(request):
     failed_reason = payload.get("failed_reason")
 
     if not spu_name:
-        return HttpResponse(status=202)
+        return JsonResponse({"status": "ok"}, status=202)
 
     from sales_channels.models.products import RemoteProduct
     from django.db.utils import OperationalError, ProgrammingError

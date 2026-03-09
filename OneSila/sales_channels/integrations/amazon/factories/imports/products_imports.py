@@ -472,12 +472,19 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
             for code, raw_values in attrs.items():
                 normalized_code = str(code or "").strip().lower()
-                if not re.match(r"^image_locator_.*pf$", normalized_code):
+                if re.match(r"^image_locator_ps\d+$", normalized_code):
+                    continue
+
+                if re.match(r"^image_locator_.*pf$", normalized_code):
+                    remote_mapping_id = "image_locator_pf"
+                elif re.match(r"^image_locator_.*ee$", normalized_code):
+                    remote_mapping_id = "image_locator_ee"
+                else:
                     continue
 
                 for entry in self._normalise_document_entries(values=raw_values):
                     _append_document(
-                        remote_mapping_id="image_locator_pf",
+                        remote_mapping_id=remote_mapping_id,
                         remote_property_code=str(code or "").strip(),
                         raw_document=entry,
                         remote_language_code=entry.get("language_tag") if isinstance(entry, dict) else None,

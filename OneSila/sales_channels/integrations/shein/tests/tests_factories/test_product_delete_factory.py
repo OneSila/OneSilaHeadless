@@ -27,6 +27,7 @@ class SheinProductDeleteFactoryTests(TestCase):
         )
         self.local_product = baker.make(
             "products.Product",
+            type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
         self.remote_product = SheinProduct.objects.create(

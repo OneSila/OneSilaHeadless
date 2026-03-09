@@ -238,6 +238,50 @@ class AmazonSchemaPropertyTypeSyncTests(TestCase):
             ).exists()
         )
 
+    def test_sync_public_definitions_collapses_ee_image_document_types(self) -> None:
+        schema_definition = {
+            "type": "array",
+            "description": "Energy efficiency image locator.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "media_location": {"type": "string"},
+                    "marketplace_id": {"type": "string"},
+                },
+            },
+        }
+
+        self.factory.sync_public_definitions(
+            attr_code="image_locator_glee",
+            schema_definition=schema_definition,
+            required_properties=set(),
+            view=self.view,
+            offer_allowed_properties=[],
+        )
+        self.factory.sync_public_definitions(
+            attr_code="image_locator_ukee",
+            schema_definition=schema_definition,
+            required_properties=set(),
+            view=self.view,
+            offer_allowed_properties=[],
+        )
+
+        self.assertEqual(
+            AmazonDocumentType.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_id="image_locator_ee",
+            ).count(),
+            1,
+        )
+        public_definition = AmazonPublicDefinition.objects.get(
+            code="image_locator_glee",
+            api_region_code=self.view.api_region_code,
+            product_type_code=self.factory.product_type.product_type_code,
+        )
+        self.assertTrue(public_definition.is_document_field)
+        self.assertTrue(public_definition.is_internal)
+        self.assertEqual(public_definition.document_field_kind, "IMAGE_EE")
+
     def test_sync_document_type_text_updates_only_for_default_or_empty_values(self) -> None:
         schema_definition = {
             "type": "array",

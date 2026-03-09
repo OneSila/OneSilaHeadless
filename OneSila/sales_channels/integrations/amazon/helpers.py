@@ -42,6 +42,8 @@ def is_amazon_document_field(*, code):
         return suffix.isdigit()
     if normalized_code.startswith("image_locator_") and normalized_code.endswith("pf"):
         return True
+    if normalized_code.startswith("image_locator_") and normalized_code.endswith("ee"):
+        return True
 
     return False
 

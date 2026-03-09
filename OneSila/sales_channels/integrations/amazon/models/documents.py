@@ -8,8 +8,9 @@ class AmazonDocumentType(RemoteDocumentType):
     # NOTE for next iteration (Amazon document/certificate coverage):
     # 1) image_locator_**pf
     # 2) image_locator_ps** (currently PS01-PS06)
-    # 3) safety_data_sheet_url
-    # 4) compliance_media[*].content_type
+    # 3) image_locator_**ee
+    # 4) safety_data_sheet_url
+    # 5) compliance_media[*].content_type
     #
     # compliance_media content_type values discovered so far:
     # - application_guide

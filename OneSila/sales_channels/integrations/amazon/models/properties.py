@@ -90,6 +90,8 @@ class AmazonPublicDefinition(models.SharedModel):
             return "IMAGE_PS"
         if re.match(r"^image_locator_.*pf$", normalized_code):
             return "IMAGE_PF"
+        if re.match(r"^image_locator_.*ee$", normalized_code):
+            return "IMAGE_EE"
         return None
 
     @property
@@ -113,6 +115,8 @@ class AmazonPublicDefinition(models.SharedModel):
             return [f"image_locator_ps0{index}" for index in range(1, 7)]
         if kind == "IMAGE_PF":
             return ["image_locator_**pf"]
+        if kind == "IMAGE_EE":
+            return ["image_locator_**ee"]
         normalized_code = str(self.code or "").strip()
         return [normalized_code] if normalized_code else []
 

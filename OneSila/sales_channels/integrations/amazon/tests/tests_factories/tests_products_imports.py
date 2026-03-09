@@ -305,6 +305,10 @@ class AmazonProductsImportProcessorDocumentsTest(TestCase):
             remote_id="image_locator_pf",
             name="PF Image",
         )
+        ee_type = self._map_document_type(
+            remote_id="image_locator_ee",
+            name="EE Image",
+        )
 
         product_data = {
             "attributes": {
@@ -329,6 +333,9 @@ class AmazonProductsImportProcessorDocumentsTest(TestCase):
                 "image_locator_ukpf": [
                     {"media_location": "https://example.com/pf-uk.jpg"},
                 ],
+                "image_locator_ukee": [
+                    {"media_location": "https://example.com/ee-uk.jpg"},
+                ],
             }
         }
 
@@ -338,14 +345,14 @@ class AmazonProductsImportProcessorDocumentsTest(TestCase):
             catalog_attributes=None,
         )
 
-        self.assertEqual(len(documents), 4)
+        self.assertEqual(len(documents), 5)
         self.assertEqual(
             {document["document_type"].id for document in documents},
-            {sds_type.id, compliance_type.id, ps_type.id, pf_type.id},
+            {sds_type.id, compliance_type.id, ps_type.id, pf_type.id, ee_type.id},
         )
         self.assertEqual(
             set(remote_map.values()),
-            {"safety_data_sheet_url", "compliance_media", "image_locator_ps01", "image_locator_ukpf"},
+            {"safety_data_sheet_url", "compliance_media", "image_locator_ps01", "image_locator_ukpf", "image_locator_ukee"},
         )
         for document in documents:
             self.assertTrue(document["document_url"].startswith("https://"))

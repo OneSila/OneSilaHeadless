@@ -247,6 +247,31 @@ class AmazonDocumentProductPayloadFactoryTest(AmazonDocumentFactoryTestBase):
         self.assertEqual(attrs["image_locator_ukpf"][0]["marketplace_id"], self.view.remote_id)
         self.assertTrue(attrs["image_locator_ukpf"][0]["media_location"].startswith("http"))
 
+    def test_product_payload_includes_ee_image_locator_for_mapped_document(self):
+        self._create_public_definition(
+            code="image_locator_ukee",
+            usage_definition=json.dumps(
+                {
+                    "image_locator_ukee": [
+                        {
+                            "marketplace_id": "%auto:marketplace_id%",
+                            "media_location": "%document_url%",
+                        }
+                    ]
+                }
+            ),
+        )
+        local_type = self._create_local_document_type(name="EE Energy Image")
+        self._map_document_type(local_document_type=local_type, remote_id="image_locator_ee")
+        self._create_document_media_through(local_document_type=local_type, as_image_document=True)
+
+        _, mock_instance = self._run_create_factory()
+        attrs = self._collect_attribute_patches(mock_instance=mock_instance)
+
+        self.assertIn("image_locator_ukee", attrs)
+        self.assertEqual(attrs["image_locator_ukee"][0]["marketplace_id"], self.view.remote_id)
+        self.assertTrue(attrs["image_locator_ukee"][0]["media_location"].startswith("http"))
+
     def test_product_payload_includes_ps01_for_first_ps_document(self):
         self._create_public_definition(
             code="image_locator_ps01",
@@ -481,6 +506,18 @@ class AmazonDocumentProductPayloadFactoryTest(AmazonDocumentFactoryTestBase):
         )
         local_type = self._create_local_document_type(name="PS")
         self._map_document_type(local_document_type=local_type, remote_id="image_locator_ps")
+        self._create_document_media_through(local_document_type=local_type, as_image_document=False)
+
+        with self.assertRaises(PreFlightCheckError):
+            self._run_create_factory()
+
+    def test_product_payload_raises_for_ee_when_media_not_document_image(self):
+        self._create_public_definition(
+            code="image_locator_ukee",
+            usage_definition=json.dumps({"image_locator_ukee": [{"marketplace_id": "%auto:marketplace_id%", "media_location": "%document_url%"}]}),
+        )
+        local_type = self._create_local_document_type(name="EE")
+        self._map_document_type(local_document_type=local_type, remote_id="image_locator_ee")
         self._create_document_media_through(local_document_type=local_type, as_image_document=False)
 
         with self.assertRaises(PreFlightCheckError):

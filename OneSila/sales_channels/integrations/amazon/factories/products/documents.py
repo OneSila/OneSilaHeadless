@@ -159,6 +159,27 @@ class AmazonDocumentThroughProductBase(AmazonProductPropertyBaseMixin):
 
         return codes[0]
 
+    def _resolve_ee_document_property_code(self):
+        remote_rule = self._get_or_resolve_remote_rule()
+        codes = list(
+            AmazonPublicDefinition.objects.filter(
+                api_region_code=self.view.api_region_code,
+                product_type_code=remote_rule.product_type_code,
+                code__regex=r"^image_locator_.*ee$",
+            )
+            .values_list("code", flat=True)
+            .distinct()
+        )
+
+        if not codes:
+            return None
+        if len(codes) > 1:
+            raise PreFlightCheckError(
+                f"{self._document_label()} matched multiple EE fields ({', '.join(sorted(codes))}). Resolve marketplace EE mapping first."
+            )
+
+        return codes[0]
+
     def _resolve_document_property_code(self):
         remote_id = str(getattr(self.remote_document_type, "remote_id", "") or "").strip()
         if not remote_id:
@@ -172,6 +193,8 @@ class AmazonDocumentThroughProductBase(AmazonProductPropertyBaseMixin):
             return self._resolve_ps_document_property_code()
         if remote_id == "image_locator_pf":
             return self._resolve_pf_document_property_code()
+        if remote_id == "image_locator_ee":
+            return self._resolve_ee_document_property_code()
 
         raise PreFlightCheckError(
             f"{self._document_label()} is mapped to unsupported Amazon document type '{remote_id}'."

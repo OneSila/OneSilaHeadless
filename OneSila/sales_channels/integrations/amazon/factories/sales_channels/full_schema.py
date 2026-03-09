@@ -393,7 +393,7 @@ class UsageDefinitionFactory:
         if current_key == "content_type":
             return "%document_type%"
 
-        if kind in {"IMAGE_PF", "IMAGE_PS", "SDS_URL"}:
+        if kind in {"IMAGE_PF", "IMAGE_PS", "IMAGE_EE", "SDS_URL"}:
             return "%document_url%"
 
         return None
@@ -822,6 +822,14 @@ class AmazonProductTypeRuleFactory(
                     "remote_id": "image_locator_ps",
                     "name": "Safety Image (PS)",
                     "description": description,
+                }
+            )
+        elif kind == "IMAGE_EE":
+            specs.append(
+                {
+                    "remote_id": "image_locator_ee",
+                    "name": "Energy Efficiency Image",
+                    "description": raw_description or "Marketplace-specific energy efficiency image locator field.",
                 }
             )
         elif kind == "SDS_URL":
