@@ -121,6 +121,102 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 
+    def test_token_authentication_is_single_use(self):
+        mutations = """
+            mutation($username: String!){
+              requestLoginToken(data:{username: $username}){
+                expiresAt
+              }
+            }
+        """
+
+        resp = self.strawberry_anonymous_test_client(
+            query=mutations,
+            variables={"username": self.user.username}
+        )
+
+        self.assertTrue(resp.errors is None)
+
+        token = MultiTenantUserLoginToken.objects.filter(multi_tenant_user=self.user).last()
+
+        first = self.strawberry_anonymous_test_client(
+            query=AUTHENTICATE_TOKEN,
+            variables={"token": token.token}
+        )
+
+        self.assertTrue(first.errors is None)
+        self.assertTrue(first.data is not None)
+
+        second = self.strawberry_anonymous_test_client(
+            query=AUTHENTICATE_TOKEN,
+            variables={"token": token.token}
+        )
+
+        self.assertTrue(second.errors is not None)
+        self.assertTrue(second.data is None)
+
+    def test_latest_token_invalidates_previous_token(self):
+        mutations = """
+            mutation($username: String!){
+              requestLoginToken(data:{username: $username}){
+                expiresAt
+              }
+            }
+        """
+
+        first = self.strawberry_anonymous_test_client(
+            query=mutations,
+            variables={"username": self.user.username}
+        )
+        self.assertTrue(first.errors is None)
+        first_token = MultiTenantUserLoginToken.objects.filter(multi_tenant_user=self.user).last().token
+
+        second = self.strawberry_anonymous_test_client(
+            query=mutations,
+            variables={"username": self.user.username}
+        )
+        self.assertTrue(second.errors is None)
+        second_token = MultiTenantUserLoginToken.objects.filter(multi_tenant_user=self.user).last().token
+
+        self.assertNotEqual(first_token, second_token)
+
+        old_resp = self.strawberry_anonymous_test_client(
+            query=AUTHENTICATE_TOKEN,
+            variables={"token": first_token}
+        )
+        self.assertTrue(old_resp.errors is not None)
+        self.assertTrue(old_resp.data is None)
+
+        new_resp = self.strawberry_anonymous_test_client(
+            query=AUTHENTICATE_TOKEN,
+            variables={"token": second_token}
+        )
+        self.assertTrue(new_resp.errors is None)
+        self.assertTrue(new_resp.data is not None)
+
+
+class UpdateMeSecurityTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def test_update_me_cannot_promote_owner(self):
+        mutation = """
+        mutation {
+          updateMe(data: {isMultiTenantCompanyOwner: true}) {
+            id
+            isMultiTenantCompanyOwner
+          }
+        }
+        """
+
+        resp = self.strawberry_test_client(
+            query=mutation,
+            asserts_errors=False,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertTrue(resp.errors is not None)
+        self.assertTrue(resp.data is None)
+        self.assertFalse(self.user.is_multi_tenant_company_owner)
+
 
 class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_register_flow(self):
@@ -380,3 +476,53 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         self.assertTrue(resp.errors is None)
         self.assertFalse(resp.data['disableUser']['isActive'])
+
+    def test_enable_disable_user_rejects_cross_tenant_access(self):
+        password = '22kk22@ksk!aAD'
+        other_company = MultiTenantCompany.objects.create(name='another-company', country="DE")
+        user = MultiTenantUser(
+            username='cross-tenant@maadil.com',
+            language="nl",
+            multi_tenant_company=other_company,
+            is_active=False,
+        )
+        user.set_password(password)
+        user.save()
+
+        user_id = to_base64("MultiTenantUserType", user.id)
+
+        enable_query = """
+        mutation enableUser($id: GlobalID!){
+          enableUser(data: {id: $id}){
+            username
+            isActive
+          }
+        }
+        """
+
+        enable_resp = self.strawberry_test_client(
+            query=enable_query,
+            variables={"id": user_id},
+            asserts_errors=False,
+        )
+
+        self.assertTrue(enable_resp.errors is not None)
+        self.assertTrue(enable_resp.data is None)
+
+        disable_query = """
+        mutation disableUser($id: GlobalID!){
+          disableUser(data: {id: $id}){
+            username
+            isActive
+          }
+        }
+        """
+
+        disable_resp = self.strawberry_test_client(
+            query=disable_query,
+            variables={"id": user_id},
+            asserts_errors=False,
+        )
+
+        self.assertTrue(disable_resp.errors is not None)
+        self.assertTrue(disable_resp.data is None)

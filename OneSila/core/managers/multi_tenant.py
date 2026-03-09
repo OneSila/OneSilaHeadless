@@ -16,7 +16,7 @@ class MultiTenantUserLoginTokenQuerySet(DjangoQueryset):
         except self.model.DoesNotExist:
             raise ValidationError(_('Unknown token'))
 
-        if not instance.is_valid:
+        if not instance.is_valid():
             raise ValidationError(_('Token is no longer valid'))
 
         return instance

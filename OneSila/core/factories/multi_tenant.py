@@ -20,6 +20,9 @@ class AuthenticateTokenFactory:
     def set_user(self):
         self.user = self.token_instance.multi_tenant_user
 
+    def consume_token(self):
+        self.token_instance.delete()
+
     def run(self):
         self.set_token_instance()
         self.set_user()
@@ -29,7 +32,11 @@ class RequestLoginTokenFactory:
     def __init__(self, user):
         self.user = user
 
+    def invalidate_existing_tokens(self):
+        MultiTenantUserLoginToken.objects.filter(multi_tenant_user=self.user).delete()
+
     def create_token(self):
+        self.invalidate_existing_tokens()
         self.token = MultiTenantUserLoginToken.objects.create(multi_tenant_user=self.user)
         # The save method will add the expiry-date after the save(). Let's refresh
         # to ensure the frontend can use that date.

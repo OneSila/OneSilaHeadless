@@ -4,6 +4,7 @@ from strawberry_django.resolvers import django_resolver
 from strawberry_django.mutations import resolvers
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from django.db import transaction
+from django.core.exceptions import PermissionDenied
 from core.schema.core.mixins import GetCurrentUserMixin, GetMultiTenantCompanyMixin
 from core.schema.core.mutations import DjangoUpdateMutation, DjangoCreateMutation, Info, models, Any
 from core.factories.multi_tenant import InviteUserFactory, AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
@@ -157,19 +158,29 @@ class UpdateMyPasswordMutation(UpdateMeMutation):
             return MultiTenantUser.objects.get(id=fac.user.id)
 
 
-class DisableUserMutation(DjangoUpdateMutation):
+class MultiTenantUserStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
+    def validate_target_company(self, *, info: Info, instance: models.Model):
+        current_user = self.get_current_user(info)
+
+        if instance.multi_tenant_company_id != current_user.multi_tenant_company_id:
+            raise PermissionDenied(_("Cannot update users from another company."))
+
+
+class DisableUserMutation(MultiTenantUserStatusMutation):
     def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
         # Do not optimize anything while retrieving the object to update
         with DjangoOptimizerExtension.disabled():
+            self.validate_target_company(info=info, instance=instance)
             fac = DisableUserFactory(user=instance)
             fac.run()
             return MultiTenantUser.objects.get(id=fac.user.id)
 
 
-class EnableUserMutation(DjangoUpdateMutation):
+class EnableUserMutation(MultiTenantUserStatusMutation):
     def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
         # Do not optimize anything while retrieving the object to update
         with DjangoOptimizerExtension.disabled():
+            self.validate_target_company(info=info, instance=instance)
             fac = EnableUserFactory(user=instance)
             fac.run()
 

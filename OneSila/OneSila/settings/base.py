@@ -306,6 +306,8 @@ CHANNEL_LAYERS = {
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
+    # This wildcard exists as a base fallback only. Deployments that keep
+    # credentials enabled must override this with explicit trusted origins.
     '*',
     # 'http://172.19.250.107:3000',
 ]

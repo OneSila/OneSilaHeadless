@@ -51,7 +51,7 @@ class MultiTenantUserStatusInput:
     id: auto
 
 
-@partial(MultiTenantUser, fields=['username', 'is_multi_tenant_company_owner',
+@partial(MultiTenantUser, fields=['username',
     'language', 'timezone', 'mobile_number', 'whatsapp_number', 'telegram_number',
     'avatar', 'is_active', 'first_name', 'last_name'])
 class MeMultiTenantUserPartialInput:
