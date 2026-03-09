@@ -1,9 +1,14 @@
 from django.core.exceptions import ValidationError
 
-from sales_channels.integrations.ebay.factories.sales_channels import EbayCategorySuggestionFactory
+from sales_channels.integrations.ebay.factories.sales_channels import (
+    EbayCategorySuggestionFactory,
+    EbayStoreCategoryPullFactory,
+)
 from sales_channels.integrations.ebay.schema.types.input import (
     EbayProductCategoryInput,
     EbayProductCategoryPartialInput,
+    EbayProductStoreCategoryInput,
+    EbayProductStoreCategoryPartialInput,
     EbaySalesChannelInput,
     EbaySalesChannelPartialInput,
     EbayValidateAuthInput,
@@ -21,6 +26,7 @@ from sales_channels.integrations.ebay.schema.types.input import (
 )
 from sales_channels.integrations.ebay.schema.types.types import (
     EbayProductCategoryType,
+    EbayProductStoreCategoryType,
     EbaySalesChannelType,
     EbayRedirectUrlType,
     EbayProductTypeType,
@@ -49,9 +55,11 @@ class EbaySalesChannelMutation:
     create_ebay_sales_channel: EbaySalesChannelType = create(EbaySalesChannelInput)
     create_ebay_sales_channels: List[EbaySalesChannelType] = create(EbaySalesChannelInput)
     create_ebay_product_category: EbayProductCategoryType = create(EbayProductCategoryInput)
+    create_ebay_product_store_category: EbayProductStoreCategoryType = create(EbayProductStoreCategoryInput)
 
     update_ebay_sales_channel: EbaySalesChannelType = update(EbaySalesChannelPartialInput)
     update_ebay_product_category: EbayProductCategoryType = update(EbayProductCategoryPartialInput)
+    update_ebay_product_store_category: EbayProductStoreCategoryType = update(EbayProductStoreCategoryPartialInput)
 
     update_ebay_product_type: EbayProductTypeType = update(EbayProductTypePartialInput)
 
@@ -66,6 +74,7 @@ class EbaySalesChannelMutation:
     create_ebay_import_process: EbaySalesChannelImportType = create(EbaySalesChannelImportInput)
     update_ebay_import_process: EbaySalesChannelImportType = update(EbaySalesChannelImportPartialInput)
     delete_ebay_product_category: EbayProductCategoryType = delete()
+    delete_ebay_product_store_category: EbayProductStoreCategoryType = delete()
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def get_ebay_redirect_url(self, instance: EbaySalesChannelPartialInput, info: Info) -> EbayRedirectUrlType:
@@ -141,6 +150,25 @@ class EbaySalesChannelMutation:
                 for entry in factory.categories
             ],
         )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def pull_ebay_store_categories(
+        self,
+        instance: EbaySalesChannelPartialInput,
+        info: Info,
+    ) -> EbaySalesChannelType:
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        sales_channel = EbaySalesChannel.objects.get(
+            id=instance.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        factory = EbayStoreCategoryPullFactory(sales_channel=sales_channel)
+        factory.run()
+
+        return sales_channel
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def create_ebay_product_types_from_local_rules(

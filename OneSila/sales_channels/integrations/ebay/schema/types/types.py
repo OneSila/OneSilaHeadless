@@ -13,7 +13,9 @@ from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.ebay.models import (
     EbayCategory,
     EbayProductCategory,
+    EbayProductStoreCategory,
     EbaySalesChannel,
+    EbayStoreCategory,
     EbayInternalProperty,
     EbayInternalPropertyOption,
     EbayProductType,
@@ -28,7 +30,9 @@ from sales_channels.integrations.ebay.models import (
 from sales_channels.integrations.ebay.schema.types.filters import (
     EbayCategoryFilter,
     EbayProductCategoryFilter,
+    EbayProductStoreCategoryFilter,
     EbaySalesChannelFilter,
+    EbayStoreCategoryFilter,
     EbayInternalPropertyFilter,
     EbayInternalPropertyOptionFilter,
     EbayProductTypeFilter,
@@ -43,7 +47,9 @@ from sales_channels.integrations.ebay.schema.types.filters import (
 from sales_channels.integrations.ebay.schema.types.ordering import (
     EbayCategoryOrder,
     EbayProductCategoryOrder,
+    EbayProductStoreCategoryOrder,
     EbaySalesChannelOrder,
+    EbayStoreCategoryOrder,
     EbayInternalPropertyOrder,
     EbayInternalPropertyOptionOrder,
     EbayProductTypeOrder,
@@ -102,6 +108,50 @@ class EbayProductCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
         'EbaySalesChannelViewType',
         lazy("sales_channels.integrations.ebay.schema.types.types")
     ]
+
+
+@type(
+    EbayStoreCategory,
+    filters=EbayStoreCategoryFilter,
+    order=EbayStoreCategoryOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayStoreCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        "EbaySalesChannelType",
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    parent: Optional[Annotated[
+        "EbayStoreCategoryType",
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
+
+    @field()
+    def full_path(self, info) -> str:
+        return EbayStoreCategory.full_path.fget(self)
+
+
+@type(
+    EbayProductStoreCategory,
+    filters=EbayProductStoreCategoryFilter,
+    order=EbayProductStoreCategoryOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayProductStoreCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        "ProductType",
+        lazy("products.schema.types.types")
+    ]
+    primary_store_category: Annotated[
+        "EbayStoreCategoryType",
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    secondary_store_category: Optional[Annotated[
+        "EbayStoreCategoryType",
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
 
 
 @type(EbaySalesChannel, filters=EbaySalesChannelFilter, order=EbaySalesChannelOrder, pagination=True, fields="__all__")

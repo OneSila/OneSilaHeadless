@@ -38,9 +38,11 @@ from sales_channels.integrations.ebay.factories.products import (
 )
 from sales_channels.integrations.ebay.models import (
     EbayProductCategory,
+    EbayProductStoreCategory,
     EbayDocumentType,
     EbayRemoteDocument,
     EbayDocumentThroughProduct,
+    EbayStoreCategory,
 )
 from sales_channels.integrations.ebay.models.properties import (
     EbayProductProperty,
@@ -2120,3 +2122,61 @@ class EbayOfferDocumentPayloadFactoryTest(EbayProductPushFactoryTestBase):
 
         self.assertIn("unsupported file type", str(exc.exception).lower())
         api_mock.commerce_media_create_document_from_url.assert_not_called()
+
+    def test_offer_payload_includes_store_category_names(self) -> None:
+        fashion = EbayStoreCategory.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="100",
+            name="Fashion",
+            order=0,
+            level=1,
+            is_leaf=False,
+        )
+        men = EbayStoreCategory.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="101",
+            name="Men",
+            order=0,
+            level=2,
+            parent=fashion,
+            is_leaf=False,
+        )
+        shirts = EbayStoreCategory.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="102",
+            name="Shirts",
+            order=0,
+            level=3,
+            parent=men,
+            is_leaf=True,
+        )
+        accessories = EbayStoreCategory.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="103",
+            name="Accessories",
+            order=1,
+            level=3,
+            parent=men,
+            is_leaf=True,
+        )
+        EbayProductStoreCategory.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            primary_store_category=shirts,
+            secondary_store_category=accessories,
+        )
+
+        payload = self._build_offer_payload(api_mock=MagicMock())
+
+        self.assertEqual(
+            payload.get("storeCategoryNames"),
+            ["/Fashion/Men/Shirts", "/Fashion/Men/Accessories"],
+        )
+
+    def test_offer_payload_omits_store_category_names_without_mapping(self) -> None:
+        payload = self._build_offer_payload(api_mock=MagicMock())
+        self.assertNotIn("storeCategoryNames", payload)

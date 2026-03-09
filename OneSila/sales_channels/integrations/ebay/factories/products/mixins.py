@@ -29,7 +29,7 @@ from sales_channels.content_templates import (
     render_sales_channel_content_template,
 )
 
-from sales_channels.integrations.ebay.models import EbayCategory, EbayProductCategory
+from sales_channels.integrations.ebay.models import EbayCategory, EbayProductCategory, EbayProductStoreCategory
 from sales_channels.integrations.ebay.models.products import (
     EbayMediaThroughProduct,
     EbayProductOffer,
@@ -1851,6 +1851,33 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
 
         return metadata
 
+    def _get_store_category_names(self, *, product) -> List[str]:
+        row = (
+            EbayProductStoreCategory.objects.filter(
+                product=product,
+                sales_channel=self.sales_channel,
+            )
+            .select_related("primary_store_category", "secondary_store_category")
+            .order_by("-id")
+            .first()
+        )
+
+        if row is None:
+            return []
+
+        names: List[str] = []
+        if row.primary_store_category:
+            primary_path = row.primary_store_category.full_path
+            if primary_path and primary_path not in names:
+                names.append(primary_path)
+
+        if row.secondary_store_category:
+            secondary_path = row.secondary_store_category.full_path
+            if secondary_path and secondary_path not in names:
+                names.append(secondary_path)
+
+        return names[:2]
+
     def _apply_offer_section(self, *, payload: Dict[str, Any], key: str, value: Any) -> None:
         if isinstance(value, Mapping):
             if value:
@@ -1882,6 +1909,11 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
                 key="secondaryCategoryId",
                 value=secondary_category_id,
             )
+        self._apply_offer_section(
+            payload=payload,
+            key="storeCategoryNames",
+            value=self._get_store_category_names(product=product) or None,
+        )
         self._apply_offer_section(
             payload=payload,
             key="listingPolicies",

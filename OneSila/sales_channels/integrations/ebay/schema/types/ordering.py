@@ -3,7 +3,9 @@ from core.schema.core.types.types import auto
 from sales_channels.integrations.ebay.models import (
     EbayCategory,
     EbayProductCategory,
+    EbayProductStoreCategory,
     EbaySalesChannel,
+    EbayStoreCategory,
     EbayInternalProperty,
     EbayInternalPropertyOption,
     EbayProductType,
@@ -29,6 +31,19 @@ class EbayCategoryOrder:
 
 @order(EbayProductCategory)
 class EbayProductCategoryOrder:
+    id: auto
+
+
+@order(EbayStoreCategory)
+class EbayStoreCategoryOrder:
+    id: auto
+    order: auto
+    level: auto
+    name: auto
+
+
+@order(EbayProductStoreCategory)
+class EbayProductStoreCategoryOrder:
     id: auto
 
 

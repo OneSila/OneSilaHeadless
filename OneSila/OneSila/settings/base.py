@@ -429,6 +429,10 @@ EBAY_APPLICATION_SCOPES = [
     "https://api.ebay.com/oauth/api_scope/sell.stores.readonly",
     "https://api.ebay.com/oauth/scope/sell.edelivery",
     "https://api.ebay.com/oauth/api_scope/commerce.vero",
+    "https://api.ebay.com/oauth/api_scope/sell.inventory.mapping",
+    "https://api.ebay.com/oauth/api_scope/commerce.message",
+    "https://api.ebay.com/oauth/api_scope/commerce.feedback",
+    "https://api.ebay.com/oauth/api_scope/commerce.shipping",
 ]
 
 

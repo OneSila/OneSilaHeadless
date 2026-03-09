@@ -19,10 +19,12 @@ from sales_channels.integrations.ebay.models import (
     EbayInternalPropertyOption,
     EbayProduct,
     EbayProductCategory,
+    EbayProductStoreCategory,
     EbayProductOffer,
     EbayRemoteLanguage,
     EbaySalesChannel,
     EbaySalesChannelView,
+    EbayStoreCategory,
 )
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 
@@ -211,6 +213,104 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
         mapping.refresh_from_db()
         self.assertEqual(mapping.remote_id, new_category.remote_id)
         self.assertEqual(mapping.secondary_category_id, existing_secondary_category.remote_id)
+
+    def test_creates_product_store_category_mapping_from_offer_paths(self) -> None:
+        fashion = baker.make(
+            EbayStoreCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="10",
+            name="Fashion",
+            level=1,
+            order=0,
+            parent=None,
+            is_leaf=False,
+        )
+        men = baker.make(
+            EbayStoreCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="11",
+            name="Men",
+            level=2,
+            order=0,
+            parent=fashion,
+            is_leaf=False,
+        )
+        shirts = baker.make(
+            EbayStoreCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="12",
+            name="Shirts",
+            level=3,
+            order=0,
+            parent=men,
+            is_leaf=True,
+        )
+        accessories = baker.make(
+            EbayStoreCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="13",
+            name="Accessories",
+            level=3,
+            order=1,
+            parent=men,
+            is_leaf=True,
+        )
+
+        offer_payload = {
+            "storeCategoryNames": [
+                "/Fashion/Men/Shirts",
+                "/Fashion/Men/Accessories",
+            ],
+        }
+
+        self.processor.handle_sales_channels_views(
+            import_instance=self.import_instance,
+            structured_data={"__marketplace_id": self.view.remote_id},
+            view=self.view,
+            offer_data=offer_payload,
+        )
+
+        mapping = EbayProductStoreCategory.objects.get(product=self.local_product)
+        self.assertEqual(mapping.primary_store_category_id, shirts.id)
+        self.assertEqual(mapping.secondary_store_category_id, accessories.id)
+
+    def test_ignores_non_leaf_store_category_path(self) -> None:
+        fashion = baker.make(
+            EbayStoreCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="20",
+            name="Fashion",
+            level=1,
+            order=0,
+            parent=None,
+            is_leaf=False,
+        )
+        baker.make(
+            EbayStoreCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="21",
+            name="Men",
+            level=2,
+            order=0,
+            parent=fashion,
+            is_leaf=False,
+        )
+
+        offer_payload = {"storeCategoryNames": ["/Fashion/Men"]}
+        self.processor.handle_sales_channels_views(
+            import_instance=self.import_instance,
+            structured_data={"__marketplace_id": self.view.remote_id},
+            view=self.view,
+            offer_data=offer_payload,
+        )
+
+        self.assertFalse(EbayProductStoreCategory.objects.filter(product=self.local_product).exists())
 
 
 @override_settings(**EBAY_TEST_SETTINGS)

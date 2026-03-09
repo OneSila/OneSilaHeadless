@@ -1,5 +1,6 @@
 from collections import Counter
 
+from django.db.models.signals import post_delete
 from core.receivers import receiver
 from core.signals import post_create, post_update
 from sales_channels.signals import (
@@ -29,6 +30,7 @@ from sales_channels.signals import (
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbayProduct,
+    EbayProductStoreCategory,
     EbayProductType,
     EbayProperty,
     EbayPropertySelectValue,
@@ -38,6 +40,11 @@ from sales_channels.integrations.ebay.flows.internal_properties import (
 )
 from sales_channels.integrations.ebay.flows.document_types import (
     ensure_ebay_document_types_flow,
+)
+from sales_channels.integrations.ebay.flows.store_categories import (
+    ebay_product_store_category_create_flow,
+    ebay_product_store_category_update_flow,
+    ebay_product_store_category_delete_flow,
 )
 from sales_channels.integrations.ebay.factories.sync import (
     EbayPropertyRuleItemSyncFactory,
@@ -813,3 +820,18 @@ def ebay__product_category__propagate_to_variations(sender, instance, **kwargs):
             view=instance.view,
             defaults={'remote_id': instance.remote_id},
         )
+
+
+@receiver(post_create, sender='ebay.EbayProductStoreCategory')
+def ebay__product_store_category__create__propagate_to_variations(sender, instance, **kwargs):
+    ebay_product_store_category_create_flow(instance=instance)
+
+
+@receiver(post_update, sender='ebay.EbayProductStoreCategory')
+def ebay__product_store_category__update__propagate_to_variations(sender, instance, **kwargs):
+    ebay_product_store_category_update_flow(instance=instance)
+
+
+@receiver(post_delete, sender=EbayProductStoreCategory)
+def ebay__product_store_category__delete__propagate_to_variations(sender, instance, **kwargs):
+    ebay_product_store_category_delete_flow(instance=instance)

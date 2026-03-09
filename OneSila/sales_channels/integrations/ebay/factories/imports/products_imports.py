@@ -39,7 +39,7 @@ from sales_channels.integrations.ebay.models import (
     EbayMediaThroughProduct,
     EbayPrice,
     EbayProductContent,
-    EbayEanCode, EbayProductProperty, EbayProductCategory,
+    EbayEanCode, EbayProductProperty, EbayProductCategory, EbayStoreCategory, EbayProductStoreCategory,
 )
 from sales_channels.models import SalesChannelIntegrationPricelist, SalesChannelViewAssign
 from sales_prices.models import SalesPrice
@@ -1416,6 +1416,10 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
             view=resolved_view,
             offer_payloads=offer_payloads,
         )
+        self._sync_product_store_categories(
+            product=local_product,
+            offer_payloads=offer_payloads,
+        )
 
     def _ensure_product_offer(
         self,
@@ -1550,6 +1554,145 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
                 context={"product_id": getattr(product, "id", None), "view_id": view.id},
                 exc=exc,
             )
+
+    def _extract_offer_store_category_names(
+        self,
+        *offer_payloads: Mapping[str, Any] | None,
+    ) -> list[str] | None:
+        """Return normalized store category paths when explicitly declared by the offer payload."""
+
+        for payload in offer_payloads:
+            if not isinstance(payload, Mapping):
+                continue
+
+            for key in ("store_category_names", "storeCategoryNames"):
+                if key not in payload:
+                    continue
+
+                raw_values = payload.get(key)
+                if isinstance(raw_values, str):
+                    source_values = [raw_values]
+                elif isinstance(raw_values, list):
+                    source_values = raw_values
+                else:
+                    return []
+
+                normalized_values: list[str] = []
+                for raw_value in source_values:
+                    if raw_value is None:
+                        continue
+                    normalized = str(raw_value).strip()
+                    if normalized:
+                        normalized_values.append(normalized)
+
+                return normalized_values
+
+        return None
+
+    def _resolve_store_category_leaf_by_full_path(
+        self,
+        *,
+        full_path: str,
+    ) -> EbayStoreCategory | None:
+        """Resolve a store-category full path and return the leaf category when it exists."""
+
+        segments = [segment.strip() for segment in str(full_path).split("/") if segment and segment.strip()]
+        if not segments:
+            return None
+
+        parent_id: int | None = None
+        current: EbayStoreCategory | None = None
+        last_index = len(segments) - 1
+
+        for index, segment in enumerate(segments):
+            queryset = EbayStoreCategory.objects.filter(
+                sales_channel=self.sales_channel,
+                parent_id=parent_id,
+                name__iexact=segment,
+            )
+
+            # The requested path must end on a leaf category.
+            if index == last_index:
+                queryset = queryset.filter(is_leaf=True)
+
+            current = queryset.order_by("id").first()
+            if current is None:
+                return None
+
+            parent_id = current.id
+
+        return current
+
+    def _sync_product_store_categories(
+        self,
+        *,
+        product: Any | None,
+        offer_payloads: tuple[Mapping[str, Any] | None, ...],
+    ) -> None:
+        """Create/update product store-category mapping from offer storeCategoryNames."""
+
+        if product is None:
+            return
+
+        store_category_names = self._extract_offer_store_category_names(*offer_payloads)
+        if store_category_names is None:
+            return
+
+        resolved_categories: list[EbayStoreCategory] = []
+        seen_ids: set[int] = set()
+        for full_path in store_category_names:
+            category = self._resolve_store_category_leaf_by_full_path(full_path=full_path)
+            if category is None or category.id in seen_ids:
+                continue
+            resolved_categories.append(category)
+            seen_ids.add(category.id)
+            if len(resolved_categories) >= 2:
+                break
+
+        if not resolved_categories:
+            return
+
+        primary_category = resolved_categories[0]
+        secondary_category = resolved_categories[1] if len(resolved_categories) > 1 else None
+        mapping = (
+            EbayProductStoreCategory.objects.filter(
+                product=product,
+                sales_channel=self.sales_channel,
+            )
+            .order_by("id")
+            .first()
+        )
+
+        try:
+            if mapping is None:
+                mapping = EbayProductStoreCategory.objects.create(
+                    multi_tenant_company=self.multi_tenant_company,
+                    product=product,
+                    sales_channel=self.sales_channel,
+                    primary_store_category=primary_category,
+                    secondary_store_category=secondary_category,
+                )
+            else:
+                update_fields: list[str] = []
+                if mapping.primary_store_category_id != primary_category.id:
+                    mapping.primary_store_category = primary_category
+                    update_fields.append("primary_store_category")
+                desired_secondary_id = secondary_category.id if secondary_category else None
+                if mapping.secondary_store_category_id != desired_secondary_id:
+                    mapping.secondary_store_category = secondary_category
+                    update_fields.append("secondary_store_category")
+                if mapping.sales_channel_id != self.sales_channel.id:
+                    mapping.sales_channel = self.sales_channel
+                    update_fields.append("sales_channel")
+                if update_fields:
+                    mapping.save(update_fields=update_fields)
+        except ValidationError:
+            return
+
+        EbayProductStoreCategory.objects.filter(
+            product=product,
+            sales_channel=self.sales_channel,
+        ).exclude(id=mapping.id).delete()
 
     def update_remote_product(
         self,
