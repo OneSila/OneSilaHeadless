@@ -69,6 +69,9 @@ AMAZON_LOCALE_MAPPING = {
 }
 
 AMAZON_INTERNAL_PROPERTIES = [
+    # removed at 9 March 2026: 'condition_note', 'supplemental_condition_information', 'is_oem_sourced_product',
+    # 'gpsr_safety_attestation', 'gpsr_manufacturer_reference', 'dsa_responsible_party_address',
+    # 'epr_product_packaging', 'national_stock_number', 'ghs', 'ghs_chemical_h_code', 'merchant_release_date'
     # Image handling (via media pipeline)
     'main_offer_image_locator', 'other_offer_image_locator_1', 'other_offer_image_locator_2',
     'other_offer_image_locator_3', 'other_offer_image_locator_4', 'other_offer_image_locator_5',
@@ -79,9 +82,10 @@ AMAZON_INTERNAL_PROPERTIES = [
     'image_locator_ps03', 'image_locator_ps04', 'image_locator_ps05', 'image_locator_ps06',
 
     'item_name', 'package_level', 'package_contains_sku', 'purchasable_offer',
-    'condition_note', 'list_price', 'max_order_quantity', 'product_description', 'bullet_point',
+    'list_price', 'max_order_quantity', 'product_description', 'bullet_point',
     'child_parent_sku_relationship', 'variation_theme', 'master_pack_layers_per_pallet_quantity',
-    'master_packs_per_layer_quantity', 'is_oem_sourced_product', 'parentage_level',
+    'master_packs_per_layer_quantity',
+    'parentage_level',
     'recommended_browse_nodes',
 
     # Auto-linking/ASIN suggestion
@@ -89,14 +93,13 @@ AMAZON_INTERNAL_PROPERTIES = [
     'supplier_declared_has_product_identifier_exemption',
 
     # Amazon-only compliance metadata (for now)
-    'compliance_media', 'gpsr_safety_attestation', 'gpsr_manufacturer_reference',
-    'dsa_responsible_party_address', 'epr_product_packaging', 'national_stock_number',
+    'compliance_media',
     'safety_data_sheet_url',
-    'ghs', 'ghs_chemical_h_code',
 
     # Fulfillment-specific (not PIM core)
-    'fulfillment_availability', 'merchant_release_date',
-    'skip_offer', 'supplemental_condition_information', 'uvp_list_price'
+    'fulfillment_availability',
+    'skip_offer',
+    'uvp_list_price'
 ]
 
 # Attributes that should be ignored when generating update patches
