@@ -4,6 +4,7 @@ import base64
 import os
 import requests
 from tempfile import NamedTemporaryFile
+from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.files.base import ContentFile
 from urllib.parse import urlparse
@@ -93,7 +94,7 @@ class ImportImageInstance(AbstractImportInstance):
             temp_file.flush()
             return temp_file
 
-        except (ValueError, requests.RequestException):
+        except (ValidationError, ValueError, requests.RequestException):
             self.skip_create = True
             return None
 

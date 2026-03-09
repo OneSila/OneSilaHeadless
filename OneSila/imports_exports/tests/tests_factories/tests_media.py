@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 from core.tests import TestCase
+from django.core.exceptions import ValidationError
 from imports_exports.factories.media import ImportDocumentInstance, ImportImageInstance
 from imports_exports.models import Import
 from media.models import DocumentType, Image, MediaProductThrough, Media
@@ -248,25 +249,25 @@ class ImportDocumentInstanceValidateTest(TestCase):
 
     def test_http_url_rejected(self):
         data = {"document_url": "http://example.com/certificate.pdf"}
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValidationError) as cm:
             ImportDocumentInstance(data, self.import_process)
         self.assertIn("HTTPS", str(cm.exception))
 
     def test_non_standard_https_port_rejected(self):
         data = {"document_url": "https://example.com:8443/certificate.pdf"}
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValidationError) as cm:
             ImportDocumentInstance(data, self.import_process)
         self.assertIn("standard HTTPS ports", str(cm.exception))
 
     def test_localhost_url_rejected(self):
         data = {"document_url": "https://localhost/certificate.pdf"}
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValidationError) as cm:
             ImportDocumentInstance(data, self.import_process)
         self.assertIn("Localhost", str(cm.exception))
 
     def test_private_ip_url_rejected(self):
         data = {"document_url": "https://10.0.0.5/certificate.pdf"}
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValidationError) as cm:
             ImportDocumentInstance(data, self.import_process)
         self.assertIn("Private or reserved IP addresses", str(cm.exception))
 

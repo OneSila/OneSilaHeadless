@@ -1,6 +1,7 @@
 import math
 import ipaddress
 from urllib.parse import urlparse
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Case, When, IntegerField, Value
 from django.db.models.functions import Cast, Least
@@ -13,18 +14,18 @@ def validate_external_fetch_url(*, url: str, label: str):
     parsed = urlparse(url)
     scheme = (parsed.scheme or "").lower()
     if scheme != "https":
-        raise ValueError(f"Only HTTPS {label} URLs are allowed.")
+        raise ValidationError(f"Only HTTPS {label} URLs are allowed.")
 
     hostname = (parsed.hostname or "").strip().lower()
     if not hostname:
-        raise ValueError(f"Invalid {label} URL host.")
+        raise ValidationError(f"Invalid {label} URL host.")
 
     port = parsed.port
     if port not in (None, 443):
-        raise ValueError(f"Only standard HTTPS ports are allowed for {label} imports.")
+        raise ValidationError(f"Only standard HTTPS ports are allowed for {label} imports.")
 
     if hostname in {"localhost", "127.0.0.1", "::1"}:
-        raise ValueError(f"Localhost URLs are not allowed for {label} imports.")
+        raise ValidationError(f"Localhost URLs are not allowed for {label} imports.")
 
     try:
         parsed_ip = ipaddress.ip_address(hostname)
@@ -39,7 +40,7 @@ def validate_external_fetch_url(*, url: str, label: str):
         or parsed_ip.is_reserved
         or parsed_ip.is_unspecified
     ):
-        raise ValueError(f"Private or reserved IP addresses are not allowed for {label} imports.")
+        raise ValidationError(f"Private or reserved IP addresses are not allowed for {label} imports.")
 
     return parsed
 

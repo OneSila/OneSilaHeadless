@@ -433,10 +433,9 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.data['acceptUserInvitation']['isActive'])
         self.assertTrue(resp.data['acceptUserInvitation']['invitationAccepted'])
 
-    def test_enable_disable_user(self):
+    def test_enable_disable_user_successfully_for_same_company(self):
         password = '22kk22@ksk!aAD'
-        company = MultiTenantCompany.objects.create(name='enableuser', country="DE")
-        user = MultiTenantUser(username='enabledisable@maadil.com', language="nl", multi_tenant_company=company,
+        user = MultiTenantUser(username='enabledisable@maadil.com', language="nl", multi_tenant_company=self.multi_tenant_company,
             is_active=False)
         user.set_password(password)
         user.save()

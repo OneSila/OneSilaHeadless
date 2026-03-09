@@ -88,4 +88,5 @@ class EbayProductStoreCategoryModelTest(TestCase):
                 primary_store_category=another_leaf_same_channel,
             )
 
-        self.assertIn("product", exc.exception.message_dict)
+        self.assertIn("__all__", exc.exception.message_dict)
+        self.assertIn("Product and Sales channel already exists", str(exc.exception))

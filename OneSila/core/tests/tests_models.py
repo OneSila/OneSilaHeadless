@@ -25,7 +25,7 @@ class TestMultiTenantUserLoginTokenTestCase(TestCase):
         token.set_expires_at(expires_at=present)
         token.refresh_from_db()
 
-        self.assertTrue(token.is_valid())
+        self.assertTrue(token.is_valid(now=present))
 
     def test_valid_token(self):
         token = baker.make("core.MultiTenantUserLoginToken")
