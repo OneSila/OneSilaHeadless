@@ -5,6 +5,7 @@ from io import TextIOWrapper
 import requests
 from django.core.exceptions import ValidationError
 from imports_exports.factories.imports import ImportMixin
+from imports_exports.helpers import validate_external_fetch_url
 from imports_exports.models import MappedImport, TypedImport
 
 
@@ -47,6 +48,7 @@ class MappedImportRunner(ImportMixin):
                 raise ValidationError("URL does not point to a .json resource.")
 
             try:
+                validate_external_fetch_url(url=self.import_process.json_url, label="JSON")
                 response = requests.get(self.import_process.json_url, timeout=10)
                 response.raise_for_status()
 

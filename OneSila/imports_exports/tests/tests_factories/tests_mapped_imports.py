@@ -1,7 +1,9 @@
 import json
 import tempfile
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from core.tests import TestCase
+from imports_exports.factories.importers.mapped import MappedImportRunner
 from imports_exports.models import MappedImport
 
 
@@ -91,3 +93,33 @@ class MappedImportUpdateOnlyBrokenRecordsTest(TestCase):
         self.assertEqual(mapped_import.status, 'success')
         self.assertEqual(mapped_import.broken_record_entries.count(), 1)
         self.assertIn('error', mapped_import.broken_records[0])
+
+
+class MappedImportRemoteJsonValidationTest(TestCase):
+    def test_localhost_json_url_rejected(self):
+        mapped_import = MappedImport.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type='product',
+            json_url='https://localhost/products.json',
+        )
+
+        runner = MappedImportRunner(mapped_import)
+
+        with self.assertRaises(ValidationError) as cm:
+            runner.prepare_import_process()
+
+        self.assertIn('Localhost', str(cm.exception))
+
+    def test_non_standard_json_port_rejected(self):
+        mapped_import = MappedImport.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type='product',
+            json_url='https://example.com:8443/products.json',
+        )
+
+        runner = MappedImportRunner(mapped_import)
+
+        with self.assertRaises(ValidationError) as cm:
+            runner.prepare_import_process()
+
+        self.assertIn('standard HTTPS ports', str(cm.exception))

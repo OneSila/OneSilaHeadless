@@ -7,7 +7,7 @@ from tempfile import NamedTemporaryFile
 from django.core.files import File
 from django.core.files.base import ContentFile
 from urllib.parse import urlparse
-import ipaddress
+from imports_exports.helpers import validate_external_fetch_url
 
 
 class ImportImageInstance(AbstractImportInstance):
@@ -79,12 +79,8 @@ class ImportImageInstance(AbstractImportInstance):
         Securely downloads an image from the given HTTPS URL.
         Returns a temporary file object if successful; otherwise, returns None.
         """
-        # @TODO: Temporary remove unitl we decide
-        # if not self.image_url.startswith("https://"):
-        #     self.skip_create = True
-        #     return None
-
         try:
+            validate_external_fetch_url(url=self.image_url, label="image")
             response = requests.get(self.image_url, stream=True, timeout=10)
             response.raise_for_status()
             content_type = response.headers.get("Content-Type", "")
@@ -97,7 +93,7 @@ class ImportImageInstance(AbstractImportInstance):
             temp_file.flush()
             return temp_file
 
-        except requests.RequestException:
+        except (ValueError, requests.RequestException):
             self.skip_create = True
             return None
 
@@ -258,30 +254,7 @@ class ImportDocumentInstance(AbstractImportInstance):
         if not hasattr(self, 'document_url') or not self.document_url:
             raise ValueError("The 'document_url' field is required.")
 
-        parsed = urlparse(self.document_url)
-        if parsed.scheme.lower() != "https":
-            raise ValueError("Only HTTPS document URLs are allowed.")
-
-        hostname = (parsed.hostname or "").strip().lower()
-        if not hostname:
-            raise ValueError("Invalid document URL host.")
-
-        if hostname in {"localhost", "127.0.0.1", "::1"}:
-            raise ValueError("Localhost URLs are not allowed for document imports.")
-
-        try:
-            parsed_ip = ipaddress.ip_address(hostname)
-        except ValueError:
-            parsed_ip = None
-
-        if parsed_ip and (
-            parsed_ip.is_private
-            or parsed_ip.is_loopback
-            or parsed_ip.is_link_local
-            or parsed_ip.is_multicast
-            or parsed_ip.is_reserved
-        ):
-            raise ValueError("Private or reserved IP addresses are not allowed for document imports.")
+        validate_external_fetch_url(url=self.document_url, label="document")
 
         extension = self._get_document_extension()
         if extension not in self.VALID_EXTENSIONS:

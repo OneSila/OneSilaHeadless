@@ -169,6 +169,54 @@ class ImportImageInstanceProcessTest(TestCase):
         self.assertTrue(instance.skip_create)
         self.assertIsNone(instance.instance)
 
+    def test_non_standard_https_port_rejected(self):
+        data = {
+            "image_url": "https://example.com:8443/image.jpg"
+        }
+
+        instance = ImportImageInstance(data, self.import_process)
+        instance.multi_tenant_company = self.import_process.multi_tenant_company
+        instance.process()
+
+        self.assertTrue(instance.skip_create)
+        self.assertIsNone(instance.instance)
+
+    def test_localhost_url_rejected(self):
+        data = {
+            "image_url": "https://localhost/image.jpg"
+        }
+
+        instance = ImportImageInstance(data, self.import_process)
+        instance.multi_tenant_company = self.import_process.multi_tenant_company
+        instance.process()
+
+        self.assertTrue(instance.skip_create)
+        self.assertIsNone(instance.instance)
+
+    def test_loopback_ip_rejected(self):
+        data = {
+            "image_url": "https://127.0.0.1/image.jpg"
+        }
+
+        instance = ImportImageInstance(data, self.import_process)
+        instance.multi_tenant_company = self.import_process.multi_tenant_company
+        instance.process()
+
+        self.assertTrue(instance.skip_create)
+        self.assertIsNone(instance.instance)
+
+    def test_private_ip_rejected(self):
+        data = {
+            "image_url": "https://10.0.0.5/image.jpg"
+        }
+
+        instance = ImportImageInstance(data, self.import_process)
+        instance.multi_tenant_company = self.import_process.multi_tenant_company
+        instance.process()
+
+        self.assertTrue(instance.skip_create)
+        self.assertIsNone(instance.instance)
+
     def test_non_image_content_type(self):
         data = {
             "image_url": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
@@ -203,6 +251,24 @@ class ImportDocumentInstanceValidateTest(TestCase):
         with self.assertRaises(ValueError) as cm:
             ImportDocumentInstance(data, self.import_process)
         self.assertIn("HTTPS", str(cm.exception))
+
+    def test_non_standard_https_port_rejected(self):
+        data = {"document_url": "https://example.com:8443/certificate.pdf"}
+        with self.assertRaises(ValueError) as cm:
+            ImportDocumentInstance(data, self.import_process)
+        self.assertIn("standard HTTPS ports", str(cm.exception))
+
+    def test_localhost_url_rejected(self):
+        data = {"document_url": "https://localhost/certificate.pdf"}
+        with self.assertRaises(ValueError) as cm:
+            ImportDocumentInstance(data, self.import_process)
+        self.assertIn("Localhost", str(cm.exception))
+
+    def test_private_ip_url_rejected(self):
+        data = {"document_url": "https://10.0.0.5/certificate.pdf"}
+        with self.assertRaises(ValueError) as cm:
+            ImportDocumentInstance(data, self.import_process)
+        self.assertIn("Private or reserved IP addresses", str(cm.exception))
 
     def test_invalid_extension_rejected(self):
         data = {"document_url": "https://example.com/certificate.exe"}
