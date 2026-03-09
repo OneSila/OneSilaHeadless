@@ -166,7 +166,7 @@ class ProductQuerySet(MultiTenantQuerySet):
 
             # Prices
             for sp in SalesPrice.objects.filter(product=product):
-                SalesPrice.objects.create(
+                SalesPrice.objects.get_or_create(
                     product=new_product,
                     currency=sp.currency,
                     rrp=sp.rrp,
@@ -175,7 +175,7 @@ class ProductQuerySet(MultiTenantQuerySet):
                 )
 
             for item in SalesPriceListItem.objects.filter(product=product):
-                SalesPriceListItem.objects.create(
+                SalesPriceListItem.objects.get_or_create(
                     salespricelist=item.salespricelist,
                     product=new_product,
                     price_auto=item.price_auto,

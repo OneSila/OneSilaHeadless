@@ -3,12 +3,13 @@ from typing import Optional
 from django.db.models import Max
 from django.utils import timezone
 from spapi import DefinitionsApi, ListingsApi
-from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
 )
+from sales_channels.integrations.amazon.helpers import is_amazon_document_field, is_amazon_internal_property
 from sales_channels.integrations.amazon.models import (
+    AmazonDocumentType,
     AmazonSalesChannelView,
     AmazonDefaultUnitConfigurator,
 )
@@ -315,8 +316,9 @@ class ExportDefinitionFactory:
 
 
 class UsageDefinitionFactory:
-    def __init__(self, public_definition):
+    def __init__(self, public_definition, *, document_mode=False):
         self.public_definition = public_definition
+        self.document_mode = document_mode
         self.current_path = []
 
     def run(self):
@@ -338,20 +340,63 @@ class UsageDefinitionFactory:
             result = {}
             for key, value in properties.items():
                 self.current_path.append(key)
-                if key == "marketplace_id":
-                    result[key] = "%auto:marketplace_id%"
-                elif key == "language_tag":
-                    result[key] = "%auto:language%"
-                elif key == "unit":
-                    attr_code = self._compose_attr_code()
-                    result[key] = f"%unit:{attr_code}%"
+                special_token = self._resolve_special_token(key=key)
+                if special_token is not None:
+                    result[key] = special_token
                 else:
                     result[key] = self._process(value)
                 self.current_path.pop()
             return result
 
+        if self.document_mode:
+            document_token = self._resolve_document_leaf_token()
+            if document_token is not None:
+                return document_token
+
         attr_code = self._compose_attr_code()
         return f"%value:{attr_code}%"
+
+    def _resolve_special_token(self, *, key):
+        if key == "marketplace_id":
+            return "%auto:marketplace_id%"
+
+        if key == "unit":
+            attr_code = self._compose_attr_code()
+            return f"%unit:{attr_code}%"
+
+        if not self.document_mode:
+            if key == "language_tag":
+                return "%auto:language%"
+            return None
+
+        if key in {"language_tag", "content_language"}:
+            return "%document_language%"
+        if key == "content_type":
+            return "%document_type%"
+        if key in {"source_location", "media_location", "document_url", "file_url"}:
+            return "%document_url%"
+
+        if key == "value" and self.public_definition.document_field_kind == "SDS_URL":
+            return "%document_url%"
+
+        return None
+
+    def _resolve_document_leaf_token(self):
+        kind = self.public_definition.document_field_kind
+        current_key = self.current_path[-1] if self.current_path else ""
+        current_key = str(current_key or "").strip().lower()
+
+        if current_key in {"source_location", "media_location", "document_url", "file_url"}:
+            return "%document_url%"
+        if current_key in {"content_language", "language_tag"}:
+            return "%document_language%"
+        if current_key == "content_type":
+            return "%document_type%"
+
+        if kind in {"IMAGE_PF", "IMAGE_PS", "SDS_URL"}:
+            return "%document_url%"
+
+        return None
 
     def _compose_attr_code(self):
         keys = []
@@ -445,14 +490,27 @@ class DefaultUnitConfiguratorFactory:
 class AmazonProductTypeRuleFactory(
     GetAmazonAPIMixin,
 ):
+    @staticmethod
+    def _normalise_compliance_content_type_label(*, value):
+        return str(value or "").replace("_", " ").strip().title()
+
+    @staticmethod
+    def _normalise_pf_suffix(*, value):
+        normalized = str(value or "").strip().lower()
+        if normalized == "gb":
+            return "uk"
+        return normalized
+
     def __init__(
         self,
         product_type_code,
         sales_channel,
+        product_type_id=None,
         api=None,
         language=None,
     ):
         self.product_type_code = product_type_code
+        self.product_type_id = product_type_id
         self.sales_channel = sales_channel
         self.language = language or sales_channel.multi_tenant_company.language
         self.multi_tenant_company = sales_channel.multi_tenant_company
@@ -465,6 +523,13 @@ class AmazonProductTypeRuleFactory(
             self.api = api
 
     def get_or_create_product_type(self):
+        if self.product_type_id is not None:
+            return AmazonProductType.objects.get(
+                id=self.product_type_id,
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
         try:
             product_type, _ = AmazonProductType.objects.get_or_create(
                 product_type_code=self.product_type_code,
@@ -591,6 +656,7 @@ class AmazonProductTypeRuleFactory(
         required_properties,
         view,
         offer_allowed_properties,
+        is_default=False,
     ):
         """
         Go over the parsed schema_definition and sync AmazonPublicDefinition models.
@@ -605,7 +671,8 @@ class AmazonProductTypeRuleFactory(
         public_def.name = schema_definition["title"] if "title" in schema_definition else f"{attr_code} {view.api_region_code}"
         public_def.raw_schema = schema_definition
         public_def.is_required = attr_code in required_properties
-        public_def.is_internal = attr_code in AMAZON_INTERNAL_PROPERTIES
+        public_def.is_document_field = is_amazon_document_field(code=attr_code)
+        public_def.is_internal = is_amazon_internal_property(code=attr_code) or public_def.is_document_field
 
         allowed = False
         if attr_code != "variation_theme" and self.product_type.variation_themes:
@@ -621,6 +688,34 @@ class AmazonProductTypeRuleFactory(
         )
         public_def.save()
 
+        if public_def.is_document_field:
+            usage_definition = UsageDefinitionFactory(
+                public_def,
+                document_mode=True,
+            ).run()
+            update_fields = []
+
+            if public_def.usage_definition != usage_definition:
+                public_def.usage_definition = usage_definition
+                update_fields.append("usage_definition")
+
+            if public_def.export_definition is not None:
+                public_def.export_definition = None
+                update_fields.append("export_definition")
+
+            public_def.last_fetched = timezone.now()
+            update_fields.append("last_fetched")
+
+            if update_fields:
+                public_def.save(update_fields=list(dict.fromkeys(update_fields)))
+
+            self._sync_document_types(
+                public_definition=public_def,
+                view=view,
+                is_default=is_default,
+            )
+            return public_def
+
         if public_def.should_refresh() and not public_def.is_internal:
 
             # These factories will handle smart fallback logic (for now: pass)
@@ -634,6 +729,178 @@ class AmazonProductTypeRuleFactory(
             public_def.save()
 
         return public_def
+
+    def _extract_image_pf_suffix(self, *, code):
+        normalized_code = str(code or "").strip().lower()
+        if not normalized_code.startswith("image_locator_") or not normalized_code.endswith("pf"):
+            return ""
+        return normalized_code[len("image_locator_"):-2]
+
+    def _preferred_image_pf_suffixes(self, *, view):
+        suffixes = set()
+
+        country_code = getattr(self.sales_channel, "country", None)
+        if country_code:
+            suffixes.add(self._normalise_pf_suffix(value=country_code))
+
+        remote_language = view.remote_languages.first() if view is not None else None
+        remote_code = str(getattr(remote_language, "remote_code", "") or "").strip().lower()
+        if remote_code:
+            for chunk in remote_code.replace("-", "_").split("_"):
+                if len(chunk) == 2:
+                    suffixes.add(self._normalise_pf_suffix(value=chunk))
+
+        company_language = str(getattr(self.multi_tenant_company, "language", "") or "").strip().lower()
+        if company_language:
+            language_key = company_language.split("-")[0].split("_")[0]
+            language_map = {
+                "en": "uk",
+                "de": "de",
+                "fr": "fr",
+                "es": "es",
+                "it": "it",
+                "nl": "nl",
+                "pl": "pl",
+                "sv": "se",
+                "tr": "tr",
+            }
+            mapped = language_map.get(language_key)
+            if mapped:
+                suffixes.add(mapped)
+
+        return {item for item in suffixes if item}
+
+    def _should_update_document_type_text(
+        self,
+        *,
+        public_definition,
+        view,
+        is_default,
+        current_value,
+    ):
+        if not current_value:
+            return True
+        if not is_default:
+            return False
+        if public_definition.document_field_kind != "IMAGE_PF":
+            return True
+
+        incoming_suffix = self._normalise_pf_suffix(
+            value=self._extract_image_pf_suffix(code=public_definition.code),
+        )
+        if not incoming_suffix:
+            return False
+
+        preferred_suffixes = self._preferred_image_pf_suffixes(view=view)
+        if not preferred_suffixes:
+            return True
+        return incoming_suffix in preferred_suffixes
+
+    def _sync_document_types(self, *, public_definition, view, is_default):
+        kind = public_definition.document_field_kind
+        if not kind:
+            return
+
+        schema = public_definition.raw_schema or {}
+        raw_description = str(schema.get("description") or "").strip()
+        specs: list[dict] = []
+
+        if kind == "IMAGE_PF":
+            specs.append(
+                {
+                    "remote_id": "image_locator_pf",
+                    "name": "Safety Image (PF)",
+                    "description": raw_description or "Marketplace-specific safety image locator field.",
+                }
+            )
+        elif kind == "IMAGE_PS":
+            description = raw_description or "Safety image locator fields PS01-PS06."
+            if "PS01" not in description and "PS06" not in description:
+                description = f"{description} Up to 6 per product."
+            specs.append(
+                {
+                    "remote_id": "image_locator_ps",
+                    "name": "Safety Image (PS)",
+                    "description": description,
+                }
+            )
+        elif kind == "SDS_URL":
+            specs.append(
+                {
+                    "remote_id": "safety_data_sheet_url",
+                    "name": "Safety Data Sheet URL",
+                    "description": raw_description or "Safety data sheet URL for the marketplace.",
+                }
+            )
+        elif kind == "COMPLIANCE_MEDIA":
+            content_type_schema = (
+                (schema.get("items") or {})
+                .get("properties", {})
+                .get("content_type", {})
+            )
+            enum_values = content_type_schema.get("enum", []) or []
+            enum_names = content_type_schema.get("enumNames", []) or []
+            content_type_description = str(content_type_schema.get("description") or "").strip()
+            description = raw_description or content_type_description
+            name_map = {}
+            for index, enum_value in enumerate(enum_values):
+                label = enum_names[index] if index < len(enum_names) else enum_value
+                name_map[str(enum_value)] = self._normalise_compliance_content_type_label(value=label)
+
+            for enum_value in public_definition.document_allowed_types:
+                specs.append(
+                    {
+                        "remote_id": f"compliance_media__{enum_value}",
+                        "name": name_map.get(enum_value, self._normalise_compliance_content_type_label(value=enum_value)),
+                        "description": description or "Compliance media document type.",
+                    }
+                )
+
+        for spec in specs:
+            remote_id = str(spec.get("remote_id") or "").strip()
+            if not remote_id:
+                continue
+
+            amazon_document_type = AmazonDocumentType.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_id=remote_id,
+            ).first()
+            if amazon_document_type is None:
+                AmazonDocumentType.objects.create(
+                    multi_tenant_company=self.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    remote_id=remote_id,
+                    name=spec.get("name"),
+                    description=spec.get("description"),
+                )
+                continue
+
+            updated_fields = []
+            can_update_name = self._should_update_document_type_text(
+                public_definition=public_definition,
+                view=view,
+                is_default=is_default,
+                current_value=amazon_document_type.name,
+            )
+            can_update_description = self._should_update_document_type_text(
+                public_definition=public_definition,
+                view=view,
+                is_default=is_default,
+                current_value=amazon_document_type.description,
+            )
+
+            if spec.get("name") and amazon_document_type.name != spec["name"] and can_update_name:
+                amazon_document_type.name = spec["name"]
+                updated_fields.append("name")
+            if (
+                spec.get("description")
+                and amazon_document_type.description != spec["description"]
+                and can_update_description
+            ):
+                amazon_document_type.description = spec["description"]
+                updated_fields.append("description")
+            if updated_fields:
+                amazon_document_type.save(update_fields=updated_fields)
 
     def _resolve_property_type(self, existing_type: str, new_type: str) -> str:
         """Return the most permissive property type based on the rules provided."""
@@ -784,6 +1051,7 @@ class AmazonProductTypeRuleFactory(
             required_properties,
             view,
             offer_allowed_properties,
+            is_default=is_default,
         )
 
         if public_definition.is_internal:

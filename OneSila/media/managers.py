@@ -3,11 +3,65 @@ from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
 import base64
 from hashlib import sha256
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
 
 
 class MediaQuerySet(MultiTenantQuerySet):
-    pass
+    def is_internal_document_media(self, *, media):
+        from .models import DocumentType, Media
+
+        if media is None or getattr(media, "type", None) != Media.FILE:
+            return False
+
+        document_type = getattr(media, "document_type", None)
+        code = getattr(document_type, "code", None)
+        if code:
+            return code == DocumentType.INTERNAL_CODE
+
+        document_type_id = getattr(media, "document_type_id", None)
+        if not document_type_id:
+            return False
+
+        resolved_code = (
+            DocumentType.objects.filter(id=document_type_id)
+            .values_list("code", flat=True)
+            .first()
+        )
+        return resolved_code == DocumentType.INTERNAL_CODE
+
+
+class DocumentTypeQuerySet(MultiTenantQuerySet):
+    def delete(self, *args, **kwargs):
+        force_delete = kwargs.pop("force_delete", False)
+
+        from .models import DocumentType
+        if not force_delete and self.filter(code=DocumentType.INTERNAL_CODE).exists():
+            raise ValidationError(DocumentType.INTERNAL_DELETE_ERROR_MESSAGE)
+
+        return super().delete(*args, **kwargs)
+
+    def create_internal_for_company(self, *, multi_tenant_company):
+        from .models import DocumentType
+
+        return self.get_or_create(
+            multi_tenant_company=multi_tenant_company,
+            code=DocumentType.INTERNAL_CODE,
+            defaults={
+                "name": DocumentType.INTERNAL_NAME,
+                "description": DocumentType.INTERNAL_DESCRIPTION,
+            },
+        )
+
+
+class DocumentTypeManager(MultiTenantManager):
+    def get_queryset(self):
+        return DocumentTypeQuerySet(self.model, using=self._db)
+
+    def create_internal_for_company(self, *, multi_tenant_company):
+        return self.get_queryset().create_internal_for_company(
+            multi_tenant_company=multi_tenant_company,
+        )
 
 
 class MediaProductThroughQuerySet(MultiTenantQuerySet):
@@ -50,8 +104,16 @@ class MediaProductThroughQuerySet(MultiTenantQuerySet):
         return (
             self.get_product_media(product=product, sales_channel=sales_channel)
             .filter(media__type=Media.FILE)
-            .order_by("sort_order")
+            .order_by("sort_order", "id")
         )
+
+    def get_public_product_documents(self, *, product, sales_channel=None):
+        from media.models import DocumentType
+
+        return self.get_product_documents(
+            product=product,
+            sales_channel=sales_channel,
+        ).exclude(media__document_type__code=DocumentType.INTERNAL_CODE)
 
     def get_product_videos(self, *, product, sales_channel=None):
         from media.models import Media
@@ -79,6 +141,9 @@ class MediaProductThroughManager(MultiTenantManager):
     def get_product_documents(self, *, product, sales_channel=None):
         return self.get_queryset().get_product_documents(product=product, sales_channel=sales_channel)
 
+    def get_public_product_documents(self, *, product, sales_channel=None):
+        return self.get_queryset().get_public_product_documents(product=product, sales_channel=sales_channel)
+
     def get_product_videos(self, *, product, sales_channel=None):
         return self.get_queryset().get_product_videos(product=product, sales_channel=sales_channel)
 
@@ -86,6 +151,9 @@ class MediaProductThroughManager(MultiTenantManager):
 class MediaManager(MultiTenantManager):
     def get_queryset(self):
         return MediaQuerySet(self.model, using=self._db)
+
+    def is_internal_document_media(self, *, media):
+        return self.get_queryset().is_internal_document_media(media=media)
 
     @staticmethod
     def _decode_base64(image_raw_base64: bytes) -> bytes:

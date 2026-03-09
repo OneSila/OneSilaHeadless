@@ -58,3 +58,36 @@ class AccountRecoveryTestCase(TestCase):
             self.fail("Shouldn't be able to login with an expired token")
         except ValidationError:
             pass
+
+    def test_token_is_single_use(self):
+        fac = RequestLoginTokenFactory(self.user)
+        fac.run()
+        token = fac.token.token
+
+        fac = AuthenticateTokenFactory(token)
+        fac.run()
+        fac.consume_token()
+
+        try:
+            fac = AuthenticateTokenFactory(token)
+            fac.run()
+            self.fail("Shouldn't be able to login twice with the same token")
+        except ValidationError:
+            pass
+
+    def test_new_token_invalidates_previous_token(self):
+        first = RequestLoginTokenFactory(self.user)
+        first.run()
+
+        second = RequestLoginTokenFactory(self.user)
+        second.run()
+
+        try:
+            fac = AuthenticateTokenFactory(first.token.token)
+            fac.run()
+            self.fail("Shouldn't be able to login with an older token")
+        except ValidationError:
+            pass
+
+        fac = AuthenticateTokenFactory(second.token.token)
+        fac.run()

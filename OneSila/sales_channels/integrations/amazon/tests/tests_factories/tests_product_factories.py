@@ -189,7 +189,7 @@ class AmazonProductTestMixin:
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.view,
-            recommended_browse_node_id="1",
+            remote_id="1",
         )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -3181,7 +3181,7 @@ class AmazonProductFallbackValuesTest(DisableWooCommerceSignalsMixin, TestCase, 
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.default_view,
-            recommended_browse_node_id="BN1",
+            remote_id="BN1",
         )
 
     def test_fallback_to_default_view(self):
@@ -3202,7 +3202,7 @@ class AmazonProductFallbackValuesTest(DisableWooCommerceSignalsMixin, TestCase, 
         self.assertEqual(ext.value, "ASINDEF")
         self.assertTrue(factory._get_gtin_exemption())
         self.assertEqual(factory._get_variation_theme(self.product), "SIZE")
-        self.assertEqual(factory._get_recommended_browse_node_id(), "BN1")
+        self.assertEqual(factory._get_browse_node_remote_id(), "BN1")
         attrs = factory.build_basic_attributes()
 
         self.assertEqual(

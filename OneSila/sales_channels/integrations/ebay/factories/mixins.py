@@ -44,6 +44,7 @@ class GetEbayAPIMixin:
             "refresh_token": self.sales_channel.refresh_token,
             "refresh_token_expiry": self.sales_channel.refresh_token_expiration.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
             "email_or_username": "OneSila",
+            "scopes": settings.EBAY_APPLICATION_SCOPES,
             "password": "???"  # For some reason username and password are validating even if we provide the
             # refresh_token and we can add anything here
         }
@@ -126,6 +127,12 @@ class GetEbayAPIMixin:
 
         return "https://api.ebay.com/sell/account/v1"
 
+    def _get_stores_api_base_url(self) -> str:
+        if self.sales_channel.environment == EbaySalesChannel.SANDBOX:
+            return "https://api.sandbox.ebay.com/sell/stores/v1"
+
+        return "https://api.ebay.com/sell/stores/v1"
+
     def _get_account_headers(self) -> dict[str, str]:
         api = getattr(self, "api", None)
         if api is None:
@@ -149,6 +156,23 @@ class GetEbayAPIMixin:
             return response.json()
         except ValueError:
             return {}
+
+    def _request_store(self, *, endpoint: str) -> dict:
+        """Call Store API with user token via requests, bypassing broken wrapper auth mode."""
+        url = f"{self._get_stores_api_base_url()}/{endpoint}"
+        headers = self._get_account_headers()
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        try:
+            return response.json()
+        except ValueError:
+            return {}
+
+    def get_store(self) -> dict:
+        return self._request_store(endpoint="store")
+
+    def get_store_categories(self) -> dict:
+        return self._request_store(endpoint="store/categories")
 
     def get_fulfillment_policies(self) -> dict:
         return self._request_account_policy("fulfillment_policy", self.view.remote_id)

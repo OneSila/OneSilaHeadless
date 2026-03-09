@@ -3,7 +3,9 @@ from django.core.exceptions import ValidationError
 from core import models
 from products.models import Product
 from sales_channels.integrations.ebay.managers import EbayCategoryManager
+from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models import SalesChannel, SalesChannelView
+from sales_channels.models.products import RemoteProductCategory
 
 
 class EbayCategory(models.SharedModel):
@@ -34,7 +36,7 @@ class EbayCategory(models.SharedModel):
         return f"{display_name} ({self.remote_id})"
 
 
-class EbayProductCategory(models.Model):
+class EbayProductCategoryOld(models.Model):
     """Link a product and view to a recommended eBay category."""
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
@@ -48,31 +50,204 @@ class EbayProductCategory(models.Model):
             models.Index(fields=["product", "view"]),
         ]
 
+
+
+class EbayProductCategory(RemoteProductCategory):
+    secondary_category_id = models.CharField(max_length=50, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "eBay Product Category"
+        verbose_name_plural = "eBay Product Categories"
+
     def __str__(self) -> str:
         return f"{self.product} @ {self.view}: {self.remote_id}"
 
     def clean(self):
         super().clean()
 
-        remote_id = (self.remote_id or "").strip()
-        if not remote_id:
-            return
-
         tree_id = getattr(self.view, "default_category_tree_id", None)
-        categories = EbayCategory.objects.filter(remote_id=remote_id)
-        if tree_id:
-            categories = categories.filter(marketplace_default_tree_id=tree_id)
+        category_ids = {
+            field_name: (getattr(self, field_name, None) or "").strip()
+            for field_name in ("remote_id", "secondary_category_id")
+        }
+        errors = {}
+        for field_name, remote_id in category_ids.items():
+            if not remote_id:
+                continue
 
-        try:
-            category = categories.get()
-        except EbayCategory.DoesNotExist as exc:
-            raise ValidationError({"remote_id": "eBay category does not exist for the given remote ID."}) from exc
-        except EbayCategory.MultipleObjectsReturned as exc:
-            raise ValidationError({"remote_id": "Multiple eBay categories found for the given remote ID."}) from exc
+            categories = EbayCategory.objects.filter(remote_id=remote_id)
+            if tree_id:
+                categories = categories.filter(marketplace_default_tree_id=tree_id)
 
-        if category.has_children:
-            raise ValidationError({"remote_id": "Only leaf eBay categories can be assigned."})
+            try:
+                category = categories.get()
+            except EbayCategory.DoesNotExist:
+                errors[field_name] = "eBay category does not exist for the given remote ID."
+                continue
+            except EbayCategory.MultipleObjectsReturned:
+                errors[field_name] = "Multiple eBay categories found for the given remote ID."
+                continue
+
+            if category.has_children:
+                errors[field_name] = "Only leaf eBay categories can be assigned."
+
+        if (
+            category_ids["remote_id"]
+            and category_ids["secondary_category_id"]
+            and category_ids["remote_id"] == category_ids["secondary_category_id"]
+        ):
+            message = "Primary and secondary eBay categories cannot be the same."
+            errors.setdefault("remote_id", message)
+            errors.setdefault("secondary_category_id", message)
+
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class EbayStoreCategory(RemoteObjectMixin, models.Model):
+    name = models.CharField(max_length=255)
+    order = models.IntegerField(default=0)
+    level = models.PositiveIntegerField(default=1)
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="children",
+    )
+    is_leaf = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("sales_channel", "remote_id")
+        indexes = [
+            models.Index(fields=["sales_channel", "remote_id"]),
+            models.Index(fields=["sales_channel", "parent"]),
+        ]
+        search_terms = ["remote_id", "name"]
+        verbose_name = "eBay Store Category"
+        verbose_name_plural = "eBay Store Categories"
+
+    @property
+    def full_path(self) -> str:
+        names: list[str] = []
+        seen: set[int] = set()
+        current = self
+
+        while current is not None:
+            key = current.pk if current.pk else id(current)
+            if key in seen:
+                break
+            seen.add(key)
+            if current.name:
+                names.append(current.name.strip("/"))
+            current = current.parent
+
+        if not names:
+            return "/"
+
+        return "/" + "/".join(reversed(names))
+
+    def __str__(self) -> str:
+        return f"{self.full_path} ({self.remote_id})"
+
+
+class EbayProductStoreCategory(models.Model):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="ebay_store_categories",
+    )
+    sales_channel = models.ForeignKey(
+        SalesChannel,
+        on_delete=models.CASCADE,
+        related_name="ebay_product_store_categories",
+        null=True,
+        blank=True,
+    )
+    primary_store_category = models.ForeignKey(
+        "ebay.EbayStoreCategory",
+        on_delete=models.CASCADE,
+        related_name="primary_product_store_categories",
+    )
+    secondary_store_category = models.ForeignKey(
+        "ebay.EbayStoreCategory",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="secondary_product_store_categories",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "sales_channel"],
+                name="ebay_product_store_category_unique_product_sales_channel",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["product"]),
+            models.Index(fields=["product", "sales_channel"]),
+            models.Index(fields=["sales_channel"]),
+            models.Index(fields=["primary_store_category"]),
+            models.Index(fields=["secondary_store_category"]),
+        ]
+        verbose_name = "eBay Product Store Category"
+        verbose_name_plural = "eBay Product Store Categories"
+
+    def clean(self):
+        super().clean()
+
+        if not self.primary_store_category_id:
+            return
+
+        if self.primary_store_category_id and not self.primary_store_category.is_leaf:
+            raise ValidationError({
+                "primary_store_category": "Primary store category must be a leaf category."
+            })
+
+        if self.secondary_store_category_id and self.secondary_store_category_id == self.primary_store_category_id:
+            raise ValidationError({
+                "secondary_store_category": "Secondary store category cannot be the same as primary store category."
+            })
+
+        if self.secondary_store_category_id and not self.secondary_store_category.is_leaf:
+            raise ValidationError({
+                "secondary_store_category": "Secondary store category must be a leaf category."
+            })
+
+        if (
+            self.secondary_store_category_id
+            and self.primary_store_category.sales_channel_id != self.secondary_store_category.sales_channel_id
+        ):
+            raise ValidationError({
+                "secondary_store_category": "Primary and secondary store categories must belong to the same sales channel."
+            })
+
+        if self.sales_channel_id and self.primary_store_category.sales_channel_id != self.sales_channel_id:
+            raise ValidationError({
+                "sales_channel": "Sales channel must match the store categories sales channel."
+            })
+
+    def save(self, *args, **kwargs):
+        primary_id = getattr(self, "primary_store_category_id", None)
+        if primary_id:
+            primary_sales_channel_id = self.primary_store_category.sales_channel_id
+            if self.sales_channel_id != primary_sales_channel_id:
+                self.sales_channel_id = primary_sales_channel_id
+                update_fields = kwargs.get("update_fields")
+                if update_fields is not None:
+                    update_fields = set(update_fields)
+                    update_fields.add("sales_channel")
+                    kwargs["update_fields"] = list(update_fields)
+
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        if self.secondary_store_category:
+            return f"{self.product}: {self.primary_store_category.full_path}, {self.secondary_store_category.full_path}"
+        return f"{self.product}: {self.primary_store_category.full_path}"

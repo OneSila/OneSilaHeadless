@@ -6,10 +6,10 @@ from django.db import IntegrityError
 from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from currencies.models import Currency, PublicCurrency
 from eancodes.models import EanCode
-from imports_exports.factories.media import ImportImageInstance
+from imports_exports.factories.media import ImportDocumentInstance, ImportImageInstance
 from imports_exports.factories.mixins import AbstractImportInstance, ImportOperationMixin
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportProductPropertyInstance
-from media.models import Image, MediaProductThrough
+from media.models import File, Image, Media, MediaProductThrough
 from products.models import (
     Product,
     ProductTranslation,
@@ -113,6 +113,7 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         self.set_field_if_exists('translations')
 
         self.set_field_if_exists('images')
+        self.set_field_if_exists('documents')
         self.set_field_if_exists('prices')
         self.set_field_if_exists('sales_pricelist_items')
 
@@ -152,6 +153,8 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         self.translation_instances = ProductTranslation.objects.none()
         self.image_instances = Image.objects.none()
         self.images_associations_instances = MediaProductThrough.objects.none()
+        self.document_instances = File.objects.none()
+        self.documents_associations_instances = MediaProductThrough.objects.none()
         self.variations_products_instances = Product.objects.none()
         self.bundle_variations_instances = Product.objects.none()
         self.alias_variations_instances = Product.objects.none()
@@ -458,6 +461,34 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         self.images_associations_instances = MediaProductThrough.objects.filter(id__in=images_instances_associations_ids)
 
     @timeit_and_log(logger)
+    def set_documents(self):
+
+        documents_instances_ids = []
+        documents_instances_associations_ids = []
+        product_has_documents = self.instance.mediaproductthrough_set.filter(media__type=Media.FILE).exists()
+        if self._skip_when_override(has_value=product_has_documents):
+            return
+
+        for document in self.documents:
+            document_import_instance = ImportDocumentInstance(
+                document,
+                import_process=self.import_process,
+                product=self.instance,
+                sales_channel=self.sales_channel,
+                create_default_assignment=not product_has_documents if self.sales_channel is not None else False
+            )
+            document_import_instance.process()
+
+            if document_import_instance.instance is not None:
+                documents_instances_ids.append(document_import_instance.instance.id)
+
+            if hasattr(document_import_instance, 'media_assign') and document_import_instance.media_assign is not None:
+                documents_instances_associations_ids.append(document_import_instance.media_assign.id)
+
+        self.document_instances = File.objects.filter(id__in=documents_instances_ids)
+        self.documents_associations_instances = MediaProductThrough.objects.filter(id__in=documents_instances_associations_ids)
+
+    @timeit_and_log(logger)
     def set_prices(self):
         sales_price_ids = []
         for price in self.prices:
@@ -646,6 +677,9 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
         if hasattr(self, 'images'):
             self.set_images()
+
+        if hasattr(self, 'documents'):
+            self.set_documents()
 
         if hasattr(self, 'prices'):
             self.set_prices()

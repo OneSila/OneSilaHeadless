@@ -15,14 +15,15 @@ from .fields import (
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
     SalesChannelViewAssignType, SalesChannelContentTemplateType, SalesChannelImportType, RemoteLanguageType, \
     RemoteCurrencyType, ImportPropertyType, SalesChannelContentTemplateCheckType, FormattedIssueType, \
-    SalesChannelGptFeedType
+    SalesChannelGptFeedType, RemoteDocumentTypeType
 from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInput, SalesChannelInput, \
     SalesChannelPartialInput, \
     SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
     SalesChannelViewPartialInput, SalesChannelViewAssignInput, SalesChannelViewAssignPartialInput, \
     SalesChannelContentTemplateInput, SalesChannelContentTemplatePartialInput, \
     SalesChannelGptFeedPartialInput, \
-    RemoteLanguagePartialInput, RemoteCurrencyPartialInput, ImportPropertyInput
+    RemoteLanguagePartialInput, RemoteCurrencyPartialInput, ImportPropertyInput, \
+    RemoteDocumentTypePartialInput
 from core.helpers import get_languages
 from products.models import Product
 from sales_channels.content_templates import (
@@ -56,12 +57,14 @@ class SalesChannelsMutation:
     update_sales_channel_view: SalesChannelViewType = update(SalesChannelViewPartialInput)
     update_remote_language: RemoteLanguageType = update(RemoteLanguagePartialInput)
     update_remote_currency: RemoteCurrencyType = update(RemoteCurrencyPartialInput)
+    update_remote_document_type: RemoteDocumentTypeType = update(RemoteDocumentTypePartialInput)
 
     # Language Bulk Update
     update_remote_languages: List[RemoteLanguageType] = update(List[RemoteLanguagePartialInput])
 
     # Currency Bulk Update
     update_remote_currencies: List[RemoteCurrencyType] = update(List[RemoteCurrencyPartialInput])
+    update_remote_document_types: List[RemoteDocumentTypeType] = update(List[RemoteDocumentTypePartialInput])
 
     create_import_properties: List[ImportPropertyType] = create(List[ImportPropertyInput])
 

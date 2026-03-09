@@ -235,7 +235,10 @@ class MultiTenantUserLoginToken(models.Model):
 
         self.__class__.objects.filter(id=self.id).update(expires_at=expires_at)
 
-    def is_valid(self, now=timezone.now()):
+    def is_valid(self, now=None):
+        if now is None:
+            now = timezone.now()
+
         return self.expires_at >= now
 
 

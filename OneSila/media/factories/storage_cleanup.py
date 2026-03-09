@@ -13,7 +13,7 @@ class CleanupMediaStorageFactory:
     Cleanup the image and cached image for a delted media instance.
     No need to handle Image instance. They Image model is a proxy to the Media model.
     """
-    NATIVE_DJANGO_FIELD_TYPES = ['image', 'file']
+    NATIVE_DJANGO_FIELD_TYPES = ['image', 'file', 'document_image_thumbnail']
     IMAGEKIT_FIELD_TYPES = ['onesila_thumbnail', 'image_web']
 
     def __init__(self, media_instance):

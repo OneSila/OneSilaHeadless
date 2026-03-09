@@ -122,7 +122,7 @@ class BulkAmazonPropertySelectValueLocalInstanceInput:
     local_instance_id: Optional[GlobalID] = None
 
 
-@input(AmazonProductBrowseNode, fields="__all__")
+@input(AmazonProductBrowseNode, exclude=['remoteproductcategory_ptr'])
 class AmazonProductBrowseNodeInput:
     pass
 

@@ -29,6 +29,7 @@ from sales_channels.models import (
     RemoteProductContent,
     RemoteProductProperty,
     RemoteProperty,
+    RemoteDocumentType,
     RemotePropertySelectValue,
     RemoteVat,
     SalesChannel,
@@ -59,6 +60,7 @@ from .filters import (
     RemoteProductContentFilter,
     RemoteProductPropertyFilter,
     RemotePropertyFilter,
+    RemoteDocumentTypeFilter,
     RemotePropertySelectValueFilter,
     RemoteVatFilter,
     SalesChannelFilter,
@@ -88,6 +90,7 @@ from .ordering import (
     RemoteProductContentOrder,
     RemoteProductPropertyOrder,
     RemotePropertyOrder,
+    RemoteDocumentTypeOrder,
     RemotePropertySelectValueOrder,
     RemoteVatOrder,
     SalesChannelOrder,
@@ -382,6 +385,12 @@ class RemotePropertyType(relay.Node, GetQuerysetMultiTenantMixin):
         if isinstance(instance, (MagentoProperty, WoocommerceGlobalAttribute)):
             return to_base64(RemotePropertyType, self.pk)
         return to_base64(RemotePropertyType, self.pk)
+
+
+@type(RemoteDocumentType, filters=RemoteDocumentTypeFilter, order=RemoteDocumentTypeOrder, pagination=True, fields='__all__')
+class RemoteDocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: SalesChannelType
+    local_instance: Optional[Annotated['DocumentTypeType', lazy("media.schema.types.types")]]
 
 
 @type(RemotePropertySelectValue, filters=RemotePropertySelectValueFilter, order=RemotePropertySelectValueOrder, pagination=True, fields='__all__')

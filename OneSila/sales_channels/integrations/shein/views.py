@@ -35,6 +35,17 @@ def _normalize_header(request, name: str) -> str | None:
     return text or None
 
 
+def _is_shein_webhook_probe(*, request) -> bool:
+    return request.method in {"GET", "HEAD", "OPTIONS"}
+
+
+def _has_request_body(*, request) -> bool:
+    content_length = request.META.get("CONTENT_LENGTH")
+    if content_length not in {None, "", "0", 0}:
+        return True
+    return bool(request.body)
+
+
 def _verify_shein_webhook_signature(*, sales_channel: SheinSalesChannel, request) -> bool:
     signature = _normalize_header(request, "x-lt-signature")
     timestamp = _normalize_header(request, "x-lt-timestamp")
@@ -172,12 +183,22 @@ def _extract_webhook_payload(*, request) -> dict | None:
 
 @csrf_exempt
 def shein_product_document_audit_status_notice(request):
+    if _is_shein_webhook_probe(request=request):
+        return JsonResponse({"status": "ok"})
+
     sales_channel = _get_sales_channel_from_request(request)
     if not sales_channel:
         return HttpResponse(status=401)
 
     if not _verify_shein_webhook_signature(sales_channel=sales_channel, request=request):
         return HttpResponse(status=401)
+
+    if not _has_request_body(request=request):
+        logger.info(
+            "Acknowledging signed SHEIN webhook probe without payload",
+            extra={"event_code": _normalize_header(request, "x-lt-eventCode")},
+        )
+        return JsonResponse({"status": "ok"})
 
     payload = _extract_webhook_payload(request=request)
     if not isinstance(payload, dict):

@@ -1,4 +1,4 @@
-from .categories import EbayCategory, EbayProductCategory
+from .categories import EbayCategory, EbayProductCategory, EbayStoreCategory, EbayProductStoreCategory
 from .orders import EbayOrder, EbayOrderItem
 from .products import (
     EbayProduct,
@@ -17,3 +17,8 @@ from .sales_channels import (
 )
 from .taxes import EbayCurrency
 from .imports import EbaySalesChannelImport
+from .documents import (
+    EbayDocumentType,
+    EbayRemoteDocument,
+    EbayDocumentThroughProduct,
+)

@@ -1401,8 +1401,6 @@ class SheinProductPayloadFactoryTests(TestCase):
         factory.rule = rule
 
         payload = factory.build_payload()
-        import pprint
-        pprint.pprint(payload)
 
         sale_attribute = payload.get("sale_attribute") or {}
         sale_attribute_list = payload.get("sale_attribute_list") or []

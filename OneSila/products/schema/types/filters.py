@@ -111,7 +111,7 @@ class ProductFilter(
         browse_node_qs = AmazonBrowseNode.objects.filter(pk=amazon_browse_node_id)
         return AmazonProductBrowseNode.objects.filter(
             product_id=OuterRef("pk"),
-            recommended_browse_node_id=Subquery(browse_node_qs.values("remote_id")[:1]),
+            remote_id=Subquery(browse_node_qs.values("remote_id")[:1]),
             view__amazonsaleschannelview__remote_id=Subquery(browse_node_qs.values("marketplace_id")[:1]),
         )
 

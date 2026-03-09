@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.db.models import Q
+from django.utils.translation import gettext as _
 
 from core import models
 from media.models import MediaProductThrough
@@ -10,13 +11,30 @@ from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR,
     MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_STOCK_ERROR, \
     MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
-    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
+    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR, REQUIRED_DOCUMENT_TYPES_ERROR, OPTIONAL_DOCUMENT_TYPES_ERROR
 from products_inspector.models import InspectorBlock
 from products_inspector.signals import *
 from ..constants import blocks
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def _build_missing_property_labels(*, multi_tenant_company, missing_property_ids):
+    from properties.models import Property
+
+    if not missing_property_ids:
+        return []
+
+    labels_by_id = {}
+    queryset = Property.objects.filter_multi_tenant(multi_tenant_company).filter(id__in=missing_property_ids).values(
+        "id",
+        "internal_name",
+    )
+    for row in queryset.iterator():
+        labels_by_id[row["id"]] = row["internal_name"] or str(row["id"])
+
+    return sorted({labels_by_id.get(property_id, str(property_id)) for property_id in missing_property_ids})
 
 
 class InspectorBlockCreateOrUpdateFactory(InspectorCreateOrUpdateFactory):
@@ -124,9 +142,11 @@ class InspectorBlockFactory(SaveInspectorMixin):
         try:
             self._check()
             self.block.successfully_checked = True
+            self.block.fixing_message = None
             logger.info(f"Block {self.block.error_code} successfully checked for product {self.product.sku}.")
         except InspectorBlockFailed as e:
             self.block.successfully_checked = False
+            self.block.fixing_message = str(e)
             logger.info(f"Block {self.block.error_code} failed for product {self.product.sku}: {str(e)}")
 
         self.block.save()
@@ -323,8 +343,17 @@ class MissingRequiredPropertiesInspectorBlockFactory(InspectorBlockFactory):
 
         existing_property_ids = set(product_properties.values_list('property_id', flat=True))
 
-        if rule_property_ids - existing_property_ids:
-            raise InspectorBlockFailed(f"Product is missing required propertes")
+        missing_property_ids = rule_property_ids - existing_property_ids
+        if missing_property_ids:
+            missing_labels = _build_missing_property_labels(
+                multi_tenant_company=self.multi_tenant_company,
+                missing_property_ids=missing_property_ids,
+            )
+            raise InspectorBlockFailed(
+                _("Add the following required properties to the product: %(properties)s") % {
+                    "properties": ", ".join(missing_labels),
+                }
+            )
 
 
 @InspectorBlockFactoryRegistry.register(MISSING_OPTIONAL_PROPERTIES_ERROR)
@@ -367,8 +396,17 @@ class MissingOptionalPropertiesInspectorBlockFactory(InspectorBlockFactory):
 
         existing_property_ids = set(product_properties.values_list('property_id', flat=True))
 
-        if rule_property_ids - existing_property_ids:
-            raise InspectorBlockFailed(f"Product is missing optional propertes")
+        missing_property_ids = rule_property_ids - existing_property_ids
+        if missing_property_ids:
+            missing_labels = _build_missing_property_labels(
+                multi_tenant_company=self.multi_tenant_company,
+                missing_property_ids=missing_property_ids,
+            )
+            raise InspectorBlockFailed(
+                _("Add the following optional properties to the product: %(properties)s") % {
+                    "properties": ", ".join(missing_labels),
+                }
+            )
 
 
 @InspectorBlockFactoryRegistry.register(MISSING_STOCK_ERROR)
@@ -511,3 +549,146 @@ class NonConfigurableRuleInspectorBlockFactory(InspectorBlockFactory):
         if configurator_properties_count == 0:
             raise InspectorBlockFailed("Configurable product has no applicable configurator rules.")
 
+
+class DocumentTypesInspectorBlockFactory(InspectorBlockFactory):
+    category_field_name = None
+    missing_message_template = "Add the following documents to the product: %(document_types)s"
+
+    def _get_product_categories_by_channel(self):
+        from sales_channels.models.products import RemoteProductCategory
+
+        categories_by_channel = {}
+        queryset = (
+            RemoteProductCategory.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                product=self.product,
+            )
+            .exclude(sales_channel_id__isnull=True)
+            .exclude(remote_id__isnull=True)
+            .exclude(remote_id="")
+            .values_list("sales_channel_id", "remote_id")
+            .distinct()
+        )
+
+        for sales_channel_id, remote_id in queryset.iterator():
+            categories_by_channel.setdefault(sales_channel_id, set()).add(str(remote_id))
+
+        return categories_by_channel
+
+    def _get_required_document_types_by_channel(self, *, categories_by_channel):
+        from sales_channels.models.documents import RemoteDocumentType
+
+        sales_channel_ids = list(categories_by_channel.keys())
+        if not sales_channel_ids:
+            return {}
+
+        required_by_channel = {}
+        queryset = RemoteDocumentType.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance_id__isnull=False,
+            sales_channel_id__in=sales_channel_ids,
+        ).values(
+            "sales_channel_id",
+            "local_instance_id",
+            "name",
+            "translated_name",
+            self.category_field_name,
+        )
+
+        for row in queryset.iterator():
+            sales_channel_id = row.get("sales_channel_id")
+            category_values = row.get(self.category_field_name) or []
+            if not isinstance(category_values, list):
+                continue
+
+            required_category_ids = {
+                str(category_id).strip()
+                for category_id in category_values
+                if str(category_id).strip()
+            }
+            if not required_category_ids:
+                continue
+
+            product_categories = categories_by_channel.get(sales_channel_id, set())
+            if not product_categories.intersection(required_category_ids):
+                continue
+
+            label = row.get("translated_name") or row.get("name") or str(row.get("local_instance_id"))
+            required_by_channel.setdefault(sales_channel_id, {})[row["local_instance_id"]] = label
+
+        return required_by_channel
+
+    def _get_document_type_ids_for_channel(self, *, sales_channel_id):
+        from media.models import Media
+
+        documents = (
+            MediaProductThrough.objects.filter(
+                product=self.product,
+                media__type=Media.FILE,
+            )
+            .filter(
+                Q(sales_channel_id=sales_channel_id) | Q(sales_channel__isnull=True)
+            )
+            .order_by("sort_order")
+        )
+        return set(documents.values_list("media__document_type_id", flat=True))
+
+    def _check(self):
+        if self.product.is_configurable():
+            return
+
+        categories_by_channel = self._get_product_categories_by_channel()
+        required_by_channel = self._get_required_document_types_by_channel(
+            categories_by_channel=categories_by_channel,
+        )
+        if not required_by_channel:
+            return
+
+        missing_document_labels = []
+        cached_document_type_ids = {}
+        for sales_channel_id, required_document_types in required_by_channel.items():
+            assigned_document_type_ids = cached_document_type_ids.get(sales_channel_id)
+            if assigned_document_type_ids is None:
+                assigned_document_type_ids = self._get_document_type_ids_for_channel(
+                    sales_channel_id=sales_channel_id,
+                )
+                cached_document_type_ids[sales_channel_id] = assigned_document_type_ids
+
+            for local_document_type_id, label in required_document_types.items():
+                if local_document_type_id in assigned_document_type_ids:
+                    continue
+                missing_document_labels.append(label)
+
+        if missing_document_labels:
+            unique_labels = sorted(set(missing_document_labels))
+            raise InspectorBlockFailed(
+                _(self.missing_message_template) % {
+                    "document_types": ", ".join(unique_labels),
+                }
+            )
+
+
+@InspectorBlockFactoryRegistry.register(REQUIRED_DOCUMENT_TYPES_ERROR)
+class RequiredDocumentTypesInspectorBlockFactory(DocumentTypesInspectorBlockFactory):
+    category_field_name = "required_categories"
+
+    def __init__(self, block, save_inspector=True):
+        super().__init__(
+            block,
+            success_signal=inspector_required_document_types_success,
+            failure_signal=inspector_required_document_types_failed,
+            save_inspector=save_inspector,
+        )
+
+
+@InspectorBlockFactoryRegistry.register(OPTIONAL_DOCUMENT_TYPES_ERROR)
+class OptionalDocumentTypesInspectorBlockFactory(DocumentTypesInspectorBlockFactory):
+    category_field_name = "optional_categories"
+
+    def __init__(self, block, save_inspector=True):
+        super().__init__(
+            block,
+            success_signal=inspector_optional_document_types_success,
+            failure_signal=inspector_optional_document_types_failed,
+            save_inspector=save_inspector,
+        )

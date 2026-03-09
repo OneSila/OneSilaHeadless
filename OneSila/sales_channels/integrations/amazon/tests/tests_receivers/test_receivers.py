@@ -59,6 +59,7 @@ class AmazonProductTypeReceiversTest(TestCase):
         task_func.assert_called_once_with(
             product_type_code=pt.product_type_code,
             sales_channel_id=pt.sales_channel_id,
+            product_type_id=pt.id,
         )
 
 
@@ -141,7 +142,7 @@ class AmazonAssignReceiversTest(TestCase):
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.view,
-            recommended_browse_node_id="1",
+            remote_id="1",
         )
         self.assign = SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -404,20 +405,20 @@ class AmazonProductBrowseNodeReceiversTest(TestCase):
             product=self.parent,
             sales_channel=self.sales_channel,
             view=self.view,
-            recommended_browse_node_id="BN1",
+            remote_id="BN1",
         )
         self.assertTrue(
             AmazonProductBrowseNode.objects.filter(
                 product=self.var1,
                 view=self.view,
-                recommended_browse_node_id="BN1",
+                remote_id="BN1",
             ).exists()
         )
         self.assertTrue(
             AmazonProductBrowseNode.objects.filter(
                 product=self.var2,
                 view=self.view,
-                recommended_browse_node_id="BN1",
+                remote_id="BN1",
             ).exists()
         )
 

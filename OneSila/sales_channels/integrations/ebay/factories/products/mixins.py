@@ -29,7 +29,7 @@ from sales_channels.content_templates import (
     render_sales_channel_content_template,
 )
 
-from sales_channels.integrations.ebay.models import EbayCategory, EbayProductCategory
+from sales_channels.integrations.ebay.models import EbayCategory, EbayProductCategory, EbayProductStoreCategory
 from sales_channels.integrations.ebay.models.products import (
     EbayMediaThroughProduct,
     EbayProductOffer,
@@ -1702,38 +1702,39 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         self._listing_policies_cache = policies
         return dict(policies)
 
-    def _get_category_id(self) -> str | None:
+    def _get_category_ids(self) -> tuple[str | None, str | None]:
         product = getattr(self.remote_product, "local_instance", None)
         view = getattr(self, "view", None)
 
         if product is None or view is None:
-            return None
+            return None, None
 
-        direct_remote_id = (
+        direct_remote_category = (
             EbayProductCategory.objects.filter(
                 product=product,
                 sales_channel=self.sales_channel,
                 view=view,
             )
             .exclude(remote_id__in=(None, ""))
-            .values_list("remote_id", flat=True)
             .first()
         )
-        if direct_remote_id:
-            candidate = str(direct_remote_id).strip()
+
+        if direct_remote_category:
+            candidate = str(direct_remote_category.remote_id or "").strip() or None
+            secondary_candidate = str(direct_remote_category.secondary_category_id or "").strip() or None
             if candidate:
-                return candidate
+                return candidate, secondary_candidate
 
         if not hasattr(product, "get_product_rule"):
-            return None
+            return None, None
 
         try:
             rule = product.get_product_rule(sales_channel=self.sales_channel)
         except Exception:  # pragma: no cover - defensive guard
-            return None
+            return None, None
 
         if rule is None:
-            return None
+            return None, None
 
         product_type_remote_id = (
             EbayProductType.objects.filter(
@@ -1749,9 +1750,17 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         if product_type_remote_id:
             candidate = str(product_type_remote_id).strip()
             if candidate:
-                return candidate
+                return candidate, None
 
-        return None
+        return None, None
+
+    def _get_category_id(self) -> str | None:
+        category_id, _ = self._get_category_ids()
+        return category_id
+
+    def _get_secondary_category_id(self) -> str | None:
+        _, secondary_category_id = self._get_category_ids()
+        return secondary_category_id
 
     def _build_pricing_summary(self) -> Dict[str, Any]:
         product = getattr(self.remote_product, "local_instance", None)
@@ -1842,6 +1851,33 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
 
         return metadata
 
+    def _get_store_category_names(self, *, product) -> List[str]:
+        row = (
+            EbayProductStoreCategory.objects.filter(
+                product=product,
+                sales_channel=self.sales_channel,
+            )
+            .select_related("primary_store_category", "secondary_store_category")
+            .order_by("-id")
+            .first()
+        )
+
+        if row is None:
+            return []
+
+        names: List[str] = []
+        if row.primary_store_category:
+            primary_path = row.primary_store_category.full_path
+            if primary_path and primary_path not in names:
+                names.append(primary_path)
+
+        if row.secondary_store_category:
+            secondary_path = row.secondary_store_category.full_path
+            if secondary_path and secondary_path not in names:
+                names.append(secondary_path)
+
+        return names[:2]
+
     def _apply_offer_section(self, *, payload: Dict[str, Any], key: str, value: Any) -> None:
         if isinstance(value, Mapping):
             if value:
@@ -1861,10 +1897,22 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         for key, value in metadata.items():
             self._apply_offer_section(payload=payload, key=key, value=value)
 
+        category_id, secondary_category_id = self._get_category_ids()
         self._apply_offer_section(
             payload=payload,
             key="categoryId",
-            value=self._get_category_id(),
+            value=category_id,
+        )
+        if secondary_category_id:
+            self._apply_offer_section(
+                payload=payload,
+                key="secondaryCategoryId",
+                value=secondary_category_id,
+            )
+        self._apply_offer_section(
+            payload=payload,
+            key="storeCategoryNames",
+            value=self._get_store_category_names(product=product) or None,
         )
         self._apply_offer_section(
             payload=payload,
@@ -1881,8 +1929,148 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
             key="tax",
             value=self._build_tax_section(),
         )
+        self._apply_offer_section(
+            payload=payload,
+            key="regulatory",
+            value=self._build_regulatory_section(),
+        )
 
         return payload
+
+    def _build_regulatory_section(self) -> Dict[str, Any] | None:
+        documents = self._build_offer_documents()
+        if not documents:
+            return None
+        return {"documents": documents}
+
+    def _get_existing_offer_document_associations(self, *, local_instance_ids: list[int]) -> Dict[int, Any]:
+        remote_document_assign_model_class = getattr(self, "remote_document_assign_model_class", None)
+        if remote_document_assign_model_class is None or not local_instance_ids:
+            return {}
+
+        queryset = (
+            remote_document_assign_model_class.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_product=self.remote_product,
+                local_instance_id__in=local_instance_ids,
+            )
+            .select_related("local_instance", "local_instance__media", "remote_document", "remote_document__remote_document_type")
+        )
+        return {association.local_instance_id: association for association in queryset}
+
+    def _sync_offer_remote_document(self, *, media_through, remote_association=None, remote_document=None):
+        remote_document_sync_factory = getattr(self, "remote_document_sync_factory", None)
+        if remote_document_sync_factory is None:
+            return remote_document
+
+        through_factory_kwargs = {
+            "sales_channel": self.sales_channel,
+            "local_instance": media_through,
+            "remote_instance": remote_association,
+            "api": getattr(self, "api", None),
+            "remote_product": self.remote_product,
+            "skip_checks": True,
+            "get_value_only": getattr(self, "get_value_only", False),
+        }
+        if hasattr(self, "view"):
+            through_factory_kwargs["view"] = self.view
+
+        try:
+            factory = remote_document_sync_factory(**through_factory_kwargs)
+        except TypeError:
+            # Fallback for document-level sync factories.
+            factory_kwargs = {
+                "sales_channel": self.sales_channel,
+                "media": media_through.media,
+                "remote_document": remote_document,
+                "remote_document_type": getattr(remote_document, "remote_document_type", None) if remote_document else None,
+                "api": getattr(self, "api", None),
+                "media_through": media_through,
+                "remote_product": self.remote_product,
+                "get_value_only": getattr(self, "get_value_only", False),
+            }
+            if hasattr(self, "view"):
+                factory_kwargs["view"] = self.view
+
+            try:
+                factory = remote_document_sync_factory(**factory_kwargs)
+            except TypeError:
+                through_factory_kwargs.pop("view", None)
+                through_factory_kwargs.pop("get_value_only", None)
+                through_factory_kwargs.pop("skip_checks", None)
+                factory = remote_document_sync_factory(**through_factory_kwargs)
+
+        result = factory.run()
+        self.api = getattr(factory, "api", getattr(self, "api", None))
+
+        if hasattr(factory, "remote_instance"):
+            factory_remote_instance = getattr(factory, "remote_instance", None)
+            if factory_remote_instance is None:
+                return None
+            remote_association = factory_remote_instance
+            if remote_association is not None:
+                return getattr(remote_association, "remote_document", None)
+
+        return result or remote_document
+
+    def _build_offer_documents(self) -> List[Dict[str, str]]:
+        if not getattr(self, "integration_has_documents", False):
+            return []
+
+        product = getattr(self.remote_product, "local_instance", None)
+        if product is None:
+            return []
+
+        media_throughs = list(
+            MediaProductThrough.objects.get_public_product_documents(
+                product=product,
+                sales_channel=self.sales_channel,
+            ).select_related("media", "media__document_type")
+        )
+        if not media_throughs:
+            return []
+
+        through_ids = [media_through.id for media_through in media_throughs if media_through.id]
+        existing_associations = self._get_existing_offer_document_associations(local_instance_ids=through_ids)
+        payload_documents: List[Dict[str, str]] = []
+        seen_document_ids: set[str] = set()
+
+        can_create_assignments = hasattr(self, "create_document_assignment") and hasattr(self, "update_document_assignment")
+        get_value_only = getattr(self, "get_value_only", False)
+
+        for media_through in media_throughs:
+            remote_association = existing_associations.get(media_through.id)
+
+            if can_create_assignments and not get_value_only:
+                if remote_association is None:
+                    remote_association = self.create_document_assignment(media_through)
+                else:
+                    remote_association = self.update_document_assignment(media_through, remote_association)
+
+            if remote_association is None:
+                continue
+
+            remote_document = getattr(remote_association, "remote_document", None)
+            if remote_document is None:
+                continue
+
+            if not (can_create_assignments and not get_value_only):
+                remote_document = self._sync_offer_remote_document(
+                    media_through=media_through,
+                    remote_association=remote_association,
+                    remote_document=remote_document,
+                )
+                if remote_document is None:
+                    continue
+
+            document_id = str(getattr(remote_document, "remote_id", "") or "").strip()
+            if not document_id or document_id in seen_document_ids:
+                continue
+
+            seen_document_ids.add(document_id)
+            payload_documents.append({"documentId": document_id})
+
+        return payload_documents
 
     def _extract_offer_id(self, response: Any) -> str | None:
         if isinstance(response, dict):

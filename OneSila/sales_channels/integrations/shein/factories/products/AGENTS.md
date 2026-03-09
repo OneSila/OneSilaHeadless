@@ -1219,3 +1219,630 @@ It does NOT mean:
 SPU = product idea  
 SKC = main visual option (usually color)  
 SKU = what the customer actually buys
+
+
+# SHEIN Certificates — JSON-style API notes + end-to-end flow
+
+This document keeps **schema/explanations in JSON-style** (not tables) so you can copy/paste into your internal docs.
+
+---
+
+## 0) Mental model (what SHEIN is doing)
+
+- **Certificate Type** = the rule/config SHEIN defines (e.g. “UK Responsible Person / UK Agent”, “CE label photo”, “Test report”, etc.). Identified by `certificateTypeId`.
+- **Certificate Pool** = an uploaded/created certificate instance (file + optional extra metadata fields) that can be **bound to SKC(s)**.
+- **Binding** = attaching one or more `certificatePoolId`s to one or more SKCs (`save-certificate-pool-skc-bind`).
+
+Why you saw “duplicates” in product queries:
+- If a certificate pool is bound to multiple SKCs, a product-level query can surface multiple records for the same type (often repeated attempts / re-uploads / re-binds).
+- Category rule queries show the **required types** but usually empty lists. Product/SPU queries show them **filled** via `certificatePoolList` / `otherSourceCertInfoList`.
+
+---
+
+## 1) Get certificate rules (by category or by SPU)
+
+### Endpoint
+`POST /open-api/goods/get-certificate-rule`
+
+### Why we use it
+- **By `category_id`**: build “required certificate types per category” structure (for UI + validations).
+- **By `spuName`**: confirm whether required certificate types are “filled”, and inspect approval/expiry info.
+
+### Response schema (JSON-style)
+```json
+{
+  "certificateTypeId": {
+    "type": "int64",
+    "required": false,
+    "description": "Certificate type ID"
+  },
+  "certificateTypeValue": {
+    "type": "string",
+    "required": false,
+    "description": "Certificate Type Name (display label)"
+  },
+  "certificateDimension": {
+    "type": "integer",
+    "required": false,
+    "description": "1 = certificate must be bound to SKC (product-level). 2 = store-level (uploading doesn't require binding to SKC)."
+  },
+  "certificateLabel": {
+    "type": "string",
+    "required": false,
+    "description": "Identifier: 0 = regular type, 1 = unique/character type (often implies special handling / “statement” style certificates)."
+  },
+  "isRequired": {
+    "type": "boolean",
+    "required": false,
+    "description": "true = required, false = optional"
+  },
+  "certificateMissStatus": {
+    "type": "boolean",
+    "required": false,
+    "description": "true = missing, false = not missing (i.e., considered filled for this product/site)."
+  },
+  "fileModelUrl": {
+    "type": "string",
+    "required": false,
+    "description": "Template download link (if SHEIN provides one). Often empty."
+  },
+  "mergeSiteInfoList": {
+    "type": "array",
+    "required": false,
+    "description": "Sites/sub-sites this rule applies to (e.g. Europe -> UK).",
+    "items": { "type": "object", "description": "Contains mergeSiteName + subSiteList." }
+  },
+
+  "certificatePoolList": {
+    "type": "array",
+    "required": false,
+    "description": "Certificates uploaded/created in THIS store/system that match this type.",
+    "items": {
+      "type": "object",
+      "properties": {
+        "certificatePoolId": {
+          "type": "int64",
+          "required": false,
+          "description": "Pool ID (this is what you bind to SKCs)."
+        },
+        "pqmsCertificateSn": {
+          "type": "string",
+          "required": false,
+          "description": "Certificate serial/number in PQMS."
+        },
+        "auditStatus": {
+          "type": "string",
+          "required": false,
+          "description": "1 Pending, 2 Approved, 3 Rejected (in practice you already noticed this may not always be reliable)."
+        },
+        "certificateExpireStatus": {
+          "type": "string",
+          "required": false,
+          "description": "1 Normal, 2 Expiring soon, 3 Expired (note: enum differs from otherSource list in some docs)."
+        },
+        "expireTime": {
+          "type": "datetime",
+          "required": false,
+          "description": "Expiration date. If 1970-01-01 00:00:00 => never expires."
+        },
+        "certificatePoolFileList": {
+          "type": "array",
+          "required": false,
+          "description": "Files attached to the certificate pool.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "certificateUrl": {
+                "type": "string",
+                "required": false,
+                "description": "Signed file URL in SHEIN storage."
+              },
+              "certificateUrlName": {
+                "type": "string",
+                "required": false,
+                "description": "Filename as shown in the UI."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "otherSourceCertInfoList": {
+    "type": "array",
+    "required": false,
+    "description": "Certificates coming from OTHER SHEIN/PQMS sources (not directly created by this API flow).",
+    "items": {
+      "type": "object",
+      "properties": {
+        "systemSource": {
+          "type": "string",
+          "required": false,
+          "description": "Source system code. Example you saw: 'GRC' / 'GRC_LABEL'."
+        },
+        "pqmsCertificateSn": {
+          "type": "string",
+          "required": false,
+          "description": "Certificate serial/number in that source system."
+        },
+        "auditStatus": {
+          "type": "string",
+          "required": false,
+          "description": "1 Pending, 2 Approved, 3 Rejected (often not fully reliable)."
+        },
+        "certificateExpireStatus": {
+          "type": "string",
+          "required": false,
+          "description": "0 Normal, 1 Expiring soon, 2 Expired (note different enum than certificatePoolList docs)."
+        },
+        "expireTime": {
+          "type": "datetime",
+          "required": false,
+          "description": "Expiration date. If 1970-01-01 00:00:00 => never expires."
+        },
+        "certificatePoolFileList": {
+          "type": "array",
+          "required": false,
+          "description": "Files linked to that external certificate record.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "certificateUrl": { "type": "string", "required": false, "description": "Signed file URL" },
+              "certificateUrlName": { "type": "string", "required": false, "description": "Filename" }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "selfCertificateList": {
+    "type": "array",
+    "required": false,
+    "description": "Chinese: '普通证书类型信息 under a character-declaration type'. Translation: 'Regular certificate type info under a character/statement-type certificate.' Usually relevant when certificateLabel=1.",
+    "items": {
+      "type": "object",
+      "properties": {
+        "certificateTypeId": { "type": "int64", "required": false, "description": "Certificate type id" },
+        "certificateTypeName": { "type": "string", "required": false, "description": "Certificate type name" }
+      }
+    }
+  }
+}
+```
+
+### Notes (practical)
+- `certificateUrl` vs `certificateUrlName`:
+  - `certificateUrl` = actual downloadable address (signed URL).
+  - `certificateUrlName` = display name / filename.
+  - You should treat `systemSource` as “where this record originated”, not as a status.
+
+---
+
+## 2) Get ALL certificate types + their extra required fields (V2)
+
+### Endpoint
+`POST /open-api/goods/certificate/get-all-certificate-type-list-v2`
+
+### Why this endpoint matters (even if you skip it now)
+This is the **only place** that explains the “mysterious” metadata fields:
+
+- `certificateRelationInfoList` in `save-or-update-certificate-pool`
+- `otherCertificateRelationInfoList` in `save-or-update-certificate-pool`
+
+Those two lists are **not random** — they correspond to **preset fields** defined per `certificateTypeId`:
+
+- `presetInfoList` / `otherPresetInfoList` describe which extra fields exist for a certificate type
+- each field has an `inputType` and can be required/optional
+- some fields require selecting from a predefined list (`presetValueList`)
+- some fields are manual string/date inputs
+- in some cases, you might need SRM testing agency/lab data (`srmDetectionAgencyList`)
+
+In other words:
+- If today you can upload certificates without these lists, it’s because your types don’t enforce those presets **OR** SHEIN doesn’t validate them strictly for your scenario.
+- But **new categories, new regions, or new certificate types** may start enforcing them and then your current “ignore it” implementation can break.
+
+### Response schema (JSON-style)
+```json
+{
+  "info": {
+    "type": "object",
+    "required": false,
+    "description": "Wrapper",
+    "properties": {
+      "data": {
+        "type": "object",
+        "required": false,
+        "description": "Response to Get Certificate Type List",
+        "properties": {
+          "certificateTypeInfoList": {
+            "type": "array",
+            "required": false,
+            "description": "All certificate types available in the store/system",
+            "items": {
+              "type": "object",
+              "properties": {
+                "certificateTypeId": {
+                  "type": "int64",
+                  "required": false,
+                  "description": "Certificate type id (note: 844 Product identifier not supported for upload via API)."
+                },
+                "certificateType": {
+                  "type": "string",
+                  "required": false,
+                  "description": "Certificate type name (e.g. 'European Food Contact Test Report')."
+                },
+                "certificateDimension": {
+                  "type": "integer",
+                  "required": false,
+                  "description": "1 = needs binding to SKC; 2 = store-level only."
+                },
+                "certificateLabel": {
+                  "type": "string",
+                  "required": false,
+                  "description": "0 regular, 1 unique/character type."
+                },
+                "fileModelUrl": {
+                  "type": "string",
+                  "required": false,
+                  "description": "Template download link (if any)."
+                },
+                "isEnabled": {
+                  "type": "integer",
+                  "required": false,
+                  "description": "0 inactive, 1 active."
+                },
+
+                "presetInfoList": {
+                  "type": "array",
+                  "required": false,
+                  "description": "Preset fields (internal) associated with this certificate type. These map to certificateRelationInfoList in upload.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "presetId": {
+                        "type": "int64",
+                        "required": false,
+                        "description": "Field id (used as certificateRelationNameId when you submit)."
+                      },
+                      "presetName": {
+                        "type": "string",
+                        "required": false,
+                        "description": "Field CODE name."
+                      },
+                      "presetRemark": {
+                        "type": "string",
+                        "required": false,
+                        "description": "Human description of the field."
+                      },
+                      "inputType": {
+                        "type": "integer",
+                        "required": false,
+                        "description": "1 single-select, 2 multi-select, 3 manual input, 4 date-time input (e.g. '2025-01-01 00:00:00')."
+                      },
+                      "isRequired": {
+                        "type": "integer",
+                        "required": false,
+                        "description": "0 no, 1 yes (field-level requirement)."
+                      },
+                      "unit": {
+                        "type": "string",
+                        "required": false,
+                        "description": "Unit for numeric fields (if any)."
+                      },
+                      "presetValueList": {
+                        "type": "array",
+                        "required": false,
+                        "description": "Allowed values if inputType is select-based.",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "presetValueId": { "type": "int64", "required": false, "description": "Value ID." },
+                            "presetValue": { "type": "string", "required": false, "description": "Value label/description." }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+
+                "otherPresetInfoList": {
+                  "type": "array",
+                  "required": false,
+                  "description": "Additional / external preset fields (often maps to otherCertificateRelationInfoList when you submit).",
+                  "items": { "type": "object", "description": "Same structure as presetInfoList." }
+                }
+              }
+            }
+          },
+
+          "srmDetectionAgencyList": {
+            "type": "array",
+            "required": false,
+            "description": "SRM testing institution + laboratory information. Used when certificate presets require selecting a lab/agency.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "detectionAgency": {
+                  "type": "object",
+                  "required": false,
+                  "description": "Testing agency info",
+                  "properties": {
+                    "detectionAgencyId": { "type": "int64", "required": false, "description": "Agency id" },
+                    "detectionAgencyName": { "type": "string", "required": false, "description": "Agency name" }
+                  }
+                },
+                "laboratoryList": {
+                  "type": "array",
+                  "required": false,
+                  "description": "Laboratories under this agency",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "laboratoryId": { "type": "int64", "required": false, "description": "Lab id" },
+                      "laboratoryName": { "type": "string", "required": false, "description": "Lab name" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Chinese block translation (the “2023-08-24” warning)
+The long Chinese note under `presetId` roughly means:
+
+- “**Important:** The following information was last updated on **2023-08-24**. This整理 is only for easier external integration; **the latest online certificate configuration should be considered the source of truth**.”
+- Then it lists common preset field IDs and what they mean, e.g.:
+  - 169: Issue date (date input)
+  - 170: Product name (manual)
+  - 171: Battery model (manual)
+  - 172: Certificate number (manual)
+  - 173: Testing agency (dropdown with BV/ITS/SGS/TUV/UL/…/Other)
+  - 175: Effective date (date input)
+  - 178: Expiration date (date input)
+  - 184: Signing method (local upload / online signing)
+  - 187: Dangerous goods classification (Class 1..9)
+  - etc.
+
+So the doc itself says: **don’t hardcode these assumptions** — fetch from this API because the configuration can change.
+
+### Practical implementation guidance (even if skipping today)
+- **Today (MVP):** ignore preset lists for types that work without them.
+- **Add a safety switch:** if `save-or-update-certificate-pool` returns an error that indicates missing required fields, fall back to:
+  1) call V2 list
+  2) find the certificateTypeId’s required preset fields
+  3) require user input in UI and send `certificateRelationInfoList`
+- In the future we might want to add all of this as INTERNAL PROPERTIES with separate values
+
+This lets you keep shipping now but avoids a “future cliff”.
+
+---
+
+## 3) Upload certificate file
+
+### Endpoint
+`POST /open-api/goods/upload-certificate-file`
+
+### Purpose
+Uploads a file into SHEIN storage and returns a signed URL you can reference in certificate pool creation.
+
+### Request schema
+```json
+{
+  "file": {
+    "type": "file",
+    "required": true,
+    "description": "Single file upload <= 20MB; formats: PDF/PNG/JPG/JPEG."
+  }
+}
+```
+
+### Response schema
+```json
+{
+  "code": { "type": "string", "required": true, "description": "0 on success" },
+  "msg": { "type": "string", "required": false, "description": "OK on success" },
+  "info": {
+    "type": "object",
+    "required": false,
+    "properties": {
+      "certificateUrl": {
+        "type": "string",
+        "required": false,
+        "description": "Signed URL of uploaded file in SHEIN storage"
+      },
+      "imageMd5": {
+        "type": "string",
+        "required": false,
+        "description": "MD5 of the uploaded file (useful for dedupe)."
+      }
+    }
+  },
+  "traceId": { "type": "string", "required": false, "description": "Request trace id" }
+}
+```
+
+**Can you host yourself instead?**
+- In practice, flows + examples strongly suggest SHEIN expects files to be in their storage (hence upload API).
+- Even if a public URL might work, relying on it is risky (signature/whitelist/anti-leech rules). Treat upload as the safe default.
+
+---
+
+## 4) Create / update a certificate pool (creates certificatePoolId)
+
+### Endpoint
+`POST /open-api/goods/save-or-update-certificate-pool`
+
+### What it does
+Creates (or edits) a certificate pool item for a given type, referencing your uploaded file URL.
+
+### Request schema
+```json
+{
+  "certificatePoolId": {
+    "type": "int64",
+    "required": false,
+    "description": "If provided, edits an existing pool. If omitted, creates a new pool."
+  },
+  "certificateTypeId": {
+    "type": "int64",
+    "required": true,
+    "description": "Certificate type id. Note: typeId=844 not supported for API upload (per docs)."
+  },
+  "certificateUrl": {
+    "type": "string",
+    "required": true,
+    "description": "File address from upload-certificate-file."
+  },
+  "certificateUrlName": {
+    "type": "string",
+    "required": true,
+    "description": "Filename displayed in SHEIN UI."
+  },
+
+  "certificateRelationInfoList": {
+    "type": "array",
+    "required": false,
+    "description": "Extra metadata fields for this certificateTypeId (maps to presetInfoList in V2).",
+    "items": {
+      "type": "object",
+      "properties": {
+        "certificateRelationNameId": {
+          "type": "int64",
+          "required": false,
+          "description": "Preset field id (presetId)."
+        },
+        "certificateRelationValueId": {
+          "type": "int64",
+          "required": false,
+          "description": "Preset value id when inputType is 1/2 (select)."
+        },
+        "certificateRelationValue": {
+          "type": "string",
+          "required": false,
+          "description": "Manual or date value when inputType is 3/4."
+        }
+      }
+    }
+  },
+
+  "otherCertificateRelationInfoList": {
+    "type": "array",
+    "required": false,
+    "description": "External preset fields (maps to otherPresetInfoList in V2). Same structure as certificateRelationInfoList.",
+    "items": { "type": "object", "properties": {} }
+  }
+}
+```
+
+### Response schema
+```json
+{
+  "code": { "type": "string", "required": true, "description": "0 on success" },
+  "msg": { "type": "string", "required": false, "description": "OK on success" },
+  "info": {
+    "type": "object",
+    "required": false,
+    "properties": {
+      "certificatePoolId": {
+        "type": "int64",
+        "required": false,
+        "description": "Pool id used for binding certificates with SKC."
+      }
+    }
+  },
+  "traceId": { "type": "string", "required": false, "description": "Request trace id" }
+}
+```
+
+---
+
+## 5) Bind certificate pool(s) to SKC(s)
+
+### Endpoint
+`POST /open-api/goods/save-certificate-pool-skc-bind`
+
+### What it does
+Links one or more `certificatePoolId`s to one or more SKCs (within one or multiple SPUs).
+
+### Request schema
+```json
+{
+  "skcCertificatePoolRelationList": {
+    "type": "array",
+    "required": true,
+    "description": "Bindings (per SKC).",
+    "items": {
+      "type": "object",
+      "properties": {
+        "spuName": {
+          "type": "string",
+          "required": true,
+          "description": "SPU name (SHEIN platform identifier)."
+        },
+        "skcName": {
+          "type": "string",
+          "required": true,
+          "description": "SKC name (SHEIN platform identifier)."
+        },
+        "certificatePoolIdList": {
+          "type": "array",
+          "required": true,
+          "description": "List of certificate pool IDs to bind to this SKC.",
+          "items": { "type": "int64" }
+        }
+      }
+    }
+  }
+}
+```
+
+### Response schema
+```json
+{
+  "code": { "type": "string", "required": true, "description": "0 on success" },
+  "msg": { "type": "string", "required": false, "description": "OK on success" },
+  "info": { "type": "null", "required": false, "description": "Usually null" }
+}
+```
+
+---
+
+## 6) End-to-end flow (recommended MVP)
+
+1. **Get category rules**  
+   - call `/open-api/goods/get-certificate-rule` with `category_id`
+   - store required `certificateTypeId`s for that category
+
+2. **Upload file(s)**  
+   - `/open-api/goods/upload-certificate-file` → get `certificateUrl` (+ `imageMd5`)
+
+3. **Create certificate pool**  
+   - `/open-api/goods/save-or-update-certificate-pool` → get `certificatePoolId`
+
+4. **Bind to SKCs**  
+   - `/open-api/goods/save-certificate-pool-skc-bind`
+
+5. **Verify**  
+   - `/open-api/goods/get-certificate-rule` by `spuName` to confirm `certificateMissStatus=false`
+
+---
+
+## 7) Important future hook: presets (why V2 may become mandatory)
+
+If a certificate type starts enforcing extra fields:
+- You must fetch required fields for that `certificateTypeId` via:
+  - `/open-api/goods/certificate/get-all-certificate-type-list-v2`
+- Then your UI must collect those values and send them in:
+  - `certificateRelationInfoList` / `otherCertificateRelationInfoList`
+
+This is the bridge between:
+- “certificateType rules”
+- and “what additional metadata SHEIN requires to accept the upload”.

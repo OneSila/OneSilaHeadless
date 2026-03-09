@@ -7,6 +7,8 @@ from collections.abc import Iterator, Mapping
 from typing import Any
 
 from django.db import IntegrityError
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.imports import AsyncProductImportMixin
@@ -29,6 +31,9 @@ from sales_channels.integrations.shein.factories.imports.product_payloads import
 )
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
 from sales_channels.integrations.shein.models import (
+    SheinDocument,
+    SheinDocumentThroughProduct,
+    SheinDocumentType,
     SheinEanCode,
     SheinImageProductAssociation,
     SheinProduct,
@@ -60,6 +65,8 @@ class SheinProductsImportProcessor(
     remote_ean_code_class = SheinEanCode
     remote_product_content_class = SheinProductContent
     remote_imageproductassociation_class = SheinImageProductAssociation
+    remote_documentproductassociation_class = SheinDocumentThroughProduct
+    remote_document_class = SheinDocument
     remote_price_class = SheinPrice
 
     def __init__(
@@ -77,6 +84,7 @@ class SheinProductsImportProcessor(
         self.language = language
         self._spu_index: list[str] | None = None
         self._payload_parser = SheinProductImportPayloadParser(sales_channel=sales_channel)
+        self._mapped_document_types_by_remote_id: dict[str, SheinDocumentType] | None = None
 
     def get_api(self):
         return self
@@ -188,6 +196,7 @@ class SheinProductsImportProcessor(
         rule = self.get_product_rule(product_data=product_data)
         is_configurable = len(sku_entries) > 1
         primary_entry = sku_entries[0]
+        spu_document_payloads = self._build_documents_for_spu(spu_name=spu_name)
         images_skc_payload = None
         if is_configurable and self.sales_channel.sync_contents:
             raw_spu_images = product_data.get("spuImageInfoList") or product_data.get("spu_image_info_list") or []
@@ -225,6 +234,7 @@ class SheinProductsImportProcessor(
             is_configurable=is_configurable,
             parent_sku=spu_name,
             images_skc_payload=images_skc_payload,
+            documents_payload=spu_document_payloads,
         )
 
         if not is_configurable or parent_instance is None:
@@ -244,8 +254,149 @@ class SheinProductsImportProcessor(
                 is_configurable=False,
                 parent_sku=parent_sku,
                 parent_remote=parent_instance.remote_instance,
+                documents_payload=spu_document_payloads,
             )
 
+    def _get_mapped_document_types_by_remote_id(self) -> dict[str, SheinDocumentType]:
+        if self._mapped_document_types_by_remote_id is not None:
+            return self._mapped_document_types_by_remote_id
+
+        queryset = (
+            SheinDocumentType.objects.filter(
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+            .exclude(local_instance__isnull=True)
+            .select_related("local_instance")
+        )
+        mapped: dict[str, SheinDocumentType] = {}
+        for remote_document_type in queryset:
+            remote_id = str(remote_document_type.remote_id or "").strip()
+            if not remote_id:
+                continue
+            mapped[remote_id] = remote_document_type
+
+        self._mapped_document_types_by_remote_id = mapped
+        return mapped
+
+    def _build_documents_for_spu(self, *, spu_name: str) -> list[dict[str, Any]]:
+        mapped_types = self._get_mapped_document_types_by_remote_id()
+        if not mapped_types:
+            return []
+
+        try:
+            certificate_records = self.get_certificate_rule_by_product_spu(spu_name=spu_name)
+        except Exception as exc:
+            self._add_broken_record(
+                code=self.ERROR_INVALID_PRODUCT_DATA,
+                message="Unable to fetch Shein certificate rules for SPU",
+                data={"spu_name": spu_name},
+                exc=exc,
+            )
+            return []
+
+        documents: list[dict[str, Any]] = []
+        seen_keys: set[tuple[str, str, str, str, str]] = set()
+
+        for record in certificate_records:
+            if not isinstance(record, Mapping):
+                continue
+
+            certificate_dimension = str(record.get("certificateDimension") or "").strip()
+            if certificate_dimension and certificate_dimension != "1":
+                continue
+
+            certificate_type_id = str(record.get("certificateTypeId") or "").strip()
+            if not certificate_type_id:
+                continue
+
+            remote_document_type = mapped_types.get(certificate_type_id)
+            if remote_document_type is None or remote_document_type.local_instance is None:
+                continue
+
+            certificate_missing = bool(record.get("certificateMissStatus"))
+            sources: list[Mapping[str, Any]] = []
+            pool_list = record.get("certificatePoolList")
+            if isinstance(pool_list, list):
+                sources.extend(item for item in pool_list if isinstance(item, Mapping))
+            other_source_list = record.get("otherSourceCertInfoList")
+            if isinstance(other_source_list, list):
+                sources.extend(item for item in other_source_list if isinstance(item, Mapping))
+
+            for source in sources:
+                certificate_pool_id = str(source.get("certificatePoolId") or "").strip()
+                pqms_certificate_sn = str(source.get("pqmsCertificateSn") or "").strip()
+                expire_time = source.get("expireTime")
+                audit_status = str(source.get("auditStatus") or "").strip()
+                association_status = self._resolve_document_association_status(
+                    certificate_missing=certificate_missing,
+                    audit_status=audit_status,
+                )
+
+                file_list = source.get("certificatePoolFileList")
+                if not isinstance(file_list, list):
+                    continue
+
+                for file_payload in file_list:
+                    if not isinstance(file_payload, Mapping):
+                        continue
+
+                    document_url = str(file_payload.get("certificateUrl") or "").strip()
+                    if not document_url:
+                        continue
+
+                    remote_filename = str(file_payload.get("certificateUrlName") or "").strip()
+                    dedupe_key = (
+                        certificate_type_id,
+                        certificate_pool_id,
+                        pqms_certificate_sn,
+                        document_url,
+                        remote_filename,
+                    )
+                    if dedupe_key in seen_keys:
+                        continue
+                    seen_keys.add(dedupe_key)
+
+                    document_payload: dict[str, Any] = {
+                        "document_url": document_url,
+                        "title": remote_filename or remote_document_type.name or remote_document_type.remote_id,
+                        "document_type": remote_document_type.local_instance,
+                        "document_language": self.multi_tenant_company.language,
+                        "__shein_remote_document_type_id": str(remote_document_type.id),
+                        "__shein_certificate_pool_id": certificate_pool_id,
+                        "__shein_pqms_certificate_sn": pqms_certificate_sn,
+                        "__shein_expire_time": str(expire_time or "").strip(),
+                        "__shein_missing_status": association_status,
+                        "__shein_remote_url": document_url,
+                        "__shein_remote_filename": remote_filename,
+                    }
+                    documents.append(document_payload)
+
+        return documents
+
+    @staticmethod
+    def _parse_shein_expire_time(*, value) -> Any | None:
+        expire_time_raw = str(value or "").strip()
+        if not expire_time_raw:
+            return None
+
+        parsed = parse_datetime(expire_time_raw.replace(" ", "T"))
+        if parsed is None:
+            return None
+        if timezone.is_naive(parsed):
+            return timezone.make_aware(parsed, timezone.get_current_timezone())
+        return parsed
+
+    @staticmethod
+    def _resolve_document_association_status(*, certificate_missing: bool, audit_status: str) -> str:
+        normalized_audit_status = str(audit_status or "").strip()
+        if normalized_audit_status == "3":
+            return SheinDocumentThroughProduct.STATUS_REJECTED
+
+        if certificate_missing:
+            return SheinDocumentThroughProduct.STATUS_NEW
+
+        return SheinDocumentThroughProduct.STATUS_ACCEPTED
 
     def _process_single_product_entry(
         self,
@@ -259,6 +410,7 @@ class SheinProductsImportProcessor(
         parent_sku: str | None,
         parent_remote: SheinProduct | None = None,
         images_skc_payload: Mapping[str, Any] | None = None,
+        documents_payload: list[dict[str, Any]] | None = None,
     ) -> ImportProductInstance | None:
         spu_name = self._extract_spu_name(payload=spu_payload)
         skc_name = self._extract_skc_name(payload=skc_payload)
@@ -319,6 +471,9 @@ class SheinProductsImportProcessor(
                 exc=exc,
             )
             return None
+
+        if documents_payload and (is_variation or not is_configurable):
+            structured["documents"] = documents_payload
 
         if remote_product and remote_product.local_instance and remote_product.local_instance.type:
             structured["type"] = remote_product.local_instance.type
@@ -401,6 +556,8 @@ class SheinProductsImportProcessor(
         if self.sales_channel.sync_contents and not is_variation:
             self.handle_translations(import_instance=instance)
             self.handle_images(import_instance=instance)
+        if not is_variation:
+            self.handle_documents(import_instance=instance)
 
         if not is_configurable:
             if self.sales_channel.sync_ean_codes:
@@ -408,6 +565,8 @@ class SheinProductsImportProcessor(
             if self.sales_channel.sync_contents and is_variation:
                 self.handle_translations(import_instance=instance)
                 self.handle_images(import_instance=instance)
+            if is_variation:
+                self.handle_documents(import_instance=instance)
             if self.sales_channel.sync_prices:
                 self.handle_prices(import_instance=instance)
 
@@ -428,6 +587,100 @@ class SheinProductsImportProcessor(
             )
 
         return instance
+
+    def handle_documents(self, *, import_instance: ImportProductInstance):
+        if not hasattr(import_instance, "documents"):
+            return
+
+        for index, document_association in enumerate(import_instance.documents_associations_instances):
+            media = getattr(document_association, "media", None)
+            if media is None:
+                continue
+
+            document_payload = import_instance.documents[index] if index < len(import_instance.documents) else {}
+            if not isinstance(document_payload, dict):
+                continue
+
+            remote_document_type_pk = str(document_payload.get("__shein_remote_document_type_id") or "").strip()
+            if not remote_document_type_pk:
+                continue
+
+            remote_document_type = (
+                SheinDocumentType.objects.filter(
+                    id=remote_document_type_pk,
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.multi_tenant_company,
+                )
+                .select_related("local_instance")
+                .first()
+            )
+            if remote_document_type is None:
+                continue
+
+            remote_document, _ = SheinDocument.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                local_instance=media,
+                remote_document_type=remote_document_type,
+            )
+
+            remote_document_update_fields: list[str] = []
+            certificate_pool_id = str(document_payload.get("__shein_certificate_pool_id") or "").strip()
+            remote_url = str(document_payload.get("__shein_remote_url") or "").strip()
+            remote_filename = str(document_payload.get("__shein_remote_filename") or "").strip()
+
+            if certificate_pool_id and remote_document.remote_id != certificate_pool_id:
+                remote_document.remote_id = certificate_pool_id
+                remote_document_update_fields.append("remote_id")
+            if remote_url and remote_document.remote_url != remote_url:
+                remote_document.remote_url = remote_url
+                remote_document_update_fields.append("remote_url")
+            if remote_filename and remote_document.remote_filename != remote_filename:
+                remote_document.remote_filename = remote_filename
+                remote_document_update_fields.append("remote_filename")
+
+            if remote_document_update_fields:
+                remote_document.save(update_fields=remote_document_update_fields)
+
+            remote_association, _ = SheinDocumentThroughProduct.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                local_instance=document_association,
+                remote_product=import_instance.remote_instance,
+                remote_document=remote_document,
+                defaults={
+                    "require_document": True,
+                },
+            )
+
+            remote_association_update_fields: list[str] = []
+            pqms_certificate_sn = str(document_payload.get("__shein_pqms_certificate_sn") or "").strip()
+            expire_time = self._parse_shein_expire_time(value=document_payload.get("__shein_expire_time"))
+            missing_status = str(document_payload.get("__shein_missing_status") or "").strip()
+            if not missing_status:
+                missing_status = SheinDocumentThroughProduct.STATUS_NEW
+
+            if remote_association.require_document is False:
+                remote_association.require_document = True
+                remote_association_update_fields.append("require_document")
+            if remote_association.remote_document_id != remote_document.id:
+                remote_association.remote_document = remote_document
+                remote_association_update_fields.append("remote_document")
+            if pqms_certificate_sn and remote_association.remote_id != pqms_certificate_sn:
+                remote_association.remote_id = pqms_certificate_sn
+                remote_association_update_fields.append("remote_id")
+            if remote_url and remote_association.remote_url != remote_url:
+                remote_association.remote_url = remote_url
+                remote_association_update_fields.append("remote_url")
+            if remote_association.missing_status != missing_status:
+                remote_association.missing_status = missing_status
+                remote_association_update_fields.append("missing_status")
+            if remote_association.expire_time != expire_time:
+                remote_association.expire_time = expire_time
+                remote_association_update_fields.append("expire_time")
+
+            if remote_association_update_fields:
+                remote_association.save(update_fields=remote_association_update_fields)
 
 
 class SheinProductsAsyncImportProcessor(AsyncProductImportMixin, SheinProductsImportProcessor):

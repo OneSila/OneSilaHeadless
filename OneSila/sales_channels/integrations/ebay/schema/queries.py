@@ -2,7 +2,9 @@ from core.schema.core.queries import node, connection, DjangoListConnection, typ
 from sales_channels.integrations.ebay.schema.types.types import (
     EbayCategoryType,
     EbayProductCategoryType,
+    EbayProductStoreCategoryType,
     EbaySalesChannelType,
+    EbayStoreCategoryType,
     EbayInternalPropertyType,
     EbayInternalPropertyOptionType,
     EbayProductTypeType,
@@ -12,6 +14,7 @@ from sales_channels.integrations.ebay.schema.types.types import (
     EbaySalesChannelViewType,
     EbaySalesChannelImportType,
     EbayCurrencyType,
+    EbayDocumentTypeType,
 )
 
 
@@ -20,6 +23,10 @@ class EbaySalesChannelsQuery:
     ebay_categories: DjangoListConnection[EbayCategoryType] = connection()
     ebay_product_category: EbayProductCategoryType = node()
     ebay_product_categories: DjangoListConnection[EbayProductCategoryType] = connection()
+    ebay_store_category: EbayStoreCategoryType = node()
+    ebay_store_categories: DjangoListConnection[EbayStoreCategoryType] = connection()
+    ebay_product_store_category: EbayProductStoreCategoryType = node()
+    ebay_product_store_categories: DjangoListConnection[EbayProductStoreCategoryType] = connection()
 
     ebay_channel: EbaySalesChannelType = node()
     ebay_channels: DjangoListConnection[EbaySalesChannelType] = connection()
@@ -48,3 +55,6 @@ class EbaySalesChannelsQuery:
 
     ebay_currency: EbayCurrencyType = node()
     ebay_currencies: DjangoListConnection[EbayCurrencyType] = connection()
+
+    ebay_document_type: EbayDocumentTypeType = node()
+    ebay_document_types: DjangoListConnection[EbayDocumentTypeType] = connection()

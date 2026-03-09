@@ -35,7 +35,7 @@ class SheinSalesChannelPartialInput(NodeInput):
     pass
 
 
-@input(SheinProductCategory, fields="__all__")
+@input(SheinProductCategory, exclude=["remoteproductcategory_ptr"])
 class SheinProductCategoryInput:
     """Create a Shein product category mapping."""
     pass

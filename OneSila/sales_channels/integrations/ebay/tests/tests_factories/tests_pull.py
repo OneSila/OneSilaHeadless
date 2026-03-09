@@ -5,7 +5,9 @@ from sales_channels.integrations.ebay.factories.sales_channels import (
     EbayRemoteCurrencyPullFactory,
     EbayRemoteLanguagePullFactory,
     EbaySalesChannelViewPullFactory,
+    EbayStoreCategoryPullFactory,
 )
+from sales_channels.integrations.ebay.models import EbayStoreCategory
 
 
 class TestEbayPullFactories(TestCaseEbayMixin):
@@ -81,3 +83,126 @@ class TestEbayPullFactories(TestCaseEbayMixin):
         from sales_channels.integrations.ebay.factories.sales_channels.languages import _map_local_language
         for lang in languages:
             self.assertEqual(lang.local_instance, _map_local_language(lang.remote_code))
+
+    @patch("sales_channels.integrations.ebay.factories.mixins.GetEbayAPIMixin.get_api", return_value=MagicMock())
+    def test_pull_store_categories_creates_hierarchy(self, _mock_get_api):
+        payload = {
+            "storeCategories": [
+                {
+                    "categoryId": "10",
+                    "categoryName": "Fashion",
+                    "order": 0,
+                    "level": 1,
+                    "childrenCategories": [
+                        {
+                            "categoryId": "11",
+                            "categoryName": "Men",
+                            "order": 0,
+                            "level": 2,
+                        }
+                    ],
+                },
+                {
+                    "categoryId": "20",
+                    "categoryName": "Other",
+                    "order": 1,
+                    "level": 1,
+                },
+            ]
+        }
+
+        with patch.object(EbayStoreCategoryPullFactory, "get_store_categories", return_value=payload):
+            factory = EbayStoreCategoryPullFactory(sales_channel=self.sales_channel)
+            factory.run()
+
+        categories = EbayStoreCategory.objects.filter(sales_channel=self.sales_channel)
+        self.assertEqual(categories.count(), 3)
+
+        fashion = categories.get(remote_id="10")
+        men = categories.get(remote_id="11")
+        other = categories.get(remote_id="20")
+
+        self.assertEqual(men.parent_id, fashion.id)
+        self.assertEqual(men.full_path, "/Fashion/Men")
+        self.assertTrue(men.is_leaf)
+        self.assertIsNone(other.parent)
+        self.assertEqual(other.full_path, "/Other")
+
+    @patch("sales_channels.integrations.ebay.factories.mixins.GetEbayAPIMixin.get_api", return_value=MagicMock())
+    def test_pull_store_categories_updates_and_deletes(self, _mock_get_api):
+        first_payload = {
+            "storeCategories": [
+                {
+                    "categoryId": "10",
+                    "categoryName": "Fashion",
+                    "order": 0,
+                    "level": 1,
+                    "childrenCategories": [
+                        {
+                            "categoryId": "11",
+                            "categoryName": "Men",
+                            "order": 0,
+                            "level": 2,
+                        }
+                    ],
+                },
+                {
+                    "categoryId": "99",
+                    "categoryName": "Legacy",
+                    "order": 1,
+                    "level": 1,
+                },
+            ]
+        }
+        second_payload = {
+            "storeCategories": [
+                {
+                    "categoryId": "10",
+                    "categoryName": "Fashion",
+                    "order": 0,
+                    "level": 1,
+                    "childrenCategories": [
+                        {
+                            "categoryId": "11",
+                            "categoryName": "Menswear",
+                            "order": 2,
+                            "level": 2,
+                            "childrenCategories": [
+                                {
+                                    "categoryId": "12",
+                                    "categoryName": "Shirts",
+                                    "order": 0,
+                                    "level": 3,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        with patch.object(EbayStoreCategoryPullFactory, "get_store_categories", return_value=first_payload):
+            factory = EbayStoreCategoryPullFactory(sales_channel=self.sales_channel)
+            factory.run()
+
+        existing = EbayStoreCategory.objects.get(sales_channel=self.sales_channel, remote_id="11")
+        existing_pk = existing.pk
+
+        with patch.object(EbayStoreCategoryPullFactory, "get_store_categories", return_value=second_payload):
+            factory = EbayStoreCategoryPullFactory(sales_channel=self.sales_channel)
+            factory.run()
+
+        self.assertFalse(
+            EbayStoreCategory.objects.filter(sales_channel=self.sales_channel, remote_id="99").exists()
+        )
+
+        updated = EbayStoreCategory.objects.get(sales_channel=self.sales_channel, remote_id="11")
+        self.assertEqual(updated.pk, existing_pk)
+        self.assertEqual(updated.name, "Menswear")
+        self.assertFalse(updated.is_leaf)
+        self.assertEqual(updated.full_path, "/Fashion/Menswear")
+
+        shirts = EbayStoreCategory.objects.get(sales_channel=self.sales_channel, remote_id="12")
+        self.assertEqual(shirts.parent_id, updated.id)
+        self.assertTrue(shirts.is_leaf)
+        self.assertEqual(shirts.full_path, "/Fashion/Menswear/Shirts")

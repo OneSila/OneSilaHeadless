@@ -306,6 +306,8 @@ CHANNEL_LAYERS = {
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
+    # This wildcard exists as a base fallback only. Deployments that keep
+    # credentials enabled must override this with explicit trusted origins.
     '*',
     # 'http://172.19.250.107:3000',
 ]
@@ -429,6 +431,10 @@ EBAY_APPLICATION_SCOPES = [
     "https://api.ebay.com/oauth/api_scope/sell.stores.readonly",
     "https://api.ebay.com/oauth/scope/sell.edelivery",
     "https://api.ebay.com/oauth/api_scope/commerce.vero",
+    "https://api.ebay.com/oauth/api_scope/sell.inventory.mapping",
+    "https://api.ebay.com/oauth/api_scope/commerce.message",
+    "https://api.ebay.com/oauth/api_scope/commerce.feedback",
+    "https://api.ebay.com/oauth/api_scope/commerce.shipping",
 ]
 
 

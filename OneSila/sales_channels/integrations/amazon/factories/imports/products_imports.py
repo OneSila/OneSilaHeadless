@@ -1,8 +1,10 @@
 import pprint
+import re
 from decimal import Decimal
 from django.utils import timezone
 import logging
 import traceback
+from urllib.parse import urlparse
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from core.logging_helpers import AddLogTimeentry, timeit_and_log
@@ -20,7 +22,7 @@ from media.models import Image
 from sales_channels.integrations.amazon.helpers import (
     infer_product_type,
     extract_description_and_bullets,
-    get_is_product_variation, extract_amazon_attribute_value,
+    get_is_product_variation, extract_amazon_attribute_value, is_amazon_internal_property,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonProduct,
@@ -33,9 +35,11 @@ from sales_channels.integrations.amazon.models import (
     AmazonPrice,
     AmazonProductContent,
     AmazonImageProductAssociation,
+    AmazonDocumentType,
+    AmazonDocumentThroughProduct,
+    AmazonRemoteLanguage,
 )
 
-from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign, SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPrice
@@ -90,6 +94,8 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self.api = self.get_api()
         self.broken_records: list[dict] = []
+        self._mapped_document_types_by_remote_id_cache = None
+        self._language_map_by_view_id = {}
 
     # ------------------------------------------------------------------
     # Helpers
@@ -261,6 +267,224 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         return images
 
+    @staticmethod
+    def _normalise_document_entries(*, values):
+        if values is None:
+            return []
+
+        if isinstance(values, (list, tuple, set)):
+            iterable = list(values)
+        else:
+            iterable = [values]
+
+        entries = []
+        for value in iterable:
+            if value is None:
+                continue
+            if isinstance(value, dict):
+                entries.append(value)
+            else:
+                entries.append({"value": value})
+
+        return entries
+
+    @staticmethod
+    def _extract_document_url(*, value):
+        candidate = value
+        if isinstance(value, dict):
+            for key in ("source_location", "media_location", "value", "document_url", "url", "link"):
+                maybe_url = value.get(key)
+                if maybe_url not in (None, ""):
+                    candidate = maybe_url
+                    break
+            else:
+                return None
+
+        normalized = str(candidate or "").strip()
+        if not normalized:
+            return None
+
+        parsed = urlparse(normalized)
+        if parsed.scheme.lower() != "https":
+            return None
+        if not parsed.netloc:
+            return None
+
+        return normalized
+
+    def _resolve_local_document_language(self, *, view, remote_language_code):
+        view_id = getattr(view, "id", None)
+        if view_id not in self._language_map_by_view_id:
+            language_map = (
+                AmazonRemoteLanguage.objects.filter(
+                    sales_channel=self.sales_channel,
+                    sales_channel_view=view,
+                )
+                .exclude(local_instance__isnull=True)
+                .exclude(local_instance="")
+                .values_list("remote_code", "local_instance")
+            )
+
+            normalized_map = {}
+            for remote_value, local_value in language_map:
+                key = str(remote_value or "").strip().lower()
+                if key and key not in normalized_map:
+                    normalized_map[key] = local_value
+            self._language_map_by_view_id[view_id] = normalized_map
+
+        normalized_map = self._language_map_by_view_id.get(view_id, {})
+        remote_code = str(remote_language_code or "").strip()
+        if remote_code:
+            normalized_remote = remote_code.replace("-", "_").lower()
+            if normalized_remote in normalized_map:
+                return normalized_map[normalized_remote]
+
+            language_root = normalized_remote.split("_")[0]
+            for remote_value, local_value in normalized_map.items():
+                if remote_value.split("_")[0] == language_root:
+                    return local_value
+
+            if language_root:
+                return language_root
+
+        return (
+            getattr(view, "language_tag_local", None)
+            or getattr(self.sales_channel.multi_tenant_company, "language", None)
+            or None
+        )
+
+    def _get_mapped_document_types_by_remote_id(self):
+        if self._mapped_document_types_by_remote_id_cache is not None:
+            return self._mapped_document_types_by_remote_id_cache
+
+        mapped_by_remote_id = {}
+        queryset = (
+            AmazonDocumentType.objects.filter(sales_channel=self.sales_channel)
+            .exclude(local_instance__isnull=True)
+            .exclude(remote_id__isnull=True)
+            .exclude(remote_id="")
+            .select_related("local_instance")
+            .order_by("id")
+        )
+
+        for remote_document_type in queryset:
+            remote_id = str(remote_document_type.remote_id or "").strip()
+            if not remote_id:
+                continue
+            if remote_id in mapped_by_remote_id:
+                continue
+            mapped_by_remote_id[remote_id] = remote_document_type.local_instance
+
+        self._mapped_document_types_by_remote_id_cache = mapped_by_remote_id
+        return self._mapped_document_types_by_remote_id_cache
+
+    def _parse_documents(self, *, product_data, view, catalog_attributes=None):
+        mapped_by_remote_id = self._get_mapped_document_types_by_remote_id()
+        if not mapped_by_remote_id:
+            return [], {}
+
+        attributes_sources = []
+        product_attributes = product_data.get("attributes") or {}
+        if isinstance(product_attributes, dict):
+            attributes_sources.append(product_attributes)
+        if isinstance(catalog_attributes, dict) and catalog_attributes:
+            attributes_sources.append(catalog_attributes)
+
+        if not attributes_sources:
+            return [], {}
+
+        documents = []
+        document_remote_id_map = {}
+        seen_document_keys = set()
+
+        def _append_document(
+            *,
+            remote_mapping_id,
+            remote_property_code,
+            raw_document,
+            remote_language_code=None,
+        ):
+            local_document_type = mapped_by_remote_id.get(remote_mapping_id)
+            if local_document_type is None:
+                return
+
+            document_url = self._extract_document_url(value=raw_document)
+            if not document_url:
+                return
+
+            dedupe_key = (
+                document_url,
+                local_document_type.id,
+                str(remote_property_code or "").strip(),
+            )
+            if dedupe_key in seen_document_keys:
+                return
+
+            local_language = self._resolve_local_document_language(
+                view=view,
+                remote_language_code=remote_language_code,
+            )
+
+            payload = {
+                "document_url": document_url,
+                "document_type": local_document_type,
+                "sort_order": len(documents),
+            }
+            if local_language:
+                payload["document_language"] = local_language
+
+            documents.append(payload)
+            document_remote_id_map[str(len(documents) - 1)] = str(remote_property_code or "").strip()
+            seen_document_keys.add(dedupe_key)
+
+        for attrs in attributes_sources:
+            if not isinstance(attrs, dict):
+                continue
+
+            for entry in self._normalise_document_entries(values=attrs.get("compliance_media")):
+                content_type = str(entry.get("content_type") or "").strip().lower()
+                if not content_type:
+                    continue
+                _append_document(
+                    remote_mapping_id=f"compliance_media__{content_type}",
+                    remote_property_code="compliance_media",
+                    raw_document=entry.get("source_location") or entry,
+                    remote_language_code=entry.get("content_language"),
+                )
+
+            for entry in self._normalise_document_entries(values=attrs.get("safety_data_sheet_url")):
+                _append_document(
+                    remote_mapping_id="safety_data_sheet_url",
+                    remote_property_code="safety_data_sheet_url",
+                    raw_document=entry,
+                    remote_language_code=entry.get("language_tag") if isinstance(entry, dict) else None,
+                )
+
+            for ps_index in range(1, 7):
+                property_code = f"image_locator_ps{ps_index:02d}"
+                for entry in self._normalise_document_entries(values=attrs.get(property_code)):
+                    _append_document(
+                        remote_mapping_id="image_locator_ps",
+                        remote_property_code=property_code,
+                        raw_document=entry,
+                        remote_language_code=entry.get("language_tag") if isinstance(entry, dict) else None,
+                    )
+
+            for code, raw_values in attrs.items():
+                normalized_code = str(code or "").strip().lower()
+                if not re.match(r"^image_locator_.*pf$", normalized_code):
+                    continue
+
+                for entry in self._normalise_document_entries(values=raw_values):
+                    _append_document(
+                        remote_mapping_id="image_locator_pf",
+                        remote_property_code=str(code or "").strip(),
+                        raw_document=entry,
+                        remote_language_code=entry.get("language_tag") if isinstance(entry, dict) else None,
+                    )
+
+        return documents, document_remote_id_map
+
     @timeit_and_log(logger, "AmazonProductsImportProcessor._parse_attributes")
     def _parse_attributes(self, attributes, product_type, marketplace):
         attrs = []
@@ -269,7 +493,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         for code, values in product_attrs.items():
 
-            if code in AMAZON_INTERNAL_PROPERTIES:
+            if is_amazon_internal_property(code=code):
                 continue
 
             definition = AmazonPublicDefinition.objects.filter(
@@ -529,6 +753,16 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             for k, v in extra_map.items():
                 if k not in mirror_map:
                     mirror_map[k] = v
+
+        documents, document_remote_id_map = self._parse_documents(
+            product_data=product_data,
+            view=view,
+            catalog_attributes=catalog_attrs,
+        )
+        if documents:
+            structured["documents"] = documents
+            structured["__document_index_to_remote_id"] = document_remote_id_map
+
         if attributes:
             structured["properties"] = attributes
             structured["__mirror_product_properties_map"] = mirror_map
@@ -777,6 +1011,58 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     instance.save(update_fields=["imported_url"])
 
     @timeit_and_log(logger)
+    def handle_documents(self, *, import_instance: ImportProductInstance):
+        if not hasattr(import_instance, "documents"):
+            return
+
+        remote_id_map = import_instance.data.get("__document_index_to_remote_id", {})
+
+        for index, document_association in enumerate(import_instance.documents_associations_instances):
+            remote_property_code = str(remote_id_map.get(str(index)) or "").strip()
+            document_payload = import_instance.documents[index] if index < len(import_instance.documents) else {}
+            remote_url = str(document_payload.get("document_url") or "").strip() if isinstance(document_payload, dict) else ""
+
+            remote_association = (
+                AmazonDocumentThroughProduct.objects.filter(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=document_association,
+                    remote_product=import_instance.remote_instance,
+                )
+                .order_by("id")
+                .first()
+            )
+            if remote_association is None:
+                remote_association = AmazonDocumentThroughProduct.objects.create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=document_association,
+                    remote_product=import_instance.remote_instance,
+                    remote_document=None,
+                    require_document=False,
+                    remote_id=remote_property_code or None,
+                    remote_url=remote_url or None,
+                )
+                continue
+
+            update_fields = []
+            if remote_association.require_document:
+                remote_association.require_document = False
+                update_fields.append("require_document")
+            if remote_association.remote_document_id is not None:
+                remote_association.remote_document = None
+                update_fields.append("remote_document")
+            if remote_property_code and remote_association.remote_id != remote_property_code:
+                remote_association.remote_id = remote_property_code
+                update_fields.append("remote_id")
+            if remote_url and remote_association.remote_url != remote_url:
+                remote_association.remote_url = remote_url
+                update_fields.append("remote_url")
+
+            if update_fields:
+                remote_association.save(update_fields=update_fields)
+
+    @timeit_and_log(logger)
     def handle_variations(self, import_instance: ImportProductInstance, view):
         from sales_channels.models.products import RemoteProductConfigurator
         from sales_channels.integrations.amazon.models import (
@@ -873,7 +1159,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 sales_channel=self.sales_channel,
                 view=view,
                 multi_tenant_company=self.import_process.multi_tenant_company,
-                defaults={"recommended_browse_node_id": node_id},
+                defaults={"remote_id": node_id},
             )
         else:
             AmazonProductBrowseNode.objects.filter(
@@ -1068,6 +1354,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         self.handle_translations(instance)
         self.handle_prices(instance)
         self.handle_images(instance)
+        self.handle_documents(import_instance=instance)
 
         self._add_log_entry("handling translations, prices and images")
 

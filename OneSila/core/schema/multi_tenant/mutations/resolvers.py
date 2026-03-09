@@ -48,5 +48,6 @@ def resolve_authenticate_token(info, token: str):
     fac.run()
 
     login(request=request, user=fac.user)
+    fac.consume_token()
 
     return fac.user

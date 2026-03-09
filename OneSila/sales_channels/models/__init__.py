@@ -39,6 +39,11 @@ from .properties import (
     RemotePropertySelectValue,
     RemoteProductProperty,
 )
+from .documents import (
+    RemoteDocumentType,
+    RemoteDocument,
+    RemoteDocumentProductAssociation,
+)
 
 # Order and customer models
 from .orders import RemoteOrder, RemoteCustomer

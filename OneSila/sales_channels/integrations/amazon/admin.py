@@ -216,11 +216,12 @@ class AmazonPublicDefinitionAdmin(admin.ModelAdmin):
         "name",
         "is_required",
         "is_internal",
+        "is_document_field",
         "allowed_in_configurator",
         "last_fetched",
     )
     search_fields = ("code", "name", "product_type_code", "api_region_code")
-    list_filter = ("api_region_code", "product_type_code", "is_required", "is_internal")
+    list_filter = ("api_region_code", "product_type_code", "is_required", "is_internal", "is_document_field")
     readonly_fields = ("last_fetched",)
     ordering = ("api_region_code", "product_type_code", "code")
     fieldsets = (
@@ -235,6 +236,7 @@ class AmazonPublicDefinitionAdmin(admin.ModelAdmin):
                 "usage_definition",
                 "is_required",
                 "is_internal",
+                "is_document_field",
                 "allowed_in_configurator",
                 "last_fetched",
             )

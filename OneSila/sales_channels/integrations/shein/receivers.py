@@ -1,14 +1,18 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
+from sales_channels.models.documents import RemoteDocumentType
 from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProperty
+from sales_channels.integrations.shein.models.documents import SheinDocumentType
 from sales_channels.integrations.shein.factories.sync.rule_sync import (
     SheinPropertyRuleItemSyncFactory,
 )
+from sales_channels.integrations.shein.tasks import shein_translate_document_type_task
 from sales_channels.signals import (
     create_remote_product,
     create_remote_product_property,
     delete_remote_image,
     delete_remote_image_association,
+    delete_remote_product,
     delete_remote_product_property,
     manual_sync_remote_product,
     add_remote_product_variation,
@@ -124,6 +128,45 @@ def shein__shein_product__manual_sync(
         view=view,
         **kwargs,
     )
+
+
+@receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
+def shein__product__delete_from_assign(*, sender, instance, **kwargs):
+    from sales_channels.integrations.shein.factories.task_queue import (
+        SheinProductDeleteFromAssignAddTask,
+    )
+    from sales_channels.integrations.shein.tasks import delete_shein_product_db_task
+
+    product = instance.product
+    sales_channel = instance.sales_channel.get_real_instance()
+
+
+    if not isinstance(sales_channel, SheinSalesChannel) or not sales_channel.active:
+        return
+
+    task_runner = SheinProductDeleteFromAssignAddTask(
+        task_func=delete_shein_product_db_task,
+        local_instance_id=product.id,
+        sales_channel=sales_channel,
+        is_variation=kwargs.get('is_variation', False),
+    )
+    task_runner.run()
+
+
+@receiver(delete_remote_product, sender='products.Product')
+def shein__product__delete_from_product(*, sender, instance, **kwargs):
+    from sales_channels.integrations.shein.factories.task_queue import (
+        SheinProductDeleteAddTask,
+    )
+    from sales_channels.integrations.shein.tasks import delete_shein_product_db_task
+
+    task_runner = SheinProductDeleteAddTask(
+        task_func=delete_shein_product_db_task,
+        local_instance_id=instance.id,
+        multi_tenant_company=instance.multi_tenant_company,
+        is_multiple=True,
+    )
+    task_runner.run()
 
 
 @receiver(update_remote_product, sender='products.Product')
@@ -451,3 +494,28 @@ def sales_channels__shein_property__sync_rule_item(
         return
 
     SheinPropertyRuleItemSyncFactory(shein_property=instance).run()
+
+
+@receiver(post_create, sender="shein.SheinDocumentType")
+@receiver(post_update, sender="shein.SheinDocumentType")
+@receiver(post_create, sender="sales_channels.RemoteDocumentType")
+@receiver(post_update, sender="sales_channels.RemoteDocumentType")
+def sales_channels__shein_document_type__translate(
+    *,
+    sender,
+    instance: RemoteDocumentType,
+    **kwargs,
+):
+    instance = instance.get_real_instance()
+    if not isinstance(instance, SheinDocumentType):
+        return
+
+    translated_name = str(instance.translated_name or "").strip()
+    if translated_name:
+        return
+
+    remote_name = str(instance.name or instance.remote_id or "").strip()
+    if not remote_name:
+        return
+
+    shein_translate_document_type_task(document_type_id=instance.id)

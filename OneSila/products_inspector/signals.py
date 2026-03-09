@@ -108,3 +108,9 @@ inspector_amazon_validation_issues_failed = ModelSignal(use_caching=True)
 inspector_amazon_validation_issues_success = ModelSignal(use_caching=True)
 inspector_amazon_remote_issues_failed = ModelSignal(use_caching=True)
 inspector_amazon_remote_issues_success = ModelSignal(use_caching=True)
+
+# signals for remote document types
+inspector_required_document_types_failed = ModelSignal(use_caching=True)
+inspector_required_document_types_success = ModelSignal(use_caching=True)
+inspector_optional_document_types_failed = ModelSignal(use_caching=True)
+inspector_optional_document_types_success = ModelSignal(use_caching=True)

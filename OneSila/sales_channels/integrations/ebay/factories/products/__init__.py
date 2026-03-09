@@ -3,6 +3,14 @@ from .images import (
     EbayMediaProductThroughUpdateFactory,
     EbayMediaProductThroughDeleteFactory,
 )
+from .documents import (
+    EbayRemoteDocumentCreateFactory,
+    EbayRemoteDocumentUpdateFactory,
+    EbayRemoteDocumentDeleteFactory,
+    EbayDocumentThroughProductCreateFactory,
+    EbayDocumentThroughProductUpdateFactory,
+    EbayDocumentThroughProductDeleteFactory,
+)
 from .content import EbayProductContentUpdateFactory
 from .eancodes import EbayEanCodeUpdateFactory
 from .products import (
@@ -28,6 +36,12 @@ __all__ = [
     "EbayMediaProductThroughCreateFactory",
     "EbayMediaProductThroughUpdateFactory",
     "EbayMediaProductThroughDeleteFactory",
+    "EbayRemoteDocumentCreateFactory",
+    "EbayRemoteDocumentUpdateFactory",
+    "EbayRemoteDocumentDeleteFactory",
+    "EbayDocumentThroughProductCreateFactory",
+    "EbayDocumentThroughProductUpdateFactory",
+    "EbayDocumentThroughProductDeleteFactory",
     "EbayProductContentUpdateFactory",
     "EbayEanCodeUpdateFactory",
     "EbayProductPropertyCreateFactory",

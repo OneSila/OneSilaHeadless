@@ -1,11 +1,12 @@
-from core.schema.core.mutations import update, delete, type, List
+from core.schema.core.mutations import create as core_create, update, delete, type, List
 from .fields import create
 
 from ..types.types import MediaType, ImageType, VideoType, MediaProductThroughType, \
-    FileType
+    FileType, DocumentTypeType
 from ..types.input import MediaInput, ImageInput, VideoInput, MediaProductThroughInput, \
     FileInput, FilePartialInput, MediaPartialInput, ImagePartialInput, \
-    VideoPartialInput, MediaProductThroughPartialInput, ImageUrlInput
+    VideoPartialInput, MediaProductThroughPartialInput, ImageUrlInput, \
+    DocumentTypeInput, DocumentTypePartialInput
 import strawberry_django
 from strawberry.types import Info
 from core.schema.core.extensions import default_extensions
@@ -40,6 +41,12 @@ class MediaMutation:
     update_video: VideoType = update(VideoPartialInput)
     delete_video: VideoType = delete()
     delete_videos: List[VideoType] = delete(is_bulk=True)
+
+    create_document_type: DocumentTypeType = core_create(DocumentTypeInput)
+    create_document_types: List[DocumentTypeType] = core_create(List[DocumentTypeInput])
+    update_document_type: DocumentTypeType = update(DocumentTypePartialInput)
+    delete_document_type: DocumentTypeType = delete()
+    delete_document_types: List[DocumentTypeType] = delete(is_bulk=True)
 
     create_mediaproducthrough: MediaProductThroughType = create(MediaProductThroughInput)
     create_mediaproducthroughs: List[MediaProductThroughType] = create(List[MediaProductThroughInput])

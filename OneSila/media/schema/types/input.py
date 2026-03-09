@@ -1,7 +1,7 @@
 from typing import Optional
 
 from core.schema.core.types.input import NodeInput, input, partial, strawberry_input
-from media.models import Media, Image, Video, MediaProductThrough, File
+from media.models import Media, Image, Video, MediaProductThrough, File, DocumentType
 
 
 @input(Media, fields="__all__", exclude=['owner'])
@@ -51,6 +51,16 @@ class MediaProductThroughInput:
 
 @partial(MediaProductThrough, fields="__all__")
 class MediaProductThroughPartialInput(NodeInput):
+    pass
+
+
+@input(DocumentType, fields="__all__")
+class DocumentTypeInput:
+    pass
+
+
+@partial(DocumentType, fields=["name", "description"])
+class DocumentTypePartialInput(NodeInput):
     pass
 
 

@@ -1,6 +1,6 @@
 """Tests covering the Shein mixin helpers."""
 
-from unittest.mock import Mock, call, patch
+from unittest.mock import ANY, Mock, call, patch
 
 import requests
 from django.test import override_settings
@@ -225,6 +225,53 @@ class SheinSignatureMixinTests(TestCase):
         )
         response.raise_for_status.assert_called_once_with()
         self.assertIs(result, response)
+
+    @patch("sales_channels.integrations.shein.factories.mixins.requests.post")
+    def test_upload_certificate_file_includes_language_header(self, post_mock: Mock) -> None:
+        response = Mock()
+        response.raise_for_status = Mock()
+        response.json.return_value = {"code": "0", "msg": "OK", "info": {"certificateUrl": "https://example.com/cert.pdf"}}
+        post_mock.return_value = response
+
+        with patch.object(
+            self.factory,
+            "build_shein_headers",
+            return_value=(
+                {
+                    "Content-Type": "application/json",
+                    "x-lt-openKeyId": "open-key",
+                    "x-lt-timestamp": "1700000000000",
+                    "x-lt-signature": "signed-value",
+                    "language": "en",
+                },
+                1700000000000,
+                "abcde",
+            ),
+        ) as headers_mock:
+            payload = self.factory.upload_certificate_file(
+                filename="cert.pdf",
+                file_bytes=b"pdf-bytes",
+                content_type="application/pdf",
+            )
+
+        headers_mock.assert_called_once_with(
+            path="/open-api/goods/upload-certificate-file",
+            add_language=True,
+            content_type="application/json",
+        )
+        post_mock.assert_called_once_with(
+            "https://openapi.sheincorp.com/open-api/goods/upload-certificate-file",
+            headers={
+                "x-lt-openKeyId": "open-key",
+                "x-lt-timestamp": "1700000000000",
+                "x-lt-signature": "signed-value",
+                "language": "en",
+            },
+            files={"file": ("cert.pdf", ANY, "application/pdf")},
+            timeout=ANY,
+            verify=self.sales_channel.verify_ssl,
+        )
+        self.assertEqual(payload, response.json.return_value)
 
     # @TODO: FIX THIS AFTER DEPLOY
     # @patch("sales_channels.integrations.shein.factories.mixins.requests.post")
@@ -485,6 +532,76 @@ class SheinSignatureMixinTests(TestCase):
             },
         )
 
+    def test_get_certificate_rule_by_category_id_returns_records(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "data": [
+                    {
+                        "certificateTypeId": 100,
+                        "certificateTypeValue": "CPC",
+                        "isRequired": True,
+                    }
+                ]
+            },
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            records = self.factory.get_certificate_rule_by_category_id(category_id="1727")
+
+        post_mock.assert_called_once_with(
+            path="/open-api/goods/get-certificate-rule",
+            payload={"categoryId": 1727, "systemId": "spmp"},
+        )
+        self.assertEqual(
+            records,
+            [
+                {
+                    "certificateTypeId": 100,
+                    "certificateTypeValue": "CPC",
+                    "isRequired": True,
+                }
+            ],
+        )
+
+    def test_get_certificate_rule_by_product_spu_returns_records(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "data": {
+                    "records": [
+                        {
+                            "certificateTypeId": 200,
+                            "certificateTypeValue": "DoC",
+                            "isRequired": False,
+                        }
+                    ]
+                }
+            },
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            records = self.factory.get_certificate_rule_by_product_spu(spu_name="SPU-1")
+
+        post_mock.assert_called_once_with(
+            path="/open-api/goods/get-certificate-rule",
+            payload={"spuName": "SPU-1", "systemId": "spmp"},
+        )
+        self.assertEqual(
+            records,
+            [
+                {
+                    "certificateTypeId": 200,
+                    "certificateTypeValue": "DoC",
+                    "isRequired": False,
+                }
+            ],
+        )
+
     def test_get_total_product_count_returns_used_quota(self) -> None:
         response = Mock()
         response.json.return_value = {
@@ -497,3 +614,42 @@ class SheinSignatureMixinTests(TestCase):
             total = self.factory.get_total_product_count()
 
         self.assertEqual(total, 37)
+
+    def test_save_or_update_certificate_pool_includes_language_header(self) -> None:
+        response = Mock()
+        response.json.return_value = {"code": "0", "msg": "OK", "info": {"certificatePoolId": 123}}
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            payload = self.factory.save_or_update_certificate_pool(
+                certificate_type_id=14,
+                certificate_url="https://example.com/cert.pdf",
+                certificate_url_name="cert.pdf",
+            )
+
+        post_mock.assert_called_once_with(
+            path="/open-api/goods/save-or-update-certificate-pool",
+            payload={
+                "certificateTypeId": 14,
+                "certificateUrl": "https://example.com/cert.pdf",
+                "certificateUrlName": "cert.pdf",
+            },
+            add_language=True,
+        )
+        self.assertEqual(payload, {"code": "0", "msg": "OK", "info": {"certificatePoolId": 123}})
+
+    def test_save_certificate_pool_skc_bind_includes_language_header(self) -> None:
+        response = Mock()
+        response.json.return_value = {"code": "0", "msg": "OK", "info": {}}
+        relation_list = [{"spuName": "SPU1", "skcName": "SKC1", "certificatePoolIdList": [123]}]
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            payload = self.factory.save_certificate_pool_skc_bind(
+                skc_certificate_pool_relation_list=relation_list,
+            )
+
+        post_mock.assert_called_once_with(
+            path="/open-api/goods/save-certificate-pool-skc-bind",
+            payload={"skcCertificatePoolRelationList": relation_list},
+            add_language=True,
+        )
+        self.assertEqual(payload, {"code": "0", "msg": "OK", "info": {}})

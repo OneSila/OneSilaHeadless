@@ -1,3 +1,5 @@
+from unittest.mock import Mock, patch
+
 from core.tests import TestCase
 from currencies.models import PublicCurrency, Currency
 from eancodes.models import EanCode
@@ -5,7 +7,7 @@ from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
 from imports_exports.factories.products import ImportProductInstance, ImportProductTranslationInstance, \
     ImportSalesPriceInstance
 from imports_exports.models import Import
-from media.models import MediaProductThrough
+from media.models import Media, MediaProductThrough
 from products.models import Product, ProductTranslation, ConfigurableVariation, BundleVariation
 from properties.models import ProductPropertiesRuleItem, ProductPropertiesRule, PropertySelectValue, \
     PropertySelectValueTranslation, Property, ProductProperty
@@ -500,6 +502,33 @@ class ImportProductInstanceProcessTest(TestCase):
                 sales_channel=None,
             ).exists()
         )
+
+    @patch("imports_exports.factories.media.requests.get")
+    def test_create_product_with_documents(self, mock_get):
+        response = Mock()
+        response.headers = {"Content-Type": "application/pdf"}
+        response.raise_for_status = Mock()
+        response.iter_content = Mock(return_value=[b"%PDF-1.7 product-document"])
+        mock_get.return_value = response
+
+        data = {
+            "name": "Document Product",
+            "sku": "DOC-PROD-001",
+            "documents": [
+                {"document_url": "https://example.com/product-certificate.pdf", "sort_order": 2}
+            ],
+        }
+
+        instance = ImportProductInstance(data, self.import_process)
+        instance.process()
+
+        through_qs = MediaProductThrough.objects.get_product_documents(
+            product=instance.instance,
+            sales_channel=None,
+        )
+        self.assertTrue(through_qs.exists())
+        self.assertEqual(through_qs.count(), 1)
+        self.assertEqual(through_qs.first().media.type, Media.FILE)
 
     def test_create_product_with_prices(self):
         data = {

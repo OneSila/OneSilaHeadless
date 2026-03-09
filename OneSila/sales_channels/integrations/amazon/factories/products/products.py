@@ -30,6 +30,11 @@ from sales_channels.integrations.amazon.factories.products.images import (
     AmazonMediaProductThroughUpdateFactory,
     AmazonMediaProductThroughDeleteFactory,
 )
+from sales_channels.integrations.amazon.factories.products.documents import (
+    AmazonDocumentThroughProductCreateFactory,
+    AmazonDocumentThroughProductUpdateFactory,
+    AmazonDocumentThroughProductDeleteFactory,
+)
 from sales_channels.integrations.amazon.factories.properties import (
     AmazonProductPropertyCreateFactory,
     AmazonProductPropertyUpdateFactory,
@@ -51,6 +56,7 @@ from sales_channels.integrations.amazon.models.properties import (
     AmazonProductType,
     AmazonPublicDefinition,
 )
+from sales_channels.integrations.amazon.models.documents import AmazonDocumentThroughProduct
 from sales_channels.integrations.amazon.models import AmazonCurrency
 from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
 from sales_channels.exceptions import SkipSyncBecauseOfStatusException
@@ -65,6 +71,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     remote_image_assign_create_factory = AmazonMediaProductThroughCreateFactory
     remote_image_assign_update_factory = AmazonMediaProductThroughUpdateFactory
     remote_image_assign_delete_factory = AmazonMediaProductThroughDeleteFactory
+    integration_has_documents = True
+    remote_document_assign_model_class = AmazonDocumentThroughProduct
+    remote_document_assign_create_factory = AmazonDocumentThroughProductCreateFactory
+    remote_document_assign_update_factory = AmazonDocumentThroughProductUpdateFactory
+    remote_document_assign_delete_factory = AmazonDocumentThroughProductDeleteFactory
 
     remote_product_property_class = AmazonProductProperty
     remote_product_property_create_factory = AmazonProductPropertyCreateFactory
@@ -108,7 +119,93 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.prices_data = {}
         self.external_product_id = self._get_external_product_id()
         self.ean_for_payload = self._get_ean_for_payload()
-        self.recommended_browse_node_id = self._get_recommended_browse_node_id()
+        self.browse_node_remote_id = self._get_browse_node_remote_id()
+
+    def _build_amazon_document_factory_kwargs(
+        self,
+        *,
+        media_through,
+        remote_product,
+        remote_rule,
+        remote_instance=None,
+    ):
+        kwargs = {
+            "local_instance": media_through,
+            "sales_channel": self.sales_channel,
+            "skip_checks": True,
+            "remote_product": remote_product,
+            "remote_rule": remote_rule,
+            "api": self.api,
+            "get_value_only": getattr(self, "get_value_only", False),
+            "view": self.view,
+        }
+        if remote_instance is not None:
+            kwargs["remote_instance"] = remote_instance
+        return kwargs
+
+    def create_document_assignment(self, media_through):
+        remote_product = self.remote_instance or getattr(self, "remote_product", None)
+        remote_rule = remote_product.get_remote_rule() if remote_product else None
+
+        factory = self.remote_document_assign_create_factory(
+            **self._build_amazon_document_factory_kwargs(
+                media_through=media_through,
+                remote_product=remote_product,
+                remote_rule=remote_rule,
+            )
+        )
+        factory.run()
+        remote_instance = getattr(factory, "remote_instance", None)
+        if remote_instance is None:
+            return None
+
+        refreshed = (
+            remote_instance.__class__.objects
+            .select_related("remote_document", "remote_document__remote_document_type")
+            .filter(pk=remote_instance.pk)
+            .first()
+        )
+        return refreshed or remote_instance
+
+    def update_document_assignment(self, media_through, remote_document_assoc):
+        remote_product = self.remote_instance or getattr(self, "remote_product", None)
+        remote_rule = remote_product.get_remote_rule() if remote_product else None
+
+        factory = self.remote_document_assign_update_factory(
+            **self._build_amazon_document_factory_kwargs(
+                media_through=media_through,
+                remote_product=remote_product,
+                remote_rule=remote_rule,
+                remote_instance=remote_document_assoc,
+            )
+        )
+        factory.run()
+        remote_instance = getattr(factory, "remote_instance", None)
+        if remote_instance is None:
+            return None
+
+        refreshed = (
+            remote_instance.__class__.objects
+            .select_related("remote_document", "remote_document__remote_document_type")
+            .filter(pk=remote_instance.pk)
+            .first()
+        )
+        return refreshed or remote_instance
+
+    def delete_document_assignment(self, media_through, remote_document_assoc):
+        remote_product = self.remote_instance or getattr(self, "remote_product", None)
+        remote_rule = remote_product.get_remote_rule() if remote_product else None
+
+        factory = self.remote_document_assign_delete_factory(
+            **self._build_amazon_document_factory_kwargs(
+                media_through=media_through,
+                remote_product=remote_product,
+                remote_rule=remote_rule,
+                remote_instance=remote_document_assoc,
+            )
+        )
+        factory.run()
+        return True
 
     def get_identifiers(self, *, fixing_caller: str = "run"):
         frame = inspect.currentframe()
@@ -536,7 +633,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
         return value
 
-    def _get_recommended_browse_node_id(self) -> str | None:
+    def _get_browse_node_remote_id(self) -> str | None:
         from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
 
         try:
@@ -556,7 +653,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     return None
             else:
                 return None
-        return obj.recommended_browse_node_id
+        return obj.remote_id
 
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
@@ -603,7 +700,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     # If GTIN exemption is claimed, drop EAN to avoid Amazon matching it to an existing ASIN.
                     attrs.pop("externally_assigned_product_identifier", None)
 
-        browse_node_id = self.recommended_browse_node_id
+        browse_node_id = self.browse_node_remote_id
         if browse_node_id:
             attrs["recommended_browse_nodes"] = [
                 {"value": browse_node_id, "marketplace_id": self.view.remote_id}

@@ -113,6 +113,17 @@ def shein_map_perfect_match_properties_db_task(*, sales_channel_id: int):
     SheinPerfectMatchPropertyMappingFactory(sales_channel=sales_channel).run()
 
 
+@db_task()
+def shein_translate_document_type_task(*, document_type_id: int):
+    from sales_channels.integrations.shein.factories.sales_channels import (
+        SheinDocumentTypeTranslationFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinDocumentType
+
+    document_type = SheinDocumentType.objects.get(id=document_type_id)
+    SheinDocumentTypeTranslationFactory(document_type=document_type).run()
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_shein_product_db_task(
@@ -211,6 +222,33 @@ def resync_shein_product_db_task(
             sales_channel=SheinSalesChannel.objects.get(id=sales_channel_id),
             local_instance=Product.objects.get(id=product_id),
             remote_instance=RemoteProduct.objects.get(id=remote_product_id),
+        )
+        factory.run()
+
+    task.execute(actual_task)
+
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def delete_shein_product_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    remote_instance: int,
+):
+    """Run the Shein product delete factory."""
+    from sales_channels.integrations.shein.factories.products import (
+        SheinProductDeleteFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinSalesChannel
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        sales_channel = SheinSalesChannel.objects.get(id=sales_channel_id)
+        factory = SheinProductDeleteFactory(
+            sales_channel=sales_channel,
+            remote_instance=remote_instance,
         )
         factory.run()
 

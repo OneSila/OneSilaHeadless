@@ -9,7 +9,8 @@ from products_inspector.managers import InspectorBlockHasImagesManager, Inspecto
     MissingProductTypeInspectorBlockManager, MissingRequiredPropertiesInspectorBlockManager, MissingOptionalPropertiesInspectorBlockManager, \
     MissingStockManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
     ItemsMismatchProductTypeManager, ItemsMissingMandatoryInformationManager, VariationsMissingMandatoryInformationManager, \
-    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager, InspectorManager
+    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager, InspectorManager, \
+    RequiredDocumentTypesInspectorBlockManager, OptionalDocumentTypesInspectorBlockManager
 
 
 class Inspector(models.Model):
@@ -55,7 +56,7 @@ class Inspector(models.Model):
                 completed = block.successfully_checked
                 if completed:
                     completed_blocks += 1
-                blocks.append({"code": block.error_code, "completed": completed})
+                blocks.append({"code": block.error_code, "completed": completed, "fixing_message": block.fixing_message})
 
         if total_blocks == 0:
             percentage = 100
@@ -85,6 +86,7 @@ class InspectorBlock(models.Model):
 
     # Reflects if the block passed its check
     successfully_checked = models.BooleanField(default=False)
+    fixing_message = models.TextField(null=True, blank=True, default=None)
 
     class Meta:
         unique_together = ("inspector", "error_code")
@@ -286,3 +288,25 @@ class NonConfigurableRuleInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Non-Configurable Rule")
+
+
+class RequiredDocumentTypesInspectorBlock(InspectorBlock):
+    from .constants import required_document_types_block
+
+    objects = RequiredDocumentTypesInspectorBlockManager()
+    proxy_filter_fields = required_document_types_block
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Inspector Block Required Document Types")
+
+
+class OptionalDocumentTypesInspectorBlock(InspectorBlock):
+    from .constants import optional_document_types_block
+
+    objects = OptionalDocumentTypesInspectorBlockManager()
+    proxy_filter_fields = optional_document_types_block
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Inspector Block Optional Document Types")

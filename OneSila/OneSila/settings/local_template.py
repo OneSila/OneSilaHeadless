@@ -56,6 +56,7 @@ CORS_ALLOWED_ORIGINS = [
     # 'http://172.19.250.107:3000',
     # the right port will depend on the port the frontend is running.
     # on a dev machine check npm run dev and add that here.
+    # Keep this list explicit so local settings replace the base wildcard.
     "http://localhost:5173",
 ]
 

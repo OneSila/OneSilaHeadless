@@ -171,6 +171,7 @@ def sales_channels__amazon_product_type__imported_rule(sender, instance, **kwarg
         create_amazon_product_type_rule_task(
             product_type_code=instance.product_type_code,
             sales_channel_id=instance.sales_channel_id,
+            product_type_id=instance.id,
         )
 
 
@@ -254,7 +255,7 @@ def amazon__product_browse_node__propagate_to_variations(sender, instance, **kwa
             product=variation,
             sales_channel=instance.sales_channel,
             view=instance.view,
-            defaults={'recommended_browse_node_id': instance.recommended_browse_node_id},
+            defaults={'remote_id': instance.remote_id},
         )
 
 

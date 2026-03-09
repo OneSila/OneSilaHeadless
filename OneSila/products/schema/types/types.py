@@ -48,6 +48,7 @@ from typing import List, Optional
 @strawberry_type
 class InspectorCompletionBlockType:
     code: int
+    fixing_message: Optional[str] = None
     completed: bool
 
 
@@ -126,7 +127,7 @@ class ProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
             inspector_status = GREEN
 
         block_types = [
-            InspectorCompletionBlockType(code=b["code"], completed=b["completed"])
+            InspectorCompletionBlockType(code=b["code"], completed=b["completed"], fixing_message=b["fixing_message"])
             for b in blocks
         ]
 

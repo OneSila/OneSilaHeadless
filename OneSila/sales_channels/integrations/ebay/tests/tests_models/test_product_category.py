@@ -1,5 +1,4 @@
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
 from model_bakery import baker
 
 from core.tests import TestCase
@@ -10,7 +9,7 @@ from sales_channels.integrations.ebay.models import (
     EbaySalesChannelView,
     EbayProductType,
 )
-from properties.models import Property
+from properties.models import Property, ProductPropertiesRule
 
 
 class EbayProductCategoryModelTest(TestCase):
@@ -18,6 +17,7 @@ class EbayProductCategoryModelTest(TestCase):
         super().setUp()
         self.product = baker.make(
             "products.Product",
+            type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
         self.sales_channel = baker.make(
@@ -31,6 +31,14 @@ class EbayProductCategoryModelTest(TestCase):
         )
 
     def test_str_contains_remote_id(self):
+        EbayCategory.objects.create(
+            marketplace_default_tree_id="0",
+            remote_id="987654321",
+            name="Leaf",
+            full_name="Leaf Category",
+            has_children=False,
+        )
+
         mapping = EbayProductCategory.objects.create(
             product=self.product,
             sales_channel=self.sales_channel,
@@ -44,6 +52,21 @@ class EbayProductCategoryModelTest(TestCase):
         self.assertIn(str(self.view), str(mapping))
 
     def test_unique_constraint_on_product_and_view(self):
+        EbayCategory.objects.create(
+            marketplace_default_tree_id="0",
+            remote_id="123",
+            name="Leaf 123",
+            full_name="Leaf Category 123",
+            has_children=False,
+        )
+        EbayCategory.objects.create(
+            marketplace_default_tree_id="0",
+            remote_id="456",
+            name="Leaf 456",
+            full_name="Leaf Category 456",
+            has_children=False,
+        )
+
         EbayProductCategory.objects.create(
             product=self.product,
             sales_channel=self.sales_channel,
@@ -52,7 +75,7 @@ class EbayProductCategoryModelTest(TestCase):
             remote_id="123",
         )
 
-        with self.assertRaises(IntegrityError):
+        with self.assertRaises(ValidationError) as exc:
             EbayProductCategory.objects.create(
                 product=self.product,
                 sales_channel=self.sales_channel,
@@ -61,10 +84,17 @@ class EbayProductCategoryModelTest(TestCase):
                 remote_id="456",
             )
 
+        self.assertIn("__all__", exc.exception.message_dict)
+
 
 class EbayProductTypeModelTest(TestCase):
     def setUp(self):
         super().setUp()
+        self.product = baker.make(
+            "products.Product",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
         self.sales_channel = baker.make(
             EbaySalesChannel,
             multi_tenant_company=self.multi_tenant_company,
@@ -74,8 +104,7 @@ class EbayProductTypeModelTest(TestCase):
             sales_channel=self.sales_channel,
             default_category_tree_id="0",
         )
-        self.product_type_property = baker.make(
-            Property,
+        self.product_type_property = Property.objects.get(
             type=Property.TYPES.SELECT,
             is_product_type=True,
             multi_tenant_company=self.multi_tenant_company,
@@ -85,8 +114,7 @@ class EbayProductTypeModelTest(TestCase):
             property=self.product_type_property,
             multi_tenant_company=self.multi_tenant_company,
         )
-        self.rule = baker.make(
-            "properties.ProductPropertiesRule",
+        self.rule = ProductPropertiesRule.objects.get(
             product_type=self.product_type_value,
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -101,7 +129,7 @@ class EbayProductTypeModelTest(TestCase):
         defaults.update(overrides)
         return EbayProductType.objects.create(**defaults)
 
-    def test_allows_leaf_remote_category(self):
+    def test_product_type_allows_leaf_remote_category(self):
         EbayCategory.objects.create(
             marketplace_default_tree_id="0",
             remote_id="123",
@@ -114,7 +142,7 @@ class EbayProductTypeModelTest(TestCase):
 
         self.assertEqual(product_type.remote_id, "123")
 
-    def test_rejects_non_leaf_remote_category(self):
+    def test_product_type_rejects_non_leaf_remote_category(self):
         EbayCategory.objects.create(
             marketplace_default_tree_id="0",
             remote_id="456",
@@ -126,11 +154,11 @@ class EbayProductTypeModelTest(TestCase):
         with self.assertRaisesMessage(ValidationError, "Only leaf eBay categories can be assigned."):
             self._create_product_type(remote_id="456")
 
-    def test_rejects_unknown_remote_category(self):
+    def test_product_type_rejects_unknown_remote_category(self):
         with self.assertRaisesMessage(ValidationError, "eBay category does not exist for the given remote ID."):
             self._create_product_type(remote_id="999")
 
-    def test_allows_leaf_remote_category(self):
+    def test_product_category_allows_leaf_remote_category(self):
         EbayCategory.objects.create(
             marketplace_default_tree_id="0",
             remote_id="123",
@@ -149,7 +177,7 @@ class EbayProductTypeModelTest(TestCase):
 
         self.assertEqual(mapping.remote_id, "123")
 
-    def test_rejects_non_leaf_remote_category(self):
+    def test_product_category_rejects_non_leaf_remote_category(self):
         EbayCategory.objects.create(
             marketplace_default_tree_id="0",
             remote_id="456",

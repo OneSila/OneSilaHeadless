@@ -6,7 +6,9 @@ from model_bakery import baker
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from products.models import Product
 from sales_channels.integrations.amazon.models import (
+    AmazonBrowseNode,
     AmazonProduct,
+    AmazonProductBrowseNode,
     AmazonSalesChannel,
     AmazonSalesChannelView,
 )
@@ -22,6 +24,15 @@ mutation ($assigns: [SalesChannelViewAssignPartialInput!]!, $forceFullUpdate: Bo
 BULK_REFRESH_AMAZON_LATEST_ISSUES_MUTATION = """
 mutation ($assigns: [SalesChannelViewAssignPartialInput!]!) {
   bulkRefreshAmazonLatestIssuesFromAssigns(assigns: $assigns)
+}
+"""
+
+CREATE_AMAZON_PRODUCT_BROWSE_NODE_MUTATION = """
+mutation ($data: AmazonProductBrowseNodeInput!) {
+  createAmazonProductBrowseNode(data: $data) {
+    id
+    remoteId
+  }
 }
 """
 
@@ -108,3 +119,38 @@ class AmazonProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
         self.assertEqual(kwargs["remote_product"].id, self.remote_product.id)
         self.assertEqual(kwargs["view"].id, self.view.id)
         factory_mock.return_value.run.assert_called_once()
+
+    def test_create_amazon_product_browse_node_without_parent_ptr_input(self):
+        self.view.remote_id = "A1F83G8C2ARO7P"
+        self.view.save(update_fields=["remote_id"])
+
+        browse_node_remote_id = "26595898031"
+        baker.make(
+            AmazonBrowseNode,
+            remote_id=browse_node_remote_id,
+            marketplace_id=self.view.remote_id,
+            has_children=False,
+        )
+
+        resp = self.strawberry_test_client(
+            query=CREATE_AMAZON_PRODUCT_BROWSE_NODE_MUTATION,
+            variables={
+                "data": {
+                    "product": {"id": self.to_global_id(self.product)},
+                    "salesChannel": {"id": self.to_global_id(self.sales_channel)},
+                    "view": {"id": self.to_global_id(self.view)},
+                    "remoteId": browse_node_remote_id,
+                },
+            },
+        )
+
+        self.assertIsNone(resp.errors)
+        self.assertEqual(resp.data["createAmazonProductBrowseNode"]["remoteId"], browse_node_remote_id)
+        self.assertTrue(
+            AmazonProductBrowseNode.objects.filter(
+                product=self.product,
+                sales_channel=self.sales_channel,
+                view=self.view,
+                remote_id=browse_node_remote_id,
+            ).exists()
+        )

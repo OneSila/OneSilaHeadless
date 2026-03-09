@@ -151,8 +151,8 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
         path_segments: list[str],
         leaf: bool,
     ) -> dict[str, Any] | None:
-        category_id = category.get("categoryId")
-        category_name = category.get("categoryName")
+        category_id = self._get_category_value(category, "id")
+        category_name = self._get_category_value(category, "name")
         if category_id is None or not category_name:
             return None
         category_path = " > ".join([segment for segment in path_segments if segment])
@@ -162,6 +162,25 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
             "category_path": category_path,
             "leaf": bool(leaf),
         }
+
+    def _get_category_value(self, category: dict[str, Any], field: str) -> Any:
+        if field == "id":
+            return category.get("categoryId") or category.get("category_id")
+        if field == "name":
+            return category.get("categoryName") or category.get("category_name")
+        return None
+
+    def _get_ancestor_name(self, ancestor: dict[str, Any]) -> str | None:
+        ancestor_category = ancestor.get("category")
+        if isinstance(ancestor_category, dict):
+            name = self._get_category_value(ancestor_category, "name")
+            if name:
+                return str(name)
+
+        name = self._get_category_value(ancestor, "name")
+        if name:
+            return str(name)
+        return None
 
     def _parse_suggestions(self, data: dict[str, Any]) -> list[dict[str, Any]]:
         suggestions: list[dict[str, Any]] = []
@@ -175,13 +194,13 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
             for ancestor in ancestors:
                 if not isinstance(ancestor, dict):
                     continue
-                ancestor_category = ancestor.get("category") or {}
-                name = ancestor_category.get("categoryName")
+                name = self._get_ancestor_name(ancestor)
                 if name:
                     path_segments.append(name)
-            path_segments.append(category.get("categoryName"))
+            category_name = self._get_category_value(category, "name")
+            if category_name:
+                path_segments.append(str(category_name))
             suggestion = self._build_entry(category, path_segments, True)
             if suggestion is not None:
                 suggestions.append(suggestion)
         return suggestions
-

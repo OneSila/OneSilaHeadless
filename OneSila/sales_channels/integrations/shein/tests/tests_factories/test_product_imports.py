@@ -9,7 +9,7 @@ from model_bakery import baker
 
 from imports_exports.models import Import
 from media.tests.helpers import CreateImageMixin
-from media.models import Image
+from media.models import DocumentType, Image, Media, MediaProductThrough
 from products.models import ConfigurableVariation, Product
 from properties.models import ProductProperty, Property, PropertySelectValue
 from sales_channels.integrations.shein.factories.imports.product_values import (
@@ -21,6 +21,9 @@ from sales_channels.integrations.shein.factories.imports.products import (
 )
 from sales_channels.integrations.shein.models import (
     SheinCategory,
+    SheinDocument,
+    SheinDocumentThroughProduct,
+    SheinDocumentType,
     SheinProduct,
     SheinProductCategory,
     SheinProperty,
@@ -596,6 +599,7 @@ class SheinProductItemFactoryImageTypeTests(CreateImageMixin, TestCase):
         image.refresh_from_db()
         self.assertEqual(image.image_type, Image.COLOR_SHOT)
 
+
     @patch("imports_exports.factories.media.ImportImageInstance.download_image_from_url")
     def test_import_updates_existing_image_to_color_shot_for_piece(self, mock_download) -> None:
         image_file = self.get_image_file(fname="red.png")
@@ -643,3 +647,384 @@ class SheinProductItemFactoryImageTypeTests(CreateImageMixin, TestCase):
 
         image.refresh_from_db()
         self.assertEqual(image.image_type, Image.COLOR_SHOT)
+
+
+
+class SheinProductImportDocumentsTests(TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.sales_channel = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            sync_contents=True,
+            sync_ean_codes=False,
+            sync_prices=False,
+        )
+        self.import_process = baker.make(
+            SheinSalesChannelImport,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            type=SheinSalesChannelImport.TYPE_PRODUCTS,
+        )
+
+    def _build_simple_payload(self, *, spu_name: str, supplier_sku: str):
+        return {
+            "spuName": spu_name,
+            "skcInfoList": [
+                {
+                    "skcName": f"{spu_name}-SKC-1",
+                    "shelfStatusInfoList": [{"siteAbbr": "shein-us", "shelfStatus": 1}],
+                    "skuInfoList": [
+                        {"skuCode": f"{supplier_sku}-CODE", "supplierSku": supplier_sku},
+                    ],
+                }
+            ],
+        }
+
+    def _build_config_payload_one_skc(self, *, spu_name: str, supplier_skus: list[str]):
+        sku_info_list = [
+            {"skuCode": f"{sku}-CODE", "supplierSku": sku}
+            for sku in supplier_skus
+        ]
+        return {
+            "spuName": spu_name,
+            "skcInfoList": [
+                {
+                    "skcName": f"{spu_name}-SKC-ONLY",
+                    "shelfStatusInfoList": [{"siteAbbr": "shein-us", "shelfStatus": 1}],
+                    "skuInfoList": sku_info_list,
+                }
+            ],
+        }
+
+    def _build_config_payload_two_skc(self, *, spu_name: str, supplier_sku_a: str, supplier_sku_b: str):
+        return {
+            "spuName": spu_name,
+            "skcInfoList": [
+                {
+                    "skcName": f"{spu_name}-SKC-A",
+                    "shelfStatusInfoList": [{"siteAbbr": "shein-us", "shelfStatus": 1}],
+                    "skuInfoList": [
+                        {"skuCode": f"{supplier_sku_a}-CODE", "supplierSku": supplier_sku_a},
+                    ],
+                },
+                {
+                    "skcName": f"{spu_name}-SKC-B",
+                    "shelfStatusInfoList": [{"siteAbbr": "shein-us", "shelfStatus": 1}],
+                    "skuInfoList": [
+                        {"skuCode": f"{supplier_sku_b}-CODE", "supplierSku": supplier_sku_b},
+                    ],
+                },
+            ],
+        }
+
+    def _create_mapped_document_type(self, *, remote_id: str, local_name: str = "Certificate"):
+        local_document_type = baker.make(
+            DocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            name=local_name,
+        )
+        return baker.make(
+            SheinDocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id=remote_id,
+            name=f"Remote {remote_id}",
+            translated_name=f"Remote {remote_id}",
+            local_instance=local_document_type,
+        )
+
+    @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
+    @patch.object(SheinProductsImportProcessor, "get_certificate_rule_by_product_spu")
+    def test_import_simple_product_creates_document_from_certificate_pool(self, mock_get_certificate_rules, _mock_download):
+        self._create_mapped_document_type(remote_id="340", local_name="UK Agent")
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateTypeId": 340,
+                "certificateDimension": 1,
+                "certificateMissStatus": False,
+                "certificatePoolList": [
+                    {
+                        "certificatePoolId": 987654,
+                        "pqmsCertificateSn": "GRC-POOL-SIMPLE-1",
+                        "expireTime": "2034-11-30 00:00:00",
+                        "certificatePoolFileList": [
+                            {
+                                "certificateUrlName": "Cert of Incorp.pdf",
+                                "certificateUrl": "https://files.example.com/cert-of-incorp.pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        payload = self._build_simple_payload(spu_name="SPU-SIMPLE-1", supplier_sku="SHEIN-SIMPLE-1")
+        processor = SheinProductsImportProcessor(import_process=self.import_process, sales_channel=self.sales_channel)
+        processor.process_product_item(product_data=payload)
+
+        remote_product = SheinProduct.objects.get(sales_channel=self.sales_channel, remote_sku="SHEIN-SIMPLE-1")
+        association = SheinDocumentThroughProduct.objects.get(
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+        )
+        remote_document = SheinDocument.objects.get(id=association.remote_document_id)
+
+        self.assertEqual(association.remote_id, "GRC-POOL-SIMPLE-1")
+        self.assertEqual(association.missing_status, SheinDocumentThroughProduct.STATUS_ACCEPTED)
+        self.assertEqual(association.remote_url, "https://files.example.com/cert-of-incorp.pdf")
+        self.assertEqual(str(remote_document.remote_id), "987654")
+        self.assertEqual(remote_document.remote_filename, "Cert of Incorp.pdf")
+        self.assertEqual(remote_document.remote_url, "https://files.example.com/cert-of-incorp.pdf")
+
+    @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
+    @patch.object(SheinProductsImportProcessor, "get_certificate_rule_by_product_spu")
+    def test_import_marks_association_rejected_when_audit_status_is_rejected(self, mock_get_certificate_rules, _mock_download):
+        self._create_mapped_document_type(remote_id="340", local_name="UK Agent")
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateTypeId": 340,
+                "certificateDimension": 1,
+                "certificateMissStatus": False,
+                "certificatePoolList": [
+                    {
+                        "certificatePoolId": 987655,
+                        "pqmsCertificateSn": "GRC-POOL-SIMPLE-REJECTED-1",
+                        "auditStatus": 3,
+                        "expireTime": "2034-11-30 00:00:00",
+                        "certificatePoolFileList": [
+                            {
+                                "certificateUrlName": "Rejected Cert.pdf",
+                                "certificateUrl": "https://files.example.com/rejected-cert.pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        payload = self._build_simple_payload(spu_name="SPU-SIMPLE-REJECTED-1", supplier_sku="SHEIN-SIMPLE-REJECTED-1")
+        processor = SheinProductsImportProcessor(import_process=self.import_process, sales_channel=self.sales_channel)
+        processor.process_product_item(product_data=payload)
+
+        remote_product = SheinProduct.objects.get(sales_channel=self.sales_channel, remote_sku="SHEIN-SIMPLE-REJECTED-1")
+        association = SheinDocumentThroughProduct.objects.get(
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+        )
+
+        self.assertEqual(association.remote_id, "GRC-POOL-SIMPLE-REJECTED-1")
+        self.assertEqual(association.missing_status, SheinDocumentThroughProduct.STATUS_REJECTED)
+        self.assertEqual(association.remote_url, "https://files.example.com/rejected-cert.pdf")
+
+    @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
+    @patch.object(SheinProductsImportProcessor, "get_certificate_rule_by_product_spu")
+    def test_import_configurable_one_skc_fans_out_documents_to_all_variations(self, mock_get_certificate_rules, _mock_download):
+        self._create_mapped_document_type(remote_id="340", local_name="UK Agent")
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateTypeId": 340,
+                "certificateDimension": 1,
+                "certificateMissStatus": False,
+                "certificatePoolList": [
+                    {
+                        "certificatePoolId": 1001,
+                        "pqmsCertificateSn": "GRC-ONE-SKC",
+                        "expireTime": "2034-11-30 00:00:00",
+                        "certificatePoolFileList": [
+                            {
+                                "certificateUrlName": "One SKC.pdf",
+                                "certificateUrl": "https://files.example.com/one-skc.pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        payload = self._build_config_payload_one_skc(
+            spu_name="SPU-CONF-ONE-SKC",
+            supplier_skus=["SHEIN-VAR-1", "SHEIN-VAR-2"],
+        )
+        processor = SheinProductsImportProcessor(import_process=self.import_process, sales_channel=self.sales_channel)
+        processor.process_product_item(product_data=payload)
+
+        variation_remote_products = SheinProduct.objects.filter(
+            sales_channel=self.sales_channel,
+            remote_sku__in=["SHEIN-VAR-1", "SHEIN-VAR-2"],
+        )
+        self.assertEqual(variation_remote_products.count(), 2)
+
+        for remote_product in variation_remote_products:
+            associations = SheinDocumentThroughProduct.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_product=remote_product,
+            )
+            self.assertEqual(associations.count(), 1)
+            self.assertEqual(associations.first().remote_id, "GRC-ONE-SKC")
+            self.assertEqual(
+                MediaProductThrough.objects.filter(
+                    product=remote_product.local_instance,
+                    sales_channel=self.sales_channel,
+                    media__type=Media.FILE,
+                ).count(),
+                1,
+            )
+
+        parent_remote_product = SheinProduct.objects.filter(
+            sales_channel=self.sales_channel,
+            remote_sku="SPU-CONF-ONE-SKC",
+        ).first()
+        self.assertIsNotNone(parent_remote_product)
+        self.assertFalse(
+            SheinDocumentThroughProduct.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_product=parent_remote_product,
+            ).exists()
+        )
+
+    @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
+    @patch.object(SheinProductsImportProcessor, "get_certificate_rule_by_product_spu")
+    def test_import_configurable_two_skc_fans_out_documents_to_each_variation(self, mock_get_certificate_rules, _mock_download):
+        self._create_mapped_document_type(remote_id="340", local_name="UK Agent")
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateTypeId": 340,
+                "certificateDimension": 1,
+                "certificateMissStatus": False,
+                "certificatePoolList": [
+                    {
+                        "certificatePoolId": 2002,
+                        "pqmsCertificateSn": "GRC-TWO-SKC",
+                        "expireTime": "2034-11-30 00:00:00",
+                        "certificatePoolFileList": [
+                            {
+                                "certificateUrlName": "Two SKC.pdf",
+                                "certificateUrl": "https://files.example.com/two-skc.pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        payload = self._build_config_payload_two_skc(
+            spu_name="SPU-CONF-TWO-SKC",
+            supplier_sku_a="SHEIN-TWO-SKC-A",
+            supplier_sku_b="SHEIN-TWO-SKC-B",
+        )
+        payload["skcInfoList"][0]["skuInfoList"].append(
+            {"skuCode": "SHEIN-TWO-SKC-A2-CODE", "supplierSku": "SHEIN-TWO-SKC-A2"}
+        )
+        processor = SheinProductsImportProcessor(import_process=self.import_process, sales_channel=self.sales_channel)
+        processor.process_product_item(product_data=payload)
+
+        variation_remote_products = SheinProduct.objects.filter(
+            sales_channel=self.sales_channel,
+            remote_sku__in=["SHEIN-TWO-SKC-A", "SHEIN-TWO-SKC-A2", "SHEIN-TWO-SKC-B"],
+        )
+        self.assertEqual(variation_remote_products.count(), 3)
+        for remote_product in variation_remote_products:
+            self.assertTrue(
+                SheinDocumentThroughProduct.objects.filter(
+                    sales_channel=self.sales_channel,
+                    remote_product=remote_product,
+                    remote_id="GRC-TWO-SKC",
+                ).exists()
+            )
+            self.assertEqual(
+                MediaProductThrough.objects.filter(
+                    product=remote_product.local_instance,
+                    sales_channel=self.sales_channel,
+                    media__type=Media.FILE,
+                ).count(),
+                1,
+            )
+
+    @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
+    @patch.object(SheinProductsImportProcessor, "get_certificate_rule_by_product_spu")
+    def test_import_reads_other_source_cert_info_with_pqms_certificate_sn(self, mock_get_certificate_rules, _mock_download):
+        self._create_mapped_document_type(remote_id="599", local_name="UK Label")
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateTypeId": 599,
+                "certificateDimension": 1,
+                "certificateMissStatus": True,
+                "otherSourceCertInfoList": [
+                    {
+                        "pqmsCertificateSn": "GRC-OTHER-SOURCE-1",
+                        "expireTime": None,
+                        "certificatePoolFileList": [
+                            {
+                                "certificateUrlName": "Label.pdf",
+                                "certificateUrl": "https://files.example.com/label.pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        payload = self._build_simple_payload(spu_name="SPU-OTHER-SOURCE", supplier_sku="SHEIN-OTHER-1")
+        processor = SheinProductsImportProcessor(import_process=self.import_process, sales_channel=self.sales_channel)
+        processor.process_product_item(product_data=payload)
+
+        remote_product = SheinProduct.objects.get(sales_channel=self.sales_channel, remote_sku="SHEIN-OTHER-1")
+        association = SheinDocumentThroughProduct.objects.get(
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+        )
+        remote_document = SheinDocument.objects.get(id=association.remote_document_id)
+
+        self.assertEqual(association.remote_id, "GRC-OTHER-SOURCE-1")
+        self.assertEqual(association.missing_status, SheinDocumentThroughProduct.STATUS_NEW)
+        self.assertEqual(association.remote_url, "https://files.example.com/label.pdf")
+        self.assertIsNone(remote_document.remote_id)
+        self.assertEqual(remote_document.remote_filename, "Label.pdf")
+
+    @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
+    @patch.object(SheinProductsImportProcessor, "get_certificate_rule_by_product_spu")
+    def test_import_configurable_two_skc_reads_other_source_for_each_variation(self, mock_get_certificate_rules, _mock_download):
+        self._create_mapped_document_type(remote_id="599", local_name="UK Label")
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateTypeId": 599,
+                "certificateDimension": 1,
+                "certificateMissStatus": False,
+                "otherSourceCertInfoList": [
+                    {
+                        "pqmsCertificateSn": "GRC-OTHER-CONF-2SKC",
+                        "expireTime": None,
+                        "certificatePoolFileList": [
+                            {
+                                "certificateUrlName": "Label Two SKC.pdf",
+                                "certificateUrl": "https://files.example.com/label-two-skc.pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        payload = self._build_config_payload_two_skc(
+            spu_name="SPU-CONF-TWO-SKC-OTHER",
+            supplier_sku_a="SHEIN-TWO-OTHER-A",
+            supplier_sku_b="SHEIN-TWO-OTHER-B",
+        )
+        processor = SheinProductsImportProcessor(import_process=self.import_process, sales_channel=self.sales_channel)
+        processor.process_product_item(product_data=payload)
+
+        variation_remote_products = SheinProduct.objects.filter(
+            sales_channel=self.sales_channel,
+            remote_sku__in=["SHEIN-TWO-OTHER-A", "SHEIN-TWO-OTHER-B"],
+        )
+        self.assertEqual(variation_remote_products.count(), 2)
+        for remote_product in variation_remote_products:
+            association = SheinDocumentThroughProduct.objects.get(
+                sales_channel=self.sales_channel,
+                remote_product=remote_product,
+            )
+            remote_document = SheinDocument.objects.get(id=association.remote_document_id)
+            self.assertEqual(association.remote_id, "GRC-OTHER-CONF-2SKC")
+            self.assertEqual(association.remote_url, "https://files.example.com/label-two-skc.pdf")
+            self.assertIsNone(remote_document.remote_id)

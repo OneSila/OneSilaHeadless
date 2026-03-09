@@ -24,6 +24,9 @@ class DisableWooCommerceSignalsMixin:
         "update_remote_image_association",
         "delete_remote_image_association",
         "delete_remote_image",
+        "create_remote_document_association",
+        "delete_remote_document_association",
+        "delete_remote_document",
         "sales_view_assign_updated",
     ]
 

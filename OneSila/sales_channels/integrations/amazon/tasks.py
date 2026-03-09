@@ -57,7 +57,7 @@ def amazon_refresh_product_import_task(product_id: int, view_id: int):
 
 # @run_task_after_commit
 @db_task()
-def create_amazon_product_type_rule_task(product_type_code: str, sales_channel_id: int):
+def create_amazon_product_type_rule_task(product_type_code: str, sales_channel_id: int, product_type_id=None):
     """Create local properties rule for an imported product type."""
     from sales_channels.integrations.amazon.factories.sales_channels.full_schema import (
         AmazonProductTypeRuleFactory,
@@ -68,6 +68,7 @@ def create_amazon_product_type_rule_task(product_type_code: str, sales_channel_i
     fac = AmazonProductTypeRuleFactory(
         product_type_code=product_type_code,
         sales_channel=sales_channel,
+        product_type_id=product_type_id,
     )
     fac.run()
 

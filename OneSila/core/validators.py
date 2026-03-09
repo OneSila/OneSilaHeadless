@@ -21,7 +21,10 @@ def validate_image_extension(value):
 
 
 def validate_file_extensions(value):
-    valid_extensions = ['.pdf', '.xlsx', '.xls', '.docx', '.doc', '.xlsm']
+    valid_extensions = [
+        '.pdf', '.xlsx', '.xls', '.docx', '.doc', '.xlsm',
+        '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.tif', '.tiff',
+    ]
     validate_extension(value, valid_extensions)
 
 

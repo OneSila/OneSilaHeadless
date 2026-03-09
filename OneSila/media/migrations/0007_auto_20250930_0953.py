@@ -28,8 +28,6 @@ def populate_image_titles(apps, schema_editor):
             media.title = title
             media.save(update_fields=['title'])
             updated_count += 1
-    
-    print(f"Updated {updated_count} image media objects with titles")
 
 
 def reverse_populate_image_titles(apps, schema_editor):
@@ -42,9 +40,6 @@ def reverse_populate_image_titles(apps, schema_editor):
     
     # Clear titles for all IMAGE type media
     Media.objects.filter(type=Media.IMAGE).update(title=None)
-    
-    print("Cleared titles for all IMAGE type media objects")
-
 
 
 class Migration(migrations.Migration):

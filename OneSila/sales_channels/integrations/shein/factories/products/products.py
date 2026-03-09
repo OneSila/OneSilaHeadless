@@ -18,6 +18,11 @@ from sales_channels.factories.products.products import (
 )
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
 from sales_channels.integrations.shein.factories.products.assigns import SheinSalesChannelAssignFactoryMixin
+from sales_channels.integrations.shein.factories.products.documents import (
+    SheinDocumentThroughProductCreateFactory,
+    SheinDocumentThroughProductDeleteFactory,
+    SheinDocumentThroughProductUpdateFactory,
+)
 from sales_channels.integrations.shein.factories.products.images import SheinMediaProductThroughUpdateFactory
 from sales_channels.integrations.shein.factories.prices import SheinPriceUpdateFactory
 from sales_channels.integrations.shein.factories.properties import SheinProductPropertyUpdateFactory
@@ -29,6 +34,8 @@ from sales_channels.integrations.shein.exceptions import (
 from sales_channels.exceptions import PreFlightCheckError, SkipSyncBecauseOfStatusException
 from sales_channels.integrations.shein.models import (
     SheinCategory,
+    SheinDocumentThroughProduct,
+    SheinDocumentType,
     SheinInternalProperty,
     SheinPrice,
     SheinProduct,
@@ -61,6 +68,11 @@ class SheinProductBaseFactory(
 
     remote_model_class = SheinProduct
     action_log = RemoteLog.ACTION_UPDATE
+    integration_has_documents = True
+    remote_document_assign_model_class = SheinDocumentThroughProduct
+    remote_document_assign_create_factory = SheinDocumentThroughProductCreateFactory
+    remote_document_assign_update_factory = SheinDocumentThroughProductUpdateFactory
+    remote_document_assign_delete_factory = SheinDocumentThroughProductDeleteFactory
     publish_permission_path = "/open-api/goods/product/check-publish-permission"
     publish_or_edit_path = "/open-api/goods/product/publishOrEdit"
     default_dimension_value = "10"
@@ -168,9 +180,419 @@ class SheinProductBaseFactory(
         """Shein images are embedded into the publish payload; skip remote media assignments."""
         return
 
+    def assign_documents(self):  # type: ignore[override]
+        """Shein documents are synced after publish in final_process."""
+        return
+
     def assign_ean_code(self):  # type: ignore[override]
         """Shein barcode is embedded into the SKU payload; skip remote EAN mirror processing."""
         return
+
+    def final_process(self):
+        if self.get_value_only:
+            return
+        if self.is_variation:
+            return
+        self.sync_documents_after_publish()
+
+    def run_on_skip_sync_status(self):
+        # Even when Shein blocks product edits during review, keep certificate sync attempt available.
+        self.final_process()
+
+    def sync_documents_after_publish(self):
+        target_remote_products = self._get_document_target_remote_products()
+        if not target_remote_products:
+            return
+
+        certificate_rule_records = self._get_certificate_rule_records_by_spu()
+        allowed_remote_document_type_ids = self._get_allowed_document_type_remote_ids_by_spu(
+            certificate_rule_records=certificate_rule_records,
+        )
+        if not allowed_remote_document_type_ids:
+            return
+
+        self._validate_required_document_types_for_spu(
+            certificate_rule_records=certificate_rule_records,
+        )
+
+        document_throughs = self._get_document_throughs_for_sync(
+            allowed_remote_document_type_ids=allowed_remote_document_type_ids,
+        )
+        if not document_throughs:
+            return
+
+        used_skc: set[str] = set()
+        for target_remote_product in target_remote_products:
+            skc_name = str(getattr(target_remote_product, "skc_name", None) or "").strip()
+            if skc_name:
+                if skc_name in used_skc:
+                    continue
+                used_skc.add(skc_name)
+
+            synced_association_ids = []
+            for media_through in document_throughs:
+                remote_association = self._sync_document_assignment_for_remote_product(
+                    media_through=media_through,
+                    remote_product=target_remote_product,
+                    allowed_remote_document_type_ids=allowed_remote_document_type_ids,
+                )
+                if remote_association is not None:
+                    synced_association_ids.append(remote_association.id)
+
+            stale_associations = self.remote_document_assign_model_class.objects.filter(
+                remote_product=target_remote_product,
+                sales_channel=self.sales_channel,
+                local_instance__product=self.local_instance,
+            ).exclude(id__in=synced_association_ids)
+            for remote_document_assoc in stale_associations.iterator():
+                self._delete_document_assignment_for_remote_product(
+                    remote_document_assoc=remote_document_assoc,
+                    remote_product=target_remote_product,
+                )
+
+    def _get_document_target_remote_products(self) -> list[SheinProduct]:
+        if self.remote_instance is None:
+            return []
+
+        if not self.local_instance.is_configurable():
+            return [self.remote_instance]
+
+        variations = list(
+            self.remote_model_class.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_parent_product=self.remote_instance,
+                is_variation=True,
+            )
+            .exclude(skc_name__isnull=True)
+            .exclude(skc_name="")
+            .order_by("id")
+        )
+        if variations:
+            unique_variations_by_skc: list[SheinProduct] = []
+            seen_skc_names: set[str] = set()
+            for variation in variations:
+                skc_name = str(getattr(variation, "skc_name", None) or "").strip()
+                if not skc_name or skc_name in seen_skc_names:
+                    continue
+                seen_skc_names.add(skc_name)
+                unique_variations_by_skc.append(variation)
+            if unique_variations_by_skc:
+                return unique_variations_by_skc
+
+        return [self.remote_instance]
+
+    def _get_document_target_spu_name(self) -> str:
+        remote_instance = getattr(self, "remote_instance", None)
+        if remote_instance is None:
+            return ""
+        return str(
+            getattr(remote_instance, "spu_name", None)
+            or getattr(remote_instance, "remote_id", None)
+            or ""
+        ).strip()
+
+    def _get_certificate_rule_records_by_spu(self) -> list[dict[str, Any]]:
+        spu_name = self._get_document_target_spu_name()
+        if not spu_name:
+            return []
+
+        try:
+            records = self.get_certificate_rule_by_product_spu(spu_name=spu_name)
+        except Exception as exc:
+            raise PreFlightCheckError(
+                f"Failed to fetch Shein certificate rules for SPU '{spu_name}'. Error: {exc}"
+            ) from exc
+
+        if not isinstance(records, list):
+            return []
+        return [record for record in records if isinstance(record, dict)]
+
+    @staticmethod
+    def _is_dimension_one_certificate_rule(*, record: dict[str, Any]) -> bool:
+        dimension = str(record.get("certificateDimension") or "").strip()
+        return not dimension or dimension == "1"
+
+    @staticmethod
+    def _is_required_certificate_rule(*, record: dict[str, Any]) -> bool:
+        value = record.get("isRequired")
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "y"}
+        return False
+
+    def _get_allowed_document_type_remote_ids_by_spu(
+        self,
+        *,
+        certificate_rule_records: Optional[list[dict[str, Any]]] = None,
+    ) -> set[str]:
+        records = (
+            certificate_rule_records
+            if certificate_rule_records is not None
+            else self._get_certificate_rule_records_by_spu()
+        )
+        remote_type_ids: set[str] = set()
+        for record in records:
+            if not self._is_dimension_one_certificate_rule(record=record):
+                continue
+            certificate_type_id = str(record.get("certificateTypeId") or "").strip()
+            if certificate_type_id:
+                remote_type_ids.add(certificate_type_id)
+        return remote_type_ids
+
+    @staticmethod
+    def _resolve_required_document_type_name(
+        *,
+        remote_id: str,
+        rule_name_by_remote_id: dict[str, str],
+        shein_type_by_remote_id: dict[str, "SheinDocumentType"],
+    ) -> str:
+        shein_type = shein_type_by_remote_id.get(remote_id)
+        if shein_type is not None:
+            translated_name = str(getattr(shein_type, "translated_name", "") or "").strip()
+            if translated_name:
+                return translated_name
+            fallback_name = str(getattr(shein_type, "name", "") or "").strip()
+            if fallback_name:
+                return fallback_name
+
+        rule_name = str(rule_name_by_remote_id.get(remote_id, "") or "").strip()
+        if rule_name:
+            return rule_name
+        return remote_id
+
+    def _validate_required_document_types_for_spu(
+        self,
+        *,
+        certificate_rule_records: Optional[list[dict[str, Any]]] = None,
+    ) -> None:
+        records = (
+            certificate_rule_records
+            if certificate_rule_records is not None
+            else self._get_certificate_rule_records_by_spu()
+        )
+        if not records:
+            return
+
+        required_remote_ids: list[str] = []
+        rule_name_by_remote_id: dict[str, str] = {}
+        for record in records:
+            if not self._is_dimension_one_certificate_rule(record=record):
+                continue
+            if not self._is_required_certificate_rule(record=record):
+                continue
+
+            remote_id = str(record.get("certificateTypeId") or "").strip()
+            if not remote_id:
+                continue
+            if remote_id not in required_remote_ids:
+                required_remote_ids.append(remote_id)
+            if remote_id not in rule_name_by_remote_id:
+                rule_name_by_remote_id[remote_id] = str(record.get("certificateTypeValue") or "").strip()
+
+        if not required_remote_ids:
+            return
+
+        shein_document_types = list(
+            SheinDocumentType.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_id__in=required_remote_ids,
+            )
+            .exclude(remote_id__in=(None, ""))
+            .only("remote_id", "translated_name", "name", "local_instance_id")
+        )
+        shein_type_by_remote_id = {
+            str(remote_document_type.remote_id): remote_document_type
+            for remote_document_type in shein_document_types
+        }
+
+        mapped_remote_ids = {
+            str(remote_document_type.remote_id)
+            for remote_document_type in shein_document_types
+            if getattr(remote_document_type, "local_instance_id", None)
+        }
+
+        document_throughs = list(
+            self.get_documents().select_related("media", "media__document_type")
+        )
+        local_document_type_ids = {
+            media_through.media.document_type_id
+            for media_through in document_throughs
+            if getattr(getattr(media_through, "media", None), "document_type_id", None)
+        }
+
+        provided_remote_ids: set[str] = set()
+        if local_document_type_ids:
+            provided_remote_ids = {
+                str(remote_id)
+                for remote_id in (
+                    SheinDocumentType.objects.filter(
+                        sales_channel=self.sales_channel,
+                        remote_id__in=required_remote_ids,
+                        local_instance_id__in=local_document_type_ids,
+                    )
+                    .exclude(remote_id__in=(None, ""))
+                    .values_list("remote_id", flat=True)
+                )
+            }
+
+        unsatisfied_remote_ids = [
+            remote_id
+            for remote_id in required_remote_ids
+            if remote_id not in provided_remote_ids
+        ]
+        if not unsatisfied_remote_ids:
+            return
+
+        missing_mapping_remote_ids = [
+            remote_id for remote_id in unsatisfied_remote_ids if remote_id not in mapped_remote_ids
+        ]
+        missing_document_remote_ids = [
+            remote_id for remote_id in unsatisfied_remote_ids if remote_id in mapped_remote_ids
+        ]
+
+        missing_mapping_labels = [
+            self._resolve_required_document_type_name(
+                remote_id=remote_id,
+                rule_name_by_remote_id=rule_name_by_remote_id,
+                shein_type_by_remote_id=shein_type_by_remote_id,
+            )
+            for remote_id in missing_mapping_remote_ids
+        ]
+        missing_document_labels = [
+            self._resolve_required_document_type_name(
+                remote_id=remote_id,
+                rule_name_by_remote_id=rule_name_by_remote_id,
+                shein_type_by_remote_id=shein_type_by_remote_id,
+            )
+            for remote_id in missing_document_remote_ids
+        ]
+
+        problems: list[str] = []
+        if missing_mapping_labels:
+            problems.extend(f"{label} (not mapped)" for label in missing_mapping_labels)
+        if missing_document_labels:
+            problems.extend(f"{label} (missing document)" for label in missing_document_labels)
+
+        raise PreFlightCheckError(
+            "Required Shein document types are not mapped or missing locally: "
+            + ", ".join(problems)
+            + ". Map these Shein document types and attach the required documents before publishing."
+        )
+
+    def _get_document_type_map_by_local_instance_id(
+        self,
+        *,
+        local_document_type_ids: set[int],
+        allowed_remote_document_type_ids: set[str],
+    ) -> dict[int, SheinDocumentType]:
+        if not local_document_type_ids:
+            return {}
+
+        queryset = (
+            SheinDocumentType.objects.filter(
+                sales_channel=self.sales_channel,
+                local_instance_id__in=local_document_type_ids,
+            )
+            .exclude(local_instance_id__isnull=True)
+            .exclude(remote_id__in=(None, ""))
+            .select_related("local_instance")
+            .order_by("id")
+        )
+        if allowed_remote_document_type_ids:
+            queryset = queryset.filter(remote_id__in=allowed_remote_document_type_ids)
+
+        mapped: dict[int, SheinDocumentType] = {}
+        for remote_document_type in queryset:
+            local_instance_id = remote_document_type.local_instance_id
+            if local_instance_id and local_instance_id not in mapped:
+                mapped[local_instance_id] = remote_document_type
+        return mapped
+
+    def _get_document_throughs_for_sync(
+        self,
+        *,
+        allowed_remote_document_type_ids: set[str],
+    ):
+        document_throughs_qs = self.get_documents().select_related("media", "media__document_type")
+        document_throughs = list(document_throughs_qs)
+        local_document_type_ids = {
+            media_through.media.document_type_id
+            for media_through in document_throughs
+            if getattr(getattr(media_through, "media", None), "document_type_id", None)
+        }
+        mapped_types = self._get_document_type_map_by_local_instance_id(
+            local_document_type_ids=local_document_type_ids,
+            allowed_remote_document_type_ids=allowed_remote_document_type_ids,
+        )
+
+        eligible_document_throughs = []
+        for media_through in document_throughs:
+            media = getattr(media_through, "media", None)
+            local_document_type_id = getattr(media, "document_type_id", None)
+            if not local_document_type_id:
+                continue
+            if local_document_type_id not in mapped_types:
+                continue
+            eligible_document_throughs.append(media_through)
+
+        return eligible_document_throughs
+
+    def _sync_document_assignment_for_remote_product(
+        self,
+        *,
+        media_through,
+        remote_product,
+        allowed_remote_document_type_ids: set[str],
+    ):
+        existing_association = self.remote_document_assign_model_class.objects.filter(
+            local_instance=media_through,
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+        ).select_related("remote_document", "remote_document__remote_document_type").first()
+
+        factory = self.remote_document_assign_update_factory(
+            local_instance=media_through,
+            sales_channel=self.sales_channel,
+            remote_instance=existing_association,
+            remote_product=remote_product,
+            api=self.api,
+            skip_checks=True,
+            get_value_only=getattr(self, "get_value_only", False),
+            allowed_remote_document_type_ids=allowed_remote_document_type_ids,
+        )
+        factory.run()
+        remote_instance = factory.remote_instance
+        if remote_instance is None:
+            return None
+        return (
+            remote_instance.__class__.objects.select_related(
+                "remote_document",
+                "remote_document__remote_document_type",
+            )
+            .filter(pk=remote_instance.pk)
+            .first()
+        )
+
+    def _delete_document_assignment_for_remote_product(
+        self,
+        *,
+        remote_document_assoc,
+        remote_product,
+    ):
+        factory = self.remote_document_assign_delete_factory(
+            local_instance=remote_document_assoc.local_instance,
+            sales_channel=self.sales_channel,
+            remote_instance=remote_document_assoc,
+            remote_product=remote_product,
+            api=self.api,
+            skip_checks=True,
+            get_value_only=getattr(self, "get_value_only", False),
+        )
+        factory.run()
+
 
     def preflight_check(self):
         if self.skip_checks:
@@ -2109,25 +2531,82 @@ class SheinProductDeleteFactory(SheinSignatureMixin, RemoteProductDeleteFactory)
     action_log = RemoteLog.ACTION_DELETE
     revoke_path = "/open-api/goods/revoke-product"
 
+    def get_delete_product_factory(self):
+        return SheinProductDeleteFactory
+
+    remote_delete_factory = property(get_delete_product_factory)
+
+    def get_api(self):
+        return getattr(self, "api", None)
+
+    def serialize_response(self, response):  # type: ignore[override]
+        if response is None:
+            return {}
+        if isinstance(response, dict):
+            return response
+        json_getter = getattr(response, "json", None)
+        if callable(json_getter):
+            try:
+                return json_getter() or {}
+            except Exception:
+                return {}
+        return {}
+
+    @staticmethod
+    def _extract_revoke_fail_messages(*, payload: dict[str, Any]) -> list[str]:
+        info = payload.get("info")
+        if not isinstance(info, dict):
+            return []
+
+        fail_list = info.get("failList")
+        if not isinstance(fail_list, list):
+            fail_list = []
+
+        fail_messages: list[str] = []
+        for item in fail_list:
+            if not isinstance(item, dict):
+                continue
+            message = str(item.get("msg") or "").strip() or "Unknown revoke failure"
+            document_sn = str(item.get("documentSn") or "").strip()
+            skc_name = str(item.get("skcName") or "").strip()
+            details: list[str] = []
+            if document_sn:
+                details.append(f"documentSn={document_sn}")
+            if skc_name:
+                details.append(f"skcName={skc_name}")
+            if details:
+                fail_messages.append(f"{message} ({', '.join(details)})")
+            else:
+                fail_messages.append(message)
+
+        fail_count_raw = info.get("failCount")
+        try:
+            fail_count = int(fail_count_raw or 0)
+        except (TypeError, ValueError):
+            fail_count = 0
+
+        if fail_count > 0 and not fail_messages:
+            fail_messages.append(f"Shein revoke returned failCount={fail_count}.")
+
+        return fail_messages
+
     def delete_remote(self):
         spu_name = getattr(self.remote_instance, "remote_id", None)
         if not spu_name:
             return {}
 
-        try:
-            response = self.shein_post(
-                path=self.revoke_path,
-                payload={"spuName": spu_name},
+        response = self.shein_post(
+            path=self.revoke_path,
+            payload={"spuName": spu_name},
+        )
+        payload = self._extract_successful_shein_json(
+            response=response,
+            context="product revoke",
+        )
+
+        fail_messages = self._extract_revoke_fail_messages(payload=payload)
+        if fail_messages:
+            raise SheinResponseException(
+                "Shein product revoke failed: " + "; ".join(fail_messages)
             )
-            return response.json() if hasattr(response, "json") else {}
-        except Exception as exc:
-            # Log as admin error but don't raise to allow local cleanup
-            self.remote_instance.add_admin_error(
-                action=self.action_log,
-                response=str(exc),
-                payload={"spuName": spu_name},
-                error_traceback="",
-                identifier=f"{self.__class__.__name__}:delete_remote",
-                remote_product=self.remote_instance,
-            )
-            return {}
+        return payload

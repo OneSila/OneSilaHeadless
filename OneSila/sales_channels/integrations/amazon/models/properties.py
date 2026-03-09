@@ -1,3 +1,5 @@
+import re
+
 from django.db.models import JSONField, UniqueConstraint, Q
 
 from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem
@@ -54,6 +56,7 @@ class AmazonPublicDefinition(models.SharedModel):
 
     is_required = models.BooleanField(default=False)
     is_internal = models.BooleanField(default=False)
+    is_document_field = models.BooleanField(default=False)
     allowed_in_configurator = models.BooleanField(default=False)
     allowed_in_listing_offer_request = models.BooleanField(default=False)
 
@@ -75,6 +78,43 @@ class AmazonPublicDefinition(models.SharedModel):
 
     def __str__(self):
         return f"[{self.api_region_code}] {self.product_type_code} :: {self.code}"
+
+    @property
+    def document_field_kind(self):
+        normalized_code = str(self.code or "").strip().lower()
+        if normalized_code == "compliance_media":
+            return "COMPLIANCE_MEDIA"
+        if normalized_code == "safety_data_sheet_url":
+            return "SDS_URL"
+        if re.match(r"^image_locator_ps\d+$", normalized_code):
+            return "IMAGE_PS"
+        if re.match(r"^image_locator_.*pf$", normalized_code):
+            return "IMAGE_PF"
+        return None
+
+    @property
+    def document_allowed_types(self):
+        if self.document_field_kind != "COMPLIANCE_MEDIA":
+            return []
+
+        schema = self.raw_schema or {}
+        content_type_schema = (
+            (schema.get("items") or {})
+            .get("properties", {})
+            .get("content_type", {})
+        )
+        allowed = content_type_schema.get("enum", [])
+        return [str(value).strip() for value in allowed if str(value).strip()]
+
+    @property
+    def document_field_candidates(self):
+        kind = self.document_field_kind
+        if kind == "IMAGE_PS":
+            return [f"image_locator_ps0{index}" for index in range(1, 7)]
+        if kind == "IMAGE_PF":
+            return ["image_locator_**pf"]
+        normalized_code = str(self.code or "").strip()
+        return [normalized_code] if normalized_code else []
 
 
 class AmazonProperty(RemoteProperty):

@@ -68,6 +68,45 @@ class SheinWebhookTests(TestCase):
         encrypted = cipher.encrypt(pad(raw.encode("utf-8"), AES.block_size))
         return base64.b64encode(encrypted).decode("utf-8")
 
+    def test_get_request_returns_ok_for_availability_check(self) -> None:
+        response = self.client.get(self.webhook_path)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {"status": "ok"})
+
+    def test_invalid_signed_request_still_returns_unauthorized(self) -> None:
+        response = self.client.post(
+            self.webhook_path,
+            **{
+                "HTTP_X_LT_OPENKEYID": self.sales_channel.open_key_id,
+                "HTTP_X_LT_APPID": self.app_id,
+                "HTTP_X_LT_TIMESTAMP": "1700000000000",
+                "HTTP_X_LT_SIGNATURE": "bad-signature",
+            },
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_signed_empty_probe_request_returns_ok(self) -> None:
+        timestamp = 1700000000000
+        random_key = "abc12"
+        signature = self._build_signature(path=self.webhook_path, timestamp=timestamp, random_key=random_key)
+
+        response = self.client.post(
+            self.webhook_path,
+            content_type="application/json",
+            **{
+                "HTTP_X_LT_OPENKEYID": self.sales_channel.open_key_id,
+                "HTTP_X_LT_APPID": self.app_id,
+                "HTTP_X_LT_TIMESTAMP": str(timestamp),
+                "HTTP_X_LT_SIGNATURE": signature,
+                "HTTP_X_LT_EVENTCODE": "product_document_audit_status_notice",
+            },
+        )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertJSONEqual(response.content, {"status": "ok"})
+
     @patch.object(SheinProductDetailRefreshFactory, "run")
     def test_audit_webhook_resolves_remote_product_by_spu_name(self, refresh_mock) -> None:
         version = "SPMP231215009184753"

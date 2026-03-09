@@ -1,10 +1,10 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from core.tests import TestCase
 from imports_exports.models import Import
 from imports_exports.factories.products import ImportProductInstance
 from model_bakery import baker
-from media.models import Image
+from media.models import Image, DocumentType, Media, MediaProductThrough
 from properties.models import (
     ProductProperty,
     ProductPropertiesRule,
@@ -25,7 +25,11 @@ from sales_channels.integrations.amazon.models import (
     AmazonImportData,
     AmazonGtinExemption,
     AmazonProductBrowseNode,
+    AmazonDocumentType,
+    AmazonDocumentThroughProduct,
+    AmazonRemoteLanguage,
 )
+from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 
 
 class AmazonProductsImportProcessorNameTest(TestCase):
@@ -246,6 +250,296 @@ class AmazonProductsImportProcessorImagesTest(TestCase):
                 },
             ],
         )
+
+
+class AmazonProductsImportProcessorDocumentsTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+            api_region_code="EU",
+        )
+        AmazonRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
+            local_instance="en",
+            remote_code="en_GB",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+
+    def _map_document_type(self, *, remote_id, name):
+        local_document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name=name,
+        )
+        AmazonDocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id=remote_id,
+            local_instance=local_document_type,
+        )
+        return local_document_type
+
+    def test_parse_documents_includes_only_mapped_remote_types(self):
+        sds_type = self._map_document_type(
+            remote_id="safety_data_sheet_url",
+            name="SDS",
+        )
+        compliance_type = self._map_document_type(
+            remote_id="compliance_media__application_guide",
+            name="Application Guide",
+        )
+        ps_type = self._map_document_type(
+            remote_id="image_locator_ps",
+            name="PS Image",
+        )
+        pf_type = self._map_document_type(
+            remote_id="image_locator_pf",
+            name="PF Image",
+        )
+
+        product_data = {
+            "attributes": {
+                "safety_data_sheet_url": [
+                    {"value": "https://example.com/sds.pdf", "language_tag": "en_GB"},
+                ],
+                "compliance_media": [
+                    {
+                        "content_type": "application_guide",
+                        "source_location": "https://example.com/guide.pdf",
+                        "content_language": "en_GB",
+                    },
+                    {
+                        "content_type": "warranty",
+                        "source_location": "https://example.com/warranty.pdf",
+                        "content_language": "en_GB",
+                    },
+                ],
+                "image_locator_ps01": [
+                    {"media_location": "https://example.com/ps-01.jpg"},
+                ],
+                "image_locator_ukpf": [
+                    {"media_location": "https://example.com/pf-uk.jpg"},
+                ],
+            }
+        }
+
+        documents, remote_map = self.processor._parse_documents(
+            product_data=product_data,
+            view=self.view,
+            catalog_attributes=None,
+        )
+
+        self.assertEqual(len(documents), 4)
+        self.assertEqual(
+            {document["document_type"].id for document in documents},
+            {sds_type.id, compliance_type.id, ps_type.id, pf_type.id},
+        )
+        self.assertEqual(
+            set(remote_map.values()),
+            {"safety_data_sheet_url", "compliance_media", "image_locator_ps01", "image_locator_ukpf"},
+        )
+        for document in documents:
+            self.assertTrue(document["document_url"].startswith("https://"))
+            self.assertEqual(document["document_language"], "en")
+
+    def test_handle_documents_creates_amazon_associations_without_remote_document(self):
+        product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+        )
+        remote_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku="SKU-DOCS",
+            is_variation=False,
+        )
+
+        document_type = DocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="SDS",
+        )
+        first_media = Media.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.FILE,
+            document_type=document_type,
+        )
+        second_media = Media.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.FILE,
+            document_type=document_type,
+        )
+
+        first_assignment = MediaProductThrough.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            media=first_media,
+            sales_channel=self.sales_channel,
+            sort_order=0,
+        )
+        second_assignment = MediaProductThrough.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            media=second_media,
+            sales_channel=self.sales_channel,
+            sort_order=1,
+        )
+
+        from types import SimpleNamespace
+
+        import_instance = SimpleNamespace(
+            documents=[{"document_url": "https://example.com/sds.pdf"}, {"document_url": "https://example.com/guide.pdf"}],
+            documents_associations_instances=MediaProductThrough.objects.filter(
+                id__in=[first_assignment.id, second_assignment.id],
+            ).order_by("id"),
+            data={
+                "__document_index_to_remote_id": {
+                    "0": "safety_data_sheet_url",
+                    "1": "compliance_media",
+                }
+            },
+            remote_instance=remote_product,
+        )
+
+        self.processor.handle_documents(import_instance=import_instance)
+
+        associations = AmazonDocumentThroughProduct.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+        ).order_by("local_instance_id")
+
+        self.assertEqual(associations.count(), 2)
+        self.assertEqual(list(associations.values_list("require_document", flat=True)), [False, False])
+        self.assertEqual(list(associations.values_list("remote_document_id", flat=True)), [None, None])
+        self.assertEqual(
+            list(associations.values_list("remote_id", flat=True)),
+            ["safety_data_sheet_url", "compliance_media"],
+        )
+        self.assertEqual(
+            list(associations.values_list("remote_url", flat=True)),
+            ["https://example.com/sds.pdf", "https://example.com/guide.pdf"],
+        )
+
+    def test_parse_documents_includes_ps_image_slots_when_mapped(self):
+        ps_type = self._map_document_type(
+            remote_id="image_locator_ps",
+            name="PS Image",
+        )
+
+        product_data = {
+            "attributes": {
+                "image_locator_ps01": [
+                    {"media_location": "https://example.com/ps-01.jpg"},
+                ],
+                "image_locator_ps02": [
+                    {"media_location": "https://example.com/ps-02.jpg"},
+                ],
+            }
+        }
+
+        documents, remote_map = self.processor._parse_documents(
+            product_data=product_data,
+            view=self.view,
+            catalog_attributes=None,
+        )
+
+        self.assertEqual(len(documents), 2)
+        self.assertEqual(
+            [document["document_type"].id for document in documents],
+            [ps_type.id, ps_type.id],
+        )
+        self.assertEqual(
+            [document["document_url"] for document in documents],
+            ["https://example.com/ps-01.jpg", "https://example.com/ps-02.jpg"],
+        )
+        self.assertEqual(
+            remote_map,
+            {"0": "image_locator_ps01", "1": "image_locator_ps02"},
+        )
+
+    def test_parse_documents_skips_ps01_when_ps_mapping_missing(self):
+        product_data = {
+            "attributes": {
+                "image_locator_ps01": [
+                    {"media_location": "https://example.com/ps-01.jpg"},
+                ],
+            }
+        }
+
+        documents, remote_map = self.processor._parse_documents(
+            product_data=product_data,
+            view=self.view,
+            catalog_attributes=None,
+        )
+
+        self.assertEqual(documents, [])
+        self.assertEqual(remote_map, {})
+
+    def test_parse_documents_skips_ps01_non_https_url(self):
+        self._map_document_type(
+            remote_id="image_locator_ps",
+            name="PS Image",
+        )
+
+        product_data = {
+            "attributes": {
+                "image_locator_ps01": [
+                    {"media_location": "http://example.com/ps-01.jpg"},
+                    {"media_location": "https://example.com/ps-01-secure.jpg"},
+                ],
+            }
+        }
+
+        documents, remote_map = self.processor._parse_documents(
+            product_data=product_data,
+            view=self.view,
+            catalog_attributes=None,
+        )
+
+        self.assertEqual(len(documents), 1)
+        self.assertEqual(documents[0]["document_url"], "https://example.com/ps-01-secure.jpg")
+        self.assertEqual(remote_map, {"0": "image_locator_ps01"})
+
+
+class AmazonProductsImportProcessorAttributesTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+    def test_parse_attributes_skips_dynamic_image_locator_properties(self):
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+
+        marketplace = MagicMock(api_region_code="EU")
+        attributes = {
+            "image_locator_usapf": [{"media_location": "https://example.com/usapf.jpg"}],
+        }
+
+        with patch.object(AmazonPublicDefinition.objects, "filter") as mock_filter:
+            attrs, mirror_map = processor._parse_attributes(
+                attributes=attributes,
+                product_type="ANY_TYPE",
+                marketplace=marketplace,
+            )
+
+        self.assertEqual(attrs, [])
+        self.assertEqual(mirror_map, {})
+        mock_filter.assert_not_called()
 
 
 class AmazonProductsImportProcessorRulePreserveTest(TestCase):
@@ -534,7 +828,7 @@ class AmazonProductsImportProcessorBrowseNodeGtinTest(TestCase):
                 product=product,
                 sales_channel=self.sales_channel,
                 view=self.view,
-                recommended_browse_node_id="BN1",
+                remote_id="BN1",
             ).exists()
         )
 

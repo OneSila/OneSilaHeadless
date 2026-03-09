@@ -13,7 +13,9 @@ from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.ebay.models import (
     EbayCategory,
     EbayProductCategory,
+    EbayProductStoreCategory,
     EbaySalesChannel,
+    EbayStoreCategory,
     EbayInternalProperty,
     EbayInternalPropertyOption,
     EbayProductType,
@@ -23,11 +25,14 @@ from sales_channels.integrations.ebay.models import (
     EbaySalesChannelImport,
     EbaySalesChannelView,
     EbayCurrency,
+    EbayDocumentType,
 )
 from sales_channels.integrations.ebay.schema.types.filters import (
     EbayCategoryFilter,
     EbayProductCategoryFilter,
+    EbayProductStoreCategoryFilter,
     EbaySalesChannelFilter,
+    EbayStoreCategoryFilter,
     EbayInternalPropertyFilter,
     EbayInternalPropertyOptionFilter,
     EbayProductTypeFilter,
@@ -37,11 +42,14 @@ from sales_channels.integrations.ebay.schema.types.filters import (
     EbaySalesChannelImportFilter,
     EbaySalesChannelViewFilter,
     EbayCurrencyFilter,
+    EbayDocumentTypeFilter,
 )
 from sales_channels.integrations.ebay.schema.types.ordering import (
     EbayCategoryOrder,
     EbayProductCategoryOrder,
+    EbayProductStoreCategoryOrder,
     EbaySalesChannelOrder,
+    EbayStoreCategoryOrder,
     EbayInternalPropertyOrder,
     EbayInternalPropertyOptionOrder,
     EbayProductTypeOrder,
@@ -51,6 +59,7 @@ from sales_channels.integrations.ebay.schema.types.ordering import (
     EbaySalesChannelImportOrder,
     EbaySalesChannelViewOrder,
     EbayCurrencyOrder,
+    EbayDocumentTypeOrder,
 )
 
 
@@ -99,6 +108,50 @@ class EbayProductCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
         'EbaySalesChannelViewType',
         lazy("sales_channels.integrations.ebay.schema.types.types")
     ]
+
+
+@type(
+    EbayStoreCategory,
+    filters=EbayStoreCategoryFilter,
+    order=EbayStoreCategoryOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayStoreCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        "EbaySalesChannelType",
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    parent: Optional[Annotated[
+        "EbayStoreCategoryType",
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
+
+    @field()
+    def full_path(self, info) -> str:
+        return EbayStoreCategory.full_path.fget(self)
+
+
+@type(
+    EbayProductStoreCategory,
+    filters=EbayProductStoreCategoryFilter,
+    order=EbayProductStoreCategoryOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayProductStoreCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        "ProductType",
+        lazy("products.schema.types.types")
+    ]
+    primary_store_category: Annotated[
+        "EbayStoreCategoryType",
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    secondary_store_category: Optional[Annotated[
+        "EbayStoreCategoryType",
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
 
 
 @type(EbaySalesChannel, filters=EbaySalesChannelFilter, order=EbaySalesChannelOrder, pagination=True, fields="__all__")
@@ -357,6 +410,24 @@ class EbayCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.schema.types.types import RemoteCurrencyType
 
         return to_base64(RemoteCurrencyType, self.pk)
+
+
+@type(
+    EbayDocumentType,
+    filters=EbayDocumentTypeFilter,
+    order=EbayDocumentTypeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayDocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'EbaySalesChannelType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'DocumentTypeType',
+        lazy("media.schema.types.types")
+    ]]
 
 
 @strawberry_type

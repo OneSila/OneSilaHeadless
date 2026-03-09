@@ -8,6 +8,9 @@ from core.helpers import get_languages
 
 from sales_channels.integrations.shein import constants
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
+from sales_channels.integrations.shein.factories.sales_channels.document_types import (
+    SheinCertificateRuleSyncFactory,
+)
 from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinProductType,
@@ -56,13 +59,18 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         language: Optional[str] = None,
         import_process=None,
         sync_product_type_attributes: bool = True,
+        sync_document_types: bool = False,
     ) -> None:
         self.sales_channel = sales_channel
         self.sales_channel_id = getattr(sales_channel, "pk", None)
         self.language = language
         self.sync_product_type_attributes = sync_product_type_attributes
+        self.sync_document_types = sync_document_types
         self.synced_categories: list[SheinCategory] = []
         self.synced_product_types: list[SheinProductType] = []
+        self.synced_document_rules = 0
+        self.synced_document_types_created = 0
+        self.synced_document_types_updated = 0
         self._remote_language_cache: set[tuple[Optional[int], str]] = set()
         self._attribute_template_cache: dict[str, list[dict[str, Any]]] = {}
         self._custom_value_permission_cache: dict[str, dict[str, bool]] = {}
@@ -92,6 +100,9 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         normalized_nodes = [node for node in nodes if isinstance(node, dict)]
         self.synced_categories = []
         self.synced_product_types = []
+        self.synced_document_rules = 0
+        self.synced_document_types_created = 0
+        self.synced_document_types_updated = 0
 
         if not normalized_nodes:
             logger.info(
@@ -261,6 +272,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self.synced_categories.append(category)
 
         self._enrich_category_publish_specs(category=category)
+        if self.sync_document_types and category.is_leaf:
+            self._sync_category_document_types(category=category)
 
         product_type = self._sync_product_type(category=category, node=node)
         if product_type is not None:
@@ -276,6 +289,23 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             )
 
         return category
+
+    def _sync_category_document_types(self, *, category: SheinCategory) -> None:
+        category_remote_id = self._normalize_identifier(category.remote_id)
+        if not category_remote_id:
+            return
+
+        factory = SheinCertificateRuleSyncFactory(
+            sales_channel=self.sales_channel,
+            category_remote_id=category_remote_id,
+        )
+        # Reuse this instance's request hook, so tests patching this class keep working.
+        factory.shein_post = self.shein_post  # type: ignore[method-assign]
+        stats = factory.run()
+
+        self.synced_document_rules += stats.get("rules_processed", 0)
+        self.synced_document_types_created += stats.get("document_types_created", 0)
+        self.synced_document_types_updated += stats.get("document_types_updated", 0)
 
     def _sync_product_type(
         self,

@@ -325,6 +325,110 @@ EBAY_PACKAGE_TYPE_OPTIONS = [
     },
 ]
 
+EBAY_DOCUMENT_TYPE_DEFAULTS = [
+    {
+        "value": "CERTIFICATE_OF_ANALYSIS",
+        "name": _("Certificate of Analysis"),
+        "description": _(
+            "This document is provided by the manufacturer or a qualified third-party "
+            "laboratory and confirms the product was tested and meets the specified criteria."
+        ),
+    },
+    {
+        "value": "CERTIFICATE_OF_CONFORMITY",
+        "name": _("Certificate of Conformity"),
+        "description": _(
+            "This certificate is issued by a manufacturer or a certification body to "
+            "declare that a product meets all required safety and regulatory standards."
+        ),
+    },
+    {
+        "value": "DECLARATION_OF_CONFORMITY",
+        "name": _("Declaration of Conformity"),
+        "description": _(
+            "This document is self-issued by a manufacturer declaring the product "
+            "complies with GPSR and other relevant requirements, regulations, and standards."
+        ),
+    },
+    {
+        "value": "INSTRUCTIONS_FOR_USE",
+        "name": _("Instructions for Use"),
+        "description": _(
+            "These are detailed directions provided by the manufacturer that explain how consumers should use the product correctly and safely."
+        ),
+    },
+    {
+        "value": "OTHER_SAFETY_DOCUMENTS",
+        "name": _("Other Safety Documents"),
+        "description": _(
+            "Additional safety documentation such as warnings, emergency procedures, "
+            "safe storage and handling guidance, or other safety information not covered "
+            "by other categories."
+        ),
+    },
+    {
+        "value": "SAFETY_DATA_SHEET",
+        "name": _("Safety Data Sheet"),
+        "description": _(
+            "A detailed document describing chemical product properties, hazards "
+            "(health, fire, reactivity, environmental), safe handling practices, and "
+            "emergency control measures."
+        ),
+    },
+    {
+        "value": "TROUBLE_SHOOTING_GUIDE",
+        "name": _("Trouble Shooting Guide"),
+        "description": _(
+            "A guide that helps users diagnose and resolve problems they may encounter with a product."
+        ),
+    },
+    {
+        "value": "USER_GUIDE_OR_MANUAL",
+        "name": _("User Guide or Manual"),
+        "description": _(
+            "A comprehensive resource containing the information consumers need to understand and operate the product."
+        ),
+    },
+    {
+        "value": "INSTALLATION_INSTRUCTIONS",
+        "name": _("Installation Instructions"),
+        "description": _(
+            "Step-by-step instructions provided by the manufacturer that explain how to properly install a product."
+        ),
+    },
+    {
+        "value": "ACCESSIBILITY_INFORMATION",
+        "name": _("Accessibility Information"),
+        "description": _(
+            "Details about product accessibility features to support use by individuals with disabilities or special needs."
+        ),
+    },
+]
+
+EBAY_DOCUMENT_ALLOWED_EXTENSIONS = (".pdf", ".jpg", ".jpeg", ".png")
+EBAY_DOCUMENT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+
+EBAY_DOCUMENT_LANGUAGE_BY_LOCAL_CODE = {
+    "en": "ENGLISH",
+    "en-us": "ENGLISH",
+    "en-gb": "ENGLISH",
+    "es": "SPANISH",
+    "es-es": "SPANISH",
+    "it": "ITALIAN",
+    "it-it": "ITALIAN",
+    "de": "GERMAN",
+    "de-de": "GERMAN",
+    "pl": "POLISH",
+    "pl-pl": "POLISH",
+    "nl": "DUTCH",
+    "nl-nl": "DUTCH",
+    "pt": "PORTUGUESE",
+    "pt-pt": "PORTUGUESE",
+    "pt-br": "PORTUGUESE",
+    "fr": "FRENCH",
+    "fr-fr": "FRENCH",
+}
+
 
 EBAY_INTERNAL_PROPERTY_DEFAULTS = [
     {

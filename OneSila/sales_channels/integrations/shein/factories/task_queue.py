@@ -1,5 +1,6 @@
 from sales_channels.factories.task_queue import (
     ChannelScopedAddTask,
+    DeleteScopedAddTask,
     GuardResult,
     ProductContentAddTask,
     ProductEanCodeAddTask,
@@ -10,6 +11,7 @@ from sales_channels.factories.task_queue import (
     SingleChannelAddTask,
 )
 from sales_channels.integrations.shein.models import (
+    SheinProduct,
     SheinProductCategory,
     SheinProductType,
     SheinProductTypeItem,
@@ -25,6 +27,14 @@ class SheinChannelAddTask(ChannelScopedAddTask):
 
 
 class SheinSingleChannelAddTask(SingleChannelAddTask, SheinChannelAddTask):
+    pass
+
+
+class SheinDeleteScopedAddTask(DeleteScopedAddTask, SheinChannelAddTask):
+    pass
+
+
+class SheinSingleChannelDeleteAddTask(DeleteScopedAddTask, SheinSingleChannelAddTask):
     pass
 
 
@@ -149,3 +159,11 @@ class SheinProductUpdateAddTask(ProductUpdateAddTask, SheinNonLiveChannelAddTask
 
 class SheinProductEanCodeAddTask(ProductEanCodeAddTask, SheinNonLiveChannelAddTask):
     pass
+
+
+class SheinProductDeleteAddTask(SheinDeleteScopedAddTask):
+    remote_class = SheinProduct
+
+
+class SheinProductDeleteFromAssignAddTask(SheinSingleChannelDeleteAddTask):
+    remote_class = SheinProduct
