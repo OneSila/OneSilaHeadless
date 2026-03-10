@@ -1,5 +1,8 @@
 from unittest.mock import patch
 
+from django.db.models.signals import post_delete
+
+from core.signals import post_create, post_update
 from core.tests import TestCase
 from media.models import DocumentType, Media, MediaProductThrough
 from products.models import ConfigurableProduct, SimpleProduct
@@ -169,7 +172,21 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
         required_block.refresh_from_db()
         self.assertFalse(required_block.successfully_checked)
 
-    def test_remote_document_type_update_live_refreshes_document_blocks(self):
+    def test_unrelated_create_delete_signals_do_not_hit_remote_product_category_receivers(self):
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        with patch(
+            "products_inspector.receivers._refresh_document_type_blocks_for_products",
+        ) as mock_refresh:
+            post_create.send(sender=product.__class__, instance=product)
+            post_delete.send(sender=product.__class__, instance=product)
+
+        mock_refresh.assert_not_called()
+
+    @patch("products_inspector.tasks.products_inspector__tasks__refresh_document_type_blocks_for_products")
+    def test_remote_document_type_update_queues_document_block_refresh(self, mock_refresh_task):
         product = SimpleProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -198,14 +215,84 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
 
         remote_document_type.local_instance = None
         remote_document_type.save()
-        required_block.refresh_from_db()
-        self.assertTrue(required_block.successfully_checked)
+        mock_refresh_task.assert_called_once_with(
+            multi_tenant_company_id=self.multi_tenant_company.id,
+            product_ids=[product.id],
+        )
 
-        remote_document_type.local_instance = document_type
+        mock_refresh_task.reset_mock()
+
         remote_document_type.required_categories = []
         remote_document_type.save()
-        required_block.refresh_from_db()
-        self.assertTrue(required_block.successfully_checked)
+        mock_refresh_task.assert_not_called()
+
+        remote_document_type.local_instance = document_type
+        remote_document_type.required_categories = ["cat-update"]
+        remote_document_type.save()
+        mock_refresh_task.assert_called_once_with(
+            multi_tenant_company_id=self.multi_tenant_company.id,
+            product_ids=[product.id],
+        )
+
+    @patch("products_inspector.tasks.products_inspector__tasks__refresh_document_type_blocks_for_products")
+    def test_remote_document_type_category_changes_queue_old_and_new_products(self, mock_refresh_task):
+        first_product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        second_product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        document_type = DocumentType.objects.create(
+            name="Category Move Cert",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        remote_document_type = RemoteDocumentType.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=document_type,
+            required_categories=["cat-old"],
+            optional_categories=[],
+        )
+        RemoteProductCategory.objects.create(
+            product=first_product,
+            sales_channel=self.sales_channel,
+            remote_id="cat-old",
+            require_view=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        RemoteProductCategory.objects.create(
+            product=second_product,
+            sales_channel=self.sales_channel,
+            remote_id="cat-new",
+            require_view=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        remote_document_type.required_categories = ["cat-new"]
+        remote_document_type.save()
+
+        mock_refresh_task.assert_called_once()
+        self.assertEqual(
+            set(mock_refresh_task.call_args.kwargs["product_ids"]),
+            {first_product.id, second_product.id},
+        )
+        self.assertEqual(
+            mock_refresh_task.call_args.kwargs["multi_tenant_company_id"],
+            self.multi_tenant_company.id,
+        )
+
+    def test_unrelated_update_signals_do_not_hit_document_type_receivers(self):
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        with patch(
+            "products_inspector.receivers._refresh_document_type_blocks_for_products",
+            side_effect=AssertionError("document type receivers should not run for unrelated senders"),
+        ) as mock_refresh:
+            post_update.send(sender=product.__class__, instance=product)
+
+        mock_refresh.assert_not_called()
 
     def test_shein_document_type_update_skips_live_refresh_while_channel_importing(self):
         sales_channel = SheinSalesChannel.objects.create(
@@ -248,7 +335,7 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
         )
 
         with patch(
-            "products_inspector.receivers._refresh_document_type_blocks_for_products"
+            "products_inspector.tasks.products_inspector__tasks__refresh_document_type_blocks_for_products"
         ) as mock_refresh:
             remote_document_type.required_categories = []
             remote_document_type.save()

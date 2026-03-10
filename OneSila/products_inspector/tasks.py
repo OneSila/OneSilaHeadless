@@ -66,3 +66,21 @@ def products_inspector__tasks__bulk_refresh_inspector(
         multi_tenant_company=multi_tenant_company,
         product_ids=product_ids,
     )
+
+
+@run_task_after_commit
+@db_task(priority=VERY_LOW_PRIORITY)
+def products_inspector__tasks__refresh_document_type_blocks_for_products(
+    *,
+    multi_tenant_company_id: int,
+    product_ids: list[int | str],
+) -> None:
+    from products.models import Product
+    from products_inspector.helpers import _send_document_type_block_refresh
+
+    queryset = Product.objects.filter(
+        id__in=product_ids,
+        multi_tenant_company_id=multi_tenant_company_id,
+    )
+    for product in queryset.iterator():
+        _send_document_type_block_refresh(product=product)

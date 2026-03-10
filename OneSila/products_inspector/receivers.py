@@ -9,9 +9,9 @@ from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR,
     MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, \
     MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
-    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR, DOCUMENT_TYPES_BLOCK_ERROR_CODES
-from products_inspector.helpers import _refresh_document_type_blocks_for_products, _is_remote_product_category_instance, \
-    _is_remote_document_type_instance, _normalise_category_ids, _send_document_type_block_refresh
+    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
+from products_inspector.helpers import _refresh_document_type_blocks_for_products, _normalise_category_ids, \
+    _send_document_type_block_refresh
 from products_inspector.models import InspectorBlock, Inspector
 from products_inspector.signals import inspector_block_refresh, inspector_missing_info_detected, inspector_missing_info_resolved
 from properties.signals import product_properties_rule_created, product_properties_rule_updated
@@ -383,23 +383,36 @@ def products_inspector__inspector__trigger_block_rule_deleted(sender, instance, 
 # REQUIRED_DOCUMENT_TYPES_ERROR -----------------------------------------------
 # OPTIONAL_DOCUMENT_TYPES_ERROR -----------------------------------------------
 
-@receiver(post_create)
-@receiver(post_delete)
-def products_inspector__inspector__trigger_document_types_on_remote_product_category_change(sender, instance, **kwargs):
-    if not _is_remote_product_category_instance(instance=instance):
-        return
-
+@receiver(post_create, sender="sales_channels.RemoteProductCategory")
+@receiver(post_create, sender="amazon.AmazonProductBrowseNode")
+@receiver(post_create, sender="shein.SheinProductCategory")
+@receiver(post_create, sender="ebay.EbayProductCategory")
+@receiver(post_delete, sender="sales_channels.RemoteProductCategory")
+@receiver(post_delete, sender="amazon.AmazonProductBrowseNode")
+@receiver(post_delete, sender="shein.SheinProductCategory")
+@receiver(post_delete, sender="ebay.EbayProductCategory")
+def products_inspector__inspector__trigger_document_types_on_remote_product_category_change(
+    *,
+    sender,
+    instance,
+    **kwargs,
+):
     _refresh_document_type_blocks_for_products(
         product_ids={instance.product_id},
         multi_tenant_company_id=instance.multi_tenant_company_id,
     )
 
 
-@receiver(post_update)
-def products_inspector__inspector__trigger_document_types_on_remote_product_category_update(sender, instance, **kwargs):
-    if not _is_remote_product_category_instance(instance=instance):
-        return
-
+@receiver(post_update, sender="sales_channels.RemoteProductCategory")
+@receiver(post_update, sender="amazon.AmazonProductBrowseNode")
+@receiver(post_update, sender="shein.SheinProductCategory")
+@receiver(post_update, sender="ebay.EbayProductCategory")
+def products_inspector__inspector__trigger_document_types_on_remote_product_category_update(
+    *,
+    sender,
+    instance,
+    **kwargs,
+):
     product_ids = {instance.product_id}
 
     if instance.is_dirty_field("product", check_relationship=True):
@@ -414,11 +427,16 @@ def products_inspector__inspector__trigger_document_types_on_remote_product_cate
     )
 
 
-@receiver(post_update)
-def products_inspector__inspector__trigger_document_types_on_remote_document_type_update(sender, instance, **kwargs):
-    if not _is_remote_document_type_instance(instance=instance):
-        return
-
+@receiver(post_update, sender="sales_channels.RemoteDocumentType")
+@receiver(post_update, sender="amazon.AmazonDocumentType")
+@receiver(post_update, sender="shein.SheinDocumentType")
+@receiver(post_update, sender="ebay.EbayDocumentType")
+def products_inspector__inspector__trigger_document_types_on_remote_document_type_update(
+    *,
+    sender,
+    instance,
+    **kwargs,
+):
     from sales_channels.integrations.shein.models import SheinDocumentType
 
     instance = instance.get_real_instance()
@@ -429,6 +447,9 @@ def products_inspector__inspector__trigger_document_types_on_remote_document_typ
     required_categories_dirty = instance.is_dirty_field("required_categories")
     optional_categories_dirty = instance.is_dirty_field("optional_categories")
 
+    if not instance.local_instance_id and not local_instance_dirty:
+        return
+
     if not any([local_instance_dirty, required_categories_dirty, optional_categories_dirty]):
         return
 
@@ -438,20 +459,23 @@ def products_inspector__inspector__trigger_document_types_on_remote_document_typ
     if local_instance_dirty:
         category_ids_to_refresh.update(_normalise_category_ids(categories=instance.required_categories))
         category_ids_to_refresh.update(_normalise_category_ids(categories=instance.optional_categories))
-
+        category_ids_to_refresh.update(
+            _normalise_category_ids(categories=dirty_fields.get("required_categories"))
+        )
+        category_ids_to_refresh.update(
+            _normalise_category_ids(categories=dirty_fields.get("optional_categories"))
+        )
+    else:
         if required_categories_dirty:
+            category_ids_to_refresh.update(_normalise_category_ids(categories=instance.required_categories))
             category_ids_to_refresh.update(
                 _normalise_category_ids(categories=dirty_fields.get("required_categories"))
             )
         if optional_categories_dirty:
+            category_ids_to_refresh.update(_normalise_category_ids(categories=instance.optional_categories))
             category_ids_to_refresh.update(
                 _normalise_category_ids(categories=dirty_fields.get("optional_categories"))
             )
-    else:
-        if required_categories_dirty:
-            category_ids_to_refresh.update(_normalise_category_ids(categories=instance.required_categories))
-        if optional_categories_dirty:
-            category_ids_to_refresh.update(_normalise_category_ids(categories=instance.optional_categories))
 
     product_ids = set()
     if category_ids_to_refresh:
@@ -465,18 +489,8 @@ def products_inspector__inspector__trigger_document_types_on_remote_document_typ
             ).values_list("product_id", flat=True)
         )
 
-    product_ids.update(
-        InspectorBlock.objects.filter(
-            multi_tenant_company_id=instance.multi_tenant_company_id,
-            error_code__in=DOCUMENT_TYPES_BLOCK_ERROR_CODES,
-            successfully_checked=False,
-            inspector__product__remoteproductcategory__sales_channel_id=instance.sales_channel_id,
-        )
-        .values_list("inspector__product_id", flat=True)
-        .distinct()
-    )
-
     _refresh_document_type_blocks_for_products(
         product_ids=product_ids,
         multi_tenant_company_id=instance.multi_tenant_company_id,
+        run_async=True,
     )

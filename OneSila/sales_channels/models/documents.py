@@ -63,12 +63,12 @@ class RemoteDocumentType(PolymorphicModel, RemoteObjectMixin, models.Model):
         name = str(self.name or "").strip()
         remote_id = str(self.remote_id or "").strip()
 
-        if translated_name and name and translated_name != name:
-            return f"{translated_name} ({name})"
         if translated_name:
             return translated_name
+
         if name:
             return name
+
         if remote_id:
             return remote_id
         return "Remote document type"

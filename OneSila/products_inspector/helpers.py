@@ -31,28 +31,34 @@ def _send_document_type_block_refresh(*, product):
         )
 
 
-def _refresh_document_type_blocks_for_products(*, product_ids, multi_tenant_company_id):
+def _refresh_document_type_blocks_for_products(
+    *,
+    product_ids,
+    multi_tenant_company_id,
+    run_async=False,
+):
     if not product_ids:
         return
 
+    product_ids = list(product_ids)
+
+    if run_async:
+        from products_inspector.tasks import (
+            products_inspector__tasks__refresh_document_type_blocks_for_products,
+        )
+
+        products_inspector__tasks__refresh_document_type_blocks_for_products(
+            multi_tenant_company_id=multi_tenant_company_id,
+            product_ids=product_ids,
+        )
+        return
+
     queryset = Product.objects.filter(
-        id__in=list(product_ids),
+        id__in=product_ids,
         multi_tenant_company_id=multi_tenant_company_id,
     )
     for product in queryset.iterator():
         _send_document_type_block_refresh(product=product)
-
-
-def _is_remote_product_category_instance(*, instance):
-    from sales_channels.models.products import RemoteProductCategory
-
-    return isinstance(instance, RemoteProductCategory)
-
-
-def _is_remote_document_type_instance(*, instance):
-    from sales_channels.models.documents import RemoteDocumentType
-
-    return isinstance(instance, RemoteDocumentType)
 
 
 def _normalise_category_ids(*, categories):
