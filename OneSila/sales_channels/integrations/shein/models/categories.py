@@ -144,6 +144,24 @@ class SheinCategory(models.Model):
         channel_suffix = f" @ {self.sales_channel}" if self.sales_channel_id else ""
         return f"{label}{channel_suffix}"
 
+    @property
+    def full_path(self) -> str:
+        names: list[str] = []
+        seen: set[int] = set()
+        current = self
+
+        while current is not None:
+            key = current.pk if current.pk else id(current)
+            if key in seen:
+                break
+            seen.add(key)
+
+            if current.name:
+                names.append(current.name.strip())
+            current = current.parent
+
+        return " > ".join(reversed(names))
+
     def get_publish_standard(self, *, default: Any | None = None) -> dict[str, Any]:
         raw_data = self.raw_data or {}
         if not isinstance(raw_data, dict):

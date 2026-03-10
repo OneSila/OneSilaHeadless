@@ -419,6 +419,12 @@ def products_inspector__inspector__trigger_document_types_on_remote_document_typ
     if not _is_remote_document_type_instance(instance=instance):
         return
 
+    from sales_channels.integrations.shein.models import SheinDocumentType
+
+    instance = instance.get_real_instance()
+    if isinstance(instance, SheinDocumentType) and getattr(instance.sales_channel, "is_importing", False):
+        return
+
     local_instance_dirty = instance.is_dirty_field("local_instance", check_relationship=True)
     required_categories_dirty = instance.is_dirty_field("required_categories")
     optional_categories_dirty = instance.is_dirty_field("optional_categories")

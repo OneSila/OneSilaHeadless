@@ -57,6 +57,22 @@ class RemoteDocumentType(PolymorphicModel, RemoteObjectMixin, models.Model):
             ),
         ]
 
+    @property
+    def effective_name(self) -> str:
+        translated_name = str(self.translated_name or "").strip()
+        name = str(self.name or "").strip()
+        remote_id = str(self.remote_id or "").strip()
+
+        if translated_name and name and translated_name != name:
+            return f"{translated_name} ({name})"
+        if translated_name:
+            return translated_name
+        if name:
+            return name
+        if remote_id:
+            return remote_id
+        return "Remote document type"
+
     def _extract_category_remote_id(self, *, value, field_name: str, index: int) -> str:
         remote_id = None
 

@@ -392,6 +392,11 @@ class RemoteDocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
     local_instance: Optional[Annotated['DocumentTypeType', lazy("media.schema.types.types")]]
 
+    @field()
+    def effective_name(self, info) -> str:
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+        return instance.effective_name
+
 
 @type(RemotePropertySelectValue, filters=RemotePropertySelectValueFilter, order=RemotePropertySelectValueOrder, pagination=True, fields='__all__')
 class RemotePropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):

@@ -7,6 +7,12 @@ from products_inspector.constants import (
     OPTIONAL_DOCUMENT_TYPES_ERROR,
     REQUIRED_DOCUMENT_TYPES_ERROR,
 )
+from sales_channels.integrations.shein.models import (
+    SheinCategory,
+    SheinDocumentType,
+    SheinProductCategory,
+    SheinSalesChannel,
+)
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
 from sales_channels.models.documents import RemoteDocumentType
 from sales_channels.models.products import RemoteProductCategory
@@ -200,6 +206,54 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
         remote_document_type.save()
         required_block.refresh_from_db()
         self.assertTrue(required_block.successfully_checked)
+
+    def test_shein_document_type_update_skips_live_refresh_while_channel_importing(self):
+        sales_channel = SheinSalesChannel.objects.create(
+            hostname="https://shein.example.com",
+            active=False,
+            is_importing=True,
+            multi_tenant_company=self.multi_tenant_company,
+            secret_key="secret",
+            open_key_id="open",
+        )
+        SheinCategory.objects.create(
+            sales_channel=sales_channel,
+            remote_id="cat-shein-import",
+            name="Category",
+            is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        document_type = DocumentType.objects.create(
+            name="Shein Import Guard Cert",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        SheinProductCategory.objects.create(
+            product=product,
+            sales_channel=sales_channel,
+            remote_id="cat-shein-import",
+            require_view=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        remote_document_type = SheinDocumentType.objects.create(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=document_type,
+            remote_id="shein-cert",
+            name="Shein Cert",
+            required_categories=["cat-shein-import"],
+            optional_categories=[],
+        )
+
+        with patch(
+            "products_inspector.receivers._refresh_document_type_blocks_for_products"
+        ) as mock_refresh:
+            remote_document_type.required_categories = []
+            remote_document_type.save()
+
+        mock_refresh.assert_not_called()
 
     def test_required_document_accepts_default_or_channel_document(self):
         product = SimpleProduct.objects.create(
