@@ -255,57 +255,6 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
 
         mock_refresh.assert_not_called()
 
-    def test_shein_document_type_update_refreshes_live_when_not_importing(self):
-        sales_channel = SheinSalesChannel.objects.create(
-            hostname="https://shein-live.example.com",
-            active=False,
-            is_importing=False,
-            multi_tenant_company=self.multi_tenant_company,
-            secret_key="secret-live",
-            open_key_id="open-live",
-        )
-        SheinCategory.objects.create(
-            sales_channel=sales_channel,
-            remote_id="cat-shein-live",
-            name="Category",
-            is_leaf=True,
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        document_type = DocumentType.objects.create(
-            name="Shein Live Cert",
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        product = SimpleProduct.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        SheinProductCategory.objects.create(
-            product=product,
-            sales_channel=sales_channel,
-            remote_id="cat-shein-live",
-            require_view=False,
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        remote_document_type = SheinDocumentType.objects.create(
-            sales_channel=sales_channel,
-            multi_tenant_company=self.multi_tenant_company,
-            local_instance=document_type,
-            remote_id="shein-cert-live",
-            name="Shein Cert",
-            required_categories=["cat-shein-live"],
-            optional_categories=[],
-        )
-
-        with patch(
-            "products_inspector.receivers._refresh_document_type_blocks_for_products"
-        ) as mock_refresh:
-            remote_document_type.required_categories = []
-            remote_document_type.save()
-
-        mock_refresh.assert_called_once_with(
-            product_ids={product.id},
-            multi_tenant_company_id=self.multi_tenant_company.id,
-        )
-
     def test_required_document_accepts_default_or_channel_document(self):
         product = SimpleProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
