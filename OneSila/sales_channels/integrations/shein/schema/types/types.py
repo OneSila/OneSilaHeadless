@@ -105,6 +105,10 @@ class SheinCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
     def properties_field(self, info) -> JSON:
         return self.properties
 
+    @field()
+    def full_path(self, info) -> str:
+        return SheinCategory.full_path.fget(self)
+
 
 @type(
     SheinProductCategory,
