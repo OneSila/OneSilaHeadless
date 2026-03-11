@@ -1,7 +1,7 @@
 from huey import crontab
 from huey.contrib.djhuey import db_task, db_periodic_task
 
-from core.huey import CRUCIAL_PRIORITY
+from core.huey import CRUCIAL_PRIORITY, HIGH_PRIORITY
 from integrations.factories.remote_task import BaseRemoteTask
 from sales_channels.decorators import remote_task
 from sales_channels.integrations.shein.factories.imports.products import (
@@ -125,7 +125,7 @@ def shein_translate_document_type_task(*, document_type_id: int):
 
 
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def create_shein_product_db_task(
     task_queue_item_id,
     *,
@@ -154,7 +154,7 @@ def create_shein_product_db_task(
 
 
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def update_shein_product_db_task(
     task_queue_item_id,
     *,
@@ -197,7 +197,7 @@ def update_shein_product_db_task(
 
 
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def resync_shein_product_db_task(
     task_queue_item_id,
     *,

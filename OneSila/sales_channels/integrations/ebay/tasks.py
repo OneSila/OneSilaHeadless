@@ -2,7 +2,7 @@
 
 from huey.contrib.djhuey import db_task
 
-from core.huey import CRUCIAL_PRIORITY
+from core.huey import CRUCIAL_PRIORITY, HIGH_PRIORITY
 from integrations.factories.remote_task import BaseRemoteTask
 from llm.flows.remote_translations import (
     TranslateRemotePropertyFlow,
@@ -145,7 +145,7 @@ def ebay_product_type_rule_sync_task(*, product_type_id: int) -> None:
 
 
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def create_ebay_product_db_task(
     task_queue_item_id,
     *,
@@ -172,7 +172,7 @@ def create_ebay_product_db_task(
 
 
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def resync_ebay_product_db_task(
     task_queue_item_id,
     *,

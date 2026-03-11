@@ -179,7 +179,7 @@ def amazon_sync_sales_channel_mappings_task(
 
 
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def create_amazon_product_db_task(
     task_queue_item_id,
     sales_channel_id,
@@ -207,7 +207,7 @@ def create_amazon_product_db_task(
 
 
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def resync_amazon_product_db_task(
     task_queue_item_id,
     sales_channel_id,
