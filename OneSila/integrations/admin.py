@@ -1,8 +1,14 @@
 from django.contrib import admin
-from core.admin import ModelAdmin
+from core.admin import ModelAdmin, SharedModelAdmin
 from polymorphic.admin import PolymorphicChildModelFilter, PolymorphicParentModelAdmin
 
-from integrations.models import Integration, IntegrationTaskQueue, IntegrationLog
+from integrations.models import (
+    Integration,
+    IntegrationTaskQueue,
+    IntegrationLog,
+    PublicIntegrationType,
+    PublicIntegrationTypeTranslation,
+)
 from django.urls import path, reverse
 from django.utils.html import format_html
 from django.http import HttpResponseRedirect
@@ -17,6 +23,11 @@ from django.utils.translation import gettext_lazy as _
 
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.models import SalesChannel, RemoteLog
+
+
+class PublicIntegrationTypeTranslationInline(admin.TabularInline):
+    model = PublicIntegrationTypeTranslation
+    extra = 1
 
 
 @admin.register(Integration)
@@ -145,3 +156,38 @@ class IntegrationLogAdmin(PolymorphicParentModelAdmin):
             'fields': ('user_error', 'keep')
         }),
     )
+
+
+@admin.register(PublicIntegrationType)
+class PublicIntegrationTypeAdmin(SharedModelAdmin):
+    list_display = (
+        "display_name",
+        "key",
+        "type",
+        "subtype",
+        "category",
+        "based_to",
+        "active",
+        "is_beta",
+        "supports_open_ai_product_feed",
+        "sort_order",
+    )
+    list_filter = ("category", "active", "is_beta", "supports_open_ai_product_feed")
+    search_fields = ("key", "type", "subtype", "translations__name", "translations__description")
+    raw_id_fields = ("based_to",)
+    inlines = (PublicIntegrationTypeTranslationInline,)
+    ordering = ("sort_order", "key")
+    list_select_related = ("based_to",)
+
+    @admin.display(description="Name")
+    def display_name(self, obj):
+        return obj.name(language=None) or "-"
+
+
+@admin.register(PublicIntegrationTypeTranslation)
+class PublicIntegrationTypeTranslationAdmin(SharedModelAdmin):
+    list_display = ("name", "language", "public_integration_type")
+    list_filter = ("language",)
+    search_fields = ("name", "description", "public_integration_type__key")
+    raw_id_fields = ("public_integration_type",)
+    list_select_related = ("public_integration_type",)

@@ -9,6 +9,7 @@ from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
 from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION, MIRAKL_INTEGRATION
 from integrations.schema.types.types import IntegrationType
+from integrations.helpers import get_public_integration_asset_url
 
 from sales_channels.models import (
     ImportCurrency,
@@ -234,6 +235,20 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
             raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
         return to_base64(graphql_type, self.pk)
+
+    @field()
+    def icon_svg(self, info) -> Optional[str]:
+        return get_public_integration_asset_url(
+            integration=self,
+            field_name="logo_svg",
+        )
+
+    @field()
+    def logo_png(self, info) -> Optional[str]:
+        return get_public_integration_asset_url(
+            integration=self,
+            field_name="logo_png",
+        )
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
 class ImportCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):

@@ -1,8 +1,11 @@
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
-from integrations.models import Integration
-from integrations.schema.types.filters import IntegrationFilter
-from integrations.schema.types.ordering import IntegrationOrder
+from typing import Annotated, Optional, List
+
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, lazy
+from integrations.models import Integration, PublicIntegrationType, PublicIntegrationTypeTranslation
+from integrations.schema.types.filters import IntegrationFilter, PublicIntegrationTypeFilter
+from integrations.schema.types.ordering import IntegrationOrder, PublicIntegrationTypeOrder
 from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION, MIRAKL_INTEGRATION
+from integrations.helpers import get_public_integration_asset_url
 from strawberry.relay.utils import to_base64
 
 
@@ -88,3 +91,72 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
         return to_base64(graphql_type, self.pk)
+
+    @field()
+    def icon_svg_url(self, info) -> Optional[str]:
+        return get_public_integration_asset_url(
+            integration=self,
+            field_name="logo_svg",
+        )
+
+    @field()
+    def logo_png_url(self, info) -> Optional[str]:
+        return get_public_integration_asset_url(
+            integration=self,
+            field_name="logo_png",
+        )
+
+
+@type(
+    PublicIntegrationTypeTranslation,
+    fields="__all__",
+)
+class PublicIntegrationTypeTranslationType(relay.Node):
+    public_integration_type: Annotated[
+        "PublicIntegrationTypeType",
+        lazy("integrations.schema.types.types"),
+    ]
+
+
+@type(
+    PublicIntegrationType,
+    filters=PublicIntegrationTypeFilter,
+    order=PublicIntegrationTypeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class PublicIntegrationTypeType(relay.Node):
+    based_to: Optional[Annotated[
+        "PublicIntegrationTypeType",
+        lazy("integrations.schema.types.types"),
+    ]]
+    translations: List[Annotated[
+        "PublicIntegrationTypeTranslationType",
+        lazy("integrations.schema.types.types"),
+    ]]
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return queryset.select_related("based_to").prefetch_related("translations", "based_to__translations").order_by(*queryset.model._meta.ordering)
+
+    @field()
+    def name(self, info, language: Optional[str] = None) -> str:
+        return PublicIntegrationType.name(self, language=language)
+
+    @field()
+    def description(self, info, language: Optional[str] = None) -> str:
+        return PublicIntegrationType.description(self, language=language)
+
+    @field()
+    def icon_svg_url(self, info) -> Optional[str]:
+        return get_public_integration_asset_url(
+            integration=self,
+            field_name="logo_svg",
+        )
+
+    @field()
+    def logo_png_url(self, info) -> Optional[str]:
+        return get_public_integration_asset_url(
+            integration=self,
+            field_name="logo_png",
+        )

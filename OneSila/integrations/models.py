@@ -10,8 +10,10 @@ from core.huey import DEFAULT_PRIORITY
 import json
 from datetime import datetime
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 
 from integrations.validators import hostname_validator
+from core.managers import Manager as SharedManager
 
 logger = logging.getLogger(__name__)
 
@@ -280,6 +282,116 @@ class IntegrationLog(PolymorphicModel, models.Model):
           - Otherwise, returns None.
         """
         return self.response if self.user_error else None
+
+
+class PublicIntegrationType(models.SharedModel):
+    CATEGORY_STOREFRONT = "storefront"
+    CATEGORY_MARKETPLACE = "marketplace"
+    CATEGORY_WEBHOOKS = "webhooks"
+
+    CATEGORY_CHOICES = [
+        (CATEGORY_STOREFRONT, "Storefront"),
+        (CATEGORY_MARKETPLACE, "Marketplace"),
+        (CATEGORY_WEBHOOKS, "Webhooks"),
+    ]
+
+    key = models.CharField(max_length=100, unique=True, db_index=True)
+    type = models.CharField(max_length=100, db_index=True)
+    subtype = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    based_to = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="derived_integration_types",
+    )
+    category = models.CharField(max_length=32, choices=CATEGORY_CHOICES, db_index=True)
+    active = models.BooleanField(default=True, db_index=True)
+    is_beta = models.BooleanField(default=False, db_index=True)
+    supports_open_ai_product_feed = models.BooleanField(default=False, db_index=True)
+    logo_png = models.ImageField(
+        upload_to="integrations/public/logo_png/",
+        null=True,
+        blank=True,
+    )
+    logo_svg = models.FileField(
+        upload_to="integrations/public/logo_svg/",
+        null=True,
+        blank=True,
+    )
+    sort_order = models.PositiveIntegerField(default=0, db_index=True)
+
+    objects = SharedManager()
+
+    class Meta:
+        ordering = ("sort_order", "key")
+        search_terms = ["key", "type", "subtype", "translations__name", "translations__description"]
+
+    def _get_translation_value(self, *, field_name, language=None):
+        translations = self.translations.all()
+
+        if language:
+            translation = (
+                translations
+                .filter(language=language)
+                .exclude(**{f"{field_name}__isnull": True})
+                .exclude(**{field_name: ""})
+                .first()
+            )
+            if translation:
+                return getattr(translation, field_name, "") or ""
+
+        fallback_translation = (
+            translations
+            .exclude(**{f"{field_name}__isnull": True})
+            .exclude(**{field_name: ""})
+            .order_by("language", "id")
+            .first()
+        )
+        if fallback_translation:
+            return getattr(fallback_translation, field_name, "") or ""
+
+        return ""
+
+    def name(self, *, language=None):
+        return self._get_translation_value(field_name="name", language=language)
+
+    def description(self, *, language=None):
+        return self._get_translation_value(field_name="description", language=language)
+
+    def __str__(self):
+        return self.name(language=None) or self.key
+
+
+class PublicIntegrationTypeTranslation(models.SharedModel):
+    public_integration_type = models.ForeignKey(
+        PublicIntegrationType,
+        on_delete=models.CASCADE,
+        related_name="translations",
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    language = models.CharField(
+        max_length=7,
+        choices=settings.LANGUAGES,
+        default=settings.LANGUAGE_CODE,
+        db_index=True,
+    )
+
+    objects = SharedManager()
+
+    class Meta:
+        ordering = ("language", "name")
+        search_terms = ["name", "description", "language", "public_integration_type__key"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["public_integration_type", "language"],
+                name="unique_public_integration_type_translation_language",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.public_integration_type.key} [{self.language}] {self.name}"
 
 
 class IntegrationObjectMixin(models.Model):

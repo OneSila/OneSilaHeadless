@@ -39,6 +39,7 @@ class SalesChannelFeedProductPayloadFactory:
         for product in products:
             translation = self._select_translation(translations=translations.get(product.id, []))
             product_payload = {
+                "local_product_id": product.id,
                 "action": self._determine_action(remote_product=self.remote_product, product=product),
                 "sku": getattr(product, "sku", "") or "",
                 "parent_sku": parent_sku if product.id != self.local_product.id else "",
