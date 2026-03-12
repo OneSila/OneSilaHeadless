@@ -50,7 +50,7 @@ class PublicIntegrationTypeDirectViewTests(
 
     def test_direct_integrations_endpoint_supports_filters_and_absolute_logo_urls(self):
         response = self.client.get(
-            "/direct/integrations/",
+            "/direct/integrations/types/",
             {
                 "key": self.integration_type.key,
                 "active": "",
