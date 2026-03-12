@@ -5,6 +5,8 @@ from sales_channels.models import (
     ImportCurrency,
     ImportImage,
     SalesChannelImport,
+    SalesChannelFeed,
+    SalesChannelFeedItem,
     ImportProduct,
     ImportProperty,
     ImportPropertySelectValue,
@@ -45,6 +47,18 @@ class ImportImageOrder:
 
 @order(SalesChannelImport)
 class SalesChannelImportOrder:
+    id: auto
+
+
+@order(SalesChannelFeed)
+class SalesChannelFeedOrder:
+    id: auto
+    created_at: auto
+    status: auto
+
+
+@order(SalesChannelFeedItem)
+class SalesChannelFeedItemOrder:
     id: auto
 
 

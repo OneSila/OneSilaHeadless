@@ -1,6 +1,7 @@
 from typing import Annotated, List, Optional
 
 from core.schema.core.types.types import GetQuerysetMultiTenantMixin, field, lazy, relay, type
+from currencies.schema.types.types import CurrencyType
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklDocumentType,
@@ -68,9 +69,11 @@ from sales_channels.integrations.mirakl.schema.types.ordering import (
     filters=MiraklSalesChannelFilter,
     order=MiraklSalesChannelOrder,
     pagination=True,
-    exclude=["api_key"],
+    fields="__all__",
 )
 class MiraklSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
+    feed_batches: List[Annotated["SalesChannelFeedType", lazy("sales_channels.schema.types.types")]]
+
     @field()
     def integration_ptr(self, info) -> str:
         return self.integration_ptr
@@ -78,6 +81,11 @@ class MiraklSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def saleschannel_ptr(self, info) -> str:
         return self.saleschannel_ptr
+
+    @field()
+    def connected(self, info) -> bool:
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+        return instance.connected
 
 
 @type(
@@ -90,6 +98,10 @@ class MiraklSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
 class MiraklSalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
 
+    @field()
+    def active(self, info) -> Optional[bool]:
+        return getattr(self.sales_channel, "active", None)
+
 
 @type(
     MiraklRemoteCurrency,
@@ -100,6 +112,7 @@ class MiraklSalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
 )
 class MiraklRemoteCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    local_instance: Optional[CurrencyType]
 
 
 @type(
@@ -122,6 +135,22 @@ class MiraklRemoteLanguageType(relay.Node, GetQuerysetMultiTenantMixin):
 )
 class MiraklInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    local_instance: Optional[Annotated["PropertyType", lazy("properties.schema.types.types")]]
+    options: List[Annotated["MiraklInternalPropertyOptionType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+
+    @field()
+    def mapped_locally(self, info) -> bool:
+        annotated_value = getattr(self, "mapped_locally", None)
+        if annotated_value is None:
+            return bool(getattr(self, "local_instance_id", None))
+        return annotated_value
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        annotated_value = getattr(self, "mapped_remotely", None)
+        if annotated_value is None:
+            return bool(getattr(self, "remote_id", None))
+        return annotated_value
 
 
 @type(
@@ -134,6 +163,7 @@ class MiraklInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
 class MiraklInternalPropertyOptionType(relay.Node, GetQuerysetMultiTenantMixin):
     internal_property: Annotated["MiraklInternalPropertyType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    local_instance: Optional[Annotated["PropertySelectValueType", lazy("properties.schema.types.types")]]
 
 
 @type(
@@ -158,6 +188,21 @@ class MiraklCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
 )
 class MiraklPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    local_instance: Optional[Annotated["PropertyType", lazy("properties.schema.types.types")]]
+
+    @field()
+    def mapped_locally(self, info) -> bool:
+        annotated_value = getattr(self, "mapped_locally", None)
+        if annotated_value is None:
+            return bool(getattr(self, "local_instance_id", None))
+        return annotated_value
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        annotated_value = getattr(self, "mapped_remotely", None)
+        if annotated_value is None:
+            return bool(getattr(self, "remote_id", None))
+        return annotated_value
 
 
 @type(
@@ -170,6 +215,25 @@ class MiraklPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
 class MiraklPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
     remote_property: Annotated["MiraklPropertyType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    local_instance: Optional[Annotated["PropertySelectValueType", lazy("properties.schema.types.types")]]
+
+    @field()
+    def label(self, info) -> str:
+        return self.translated_value or self.value or self.code
+
+    @field()
+    def mapped_locally(self, info) -> bool:
+        annotated_value = getattr(self, "mapped_locally", None)
+        if annotated_value is None:
+            return bool(getattr(self, "local_instance_id", None))
+        return annotated_value
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        annotated_value = getattr(self, "mapped_remotely", None)
+        if annotated_value is None:
+            return bool(getattr(self, "remote_id", None))
+        return annotated_value
 
 
 @type(
@@ -274,3 +338,20 @@ class MiraklDocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
 )
 class MiraklSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    feed: Optional[Annotated["SalesChannelFeedType", lazy("sales_channels.schema.types.types")]]
+
+    @field()
+    def error_report_file_url(self, info) -> str | None:
+        return self._get_file_url(field_name="error_report_file")
+
+    @field()
+    def new_product_report_file_url(self, info) -> str | None:
+        return self._get_file_url(field_name="new_product_report_file")
+
+    @field()
+    def transformed_file_url(self, info) -> str | None:
+        return self._get_file_url(field_name="transformed_file")
+
+    @field()
+    def transformation_error_report_file_url(self, info) -> str | None:
+        return self._get_file_url(field_name="transformation_error_report_file")

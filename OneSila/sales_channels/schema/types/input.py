@@ -3,6 +3,7 @@ from core.schema.core.types.input import NodeInput, input, partial, List
 
 from sales_channels.models import (
     SalesChannelImport,
+    SalesChannelFeed,
     RemoteCategory,
     RemoteCurrency,
     RemoteCustomer,
@@ -36,6 +37,11 @@ class SalesChannelImportInput:
 
 @partial(SalesChannelImport, fields="__all__", exclude=['import_ptr'])
 class SalesChannelImportPartialInput(NodeInput):
+    pass
+
+
+@partial(SalesChannelFeed, fields="__all__")
+class SalesChannelFeedPartialInput(NodeInput):
     pass
 
 

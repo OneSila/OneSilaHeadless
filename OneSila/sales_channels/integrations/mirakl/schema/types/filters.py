@@ -40,6 +40,7 @@ class MiraklSalesChannelFilter(SearchFilterMixin):
     id: auto
     active: auto
     hostname: auto
+    sub_type: auto
     shop_id: auto
 
 
@@ -176,3 +177,5 @@ class MiraklDocumentTypeFilter(SearchFilterMixin):
 @filter(MiraklSalesChannelImport)
 class MiraklSalesChannelImportFilter(SalesChannelImportFilter):
     type: auto
+    remote_import_id: auto
+    import_status: auto

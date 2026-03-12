@@ -2,7 +2,7 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 from integrations.models import Integration
 from integrations.schema.types.filters import IntegrationFilter
 from integrations.schema.types.ordering import IntegrationOrder
-from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
+from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION, MIRAKL_INTEGRATION
 from strawberry.relay.utils import to_base64
 
 
@@ -11,7 +11,12 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def type(self, info) -> str:
-        return INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
+        integration_type = INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
+        if integration_type != MIRAKL_INTEGRATION:
+            return integration_type
+
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+        return getattr(instance, "sub_type", None) or MIRAKL_INTEGRATION
 
     @field()
     def connected(self, info) -> bool:
@@ -21,6 +26,7 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.integrations.amazon.models import AmazonSalesChannel
         from sales_channels.integrations.ebay.models import EbaySalesChannel
         from sales_channels.integrations.shein.models import SheinSalesChannel
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel
         from webhooks.models import WebhookIntegration
 
         if isinstance(self, MagentoSalesChannel):
@@ -37,6 +43,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             return True
         elif isinstance(self, EbaySalesChannel):
             return self.access_token is not None
+        elif isinstance(self, MiraklSalesChannel):
+            return self.connected
 
         raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
@@ -56,6 +64,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.integrations.ebay.schema.types.types import EbaySalesChannelType
         from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.shein.schema.types.types import SheinSalesChannelType
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+        from sales_channels.integrations.mirakl.schema.types.types import MiraklSalesChannelType
 
 
         if isinstance(self, MagentoSalesChannel):
@@ -72,6 +82,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = WebhookIntegrationType
         elif isinstance(self, EbaySalesChannel):
             graphql_type = EbaySalesChannelType
+        elif isinstance(self, MiraklSalesChannel):
+            graphql_type = MiraklSalesChannelType
         else:
             raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 

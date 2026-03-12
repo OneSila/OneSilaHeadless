@@ -11,6 +11,8 @@ from sales_channels.models import (
     ImportCurrency,
     ImportImage,
     SalesChannelImport,
+    SalesChannelFeed,
+    SalesChannelFeedItem,
     ImportProduct,
     ImportProperty,
     ImportPropertySelectValue,
@@ -184,6 +186,26 @@ class RemoteCurrencyFilter(SearchFilterMixin):
 class SalesChannelImportFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
+
+
+@filter(SalesChannelFeed)
+class SalesChannelFeedFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    type: auto
+    status: auto
+    remote_id: auto
+
+
+@filter(SalesChannelFeedItem)
+class SalesChannelFeedItemFilter(SearchFilterMixin):
+    id: auto
+    feed: Optional["SalesChannelFeedFilter"]
+    remote_product: Optional[RemoteProductFilter]
+    sales_channel_view: Optional["SalesChannelViewFilter"]
+    action: auto
+    status: auto
+    identifier: auto
 
 
 @filter(SalesChannelView)

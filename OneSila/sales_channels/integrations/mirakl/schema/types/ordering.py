@@ -112,3 +112,4 @@ class MiraklDocumentTypeOrder:
 @order(MiraklSalesChannelImport)
 class MiraklSalesChannelImportOrder:
     id: auto
+    created_at: auto

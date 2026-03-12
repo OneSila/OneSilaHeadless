@@ -8,6 +8,7 @@ from .sales_channels import (
     RemoteLanguage,
 )
 from .gpt import SalesChannelGptFeed
+from .feeds import SalesChannelFeed, SalesChannelFeedItem
 
 # Import related models
 from .imports import (
@@ -50,13 +51,4 @@ from .orders import RemoteOrder, RemoteCustomer
 
 # Logging models
 from .logs import RemoteLog
-from .products import RemoteProduct, RemoteImage, RemoteProductContent, RemotePrice, RemoteInventory, RemoteCategory, RemoteImageProductAssociation, SyncRequest
-from .properties import RemoteProperty, RemotePropertySelectValue, RemoteProductProperty
-from .sales_channels import (
-    SalesChannel,
-    SalesChannelView,
-    SalesChannelIntegrationPricelist,
-    SalesChannelContentTemplate,
-    SalesChannelViewAssign,
-)
 from .taxes import RemoteVat, RemoteCurrency

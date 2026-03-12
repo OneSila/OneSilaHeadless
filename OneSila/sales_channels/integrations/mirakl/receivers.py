@@ -13,7 +13,7 @@ def sales_channels__mirakl__handle_pull(sender, instance, **kwargs):
     if not isinstance(real_instance, MiraklSalesChannel):
         return
 
-    if not real_instance.connect():
+    if not real_instance.connected:
         return
 
     from sales_channels.integrations.mirakl.factories.sales_channels import (

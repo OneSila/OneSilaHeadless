@@ -12,6 +12,8 @@ from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttr
 from .types.types import (
     RemoteLogType,
     RemoteProductType,
+    SalesChannelFeedType,
+    SalesChannelFeedItemType,
     SalesChannelType,
     SalesChannelIntegrationPricelistType,
     SalesChannelViewType,
@@ -34,6 +36,12 @@ from .types.types import RemoteLogType, RemoteProductType, SalesChannelType, \
 class SalesChannelsQuery:
     sales_channel_import: SalesChannelImportType = node()
     sales_channel_imports: DjangoListConnection[SalesChannelImportType] = connection()
+
+    sales_channel_feed: SalesChannelFeedType = node()
+    sales_channel_feeds: DjangoListConnection[SalesChannelFeedType] = connection()
+
+    sales_channel_feed_item: SalesChannelFeedItemType = node()
+    sales_channel_feed_items: DjangoListConnection[SalesChannelFeedItemType] = connection()
 
     remote_log: RemoteLogType = node()
     remote_logs: DjangoListConnection[RemoteLogType] = connection()

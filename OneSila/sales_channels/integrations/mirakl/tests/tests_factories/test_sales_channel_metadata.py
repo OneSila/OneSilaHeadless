@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.test import override_settings
 from currencies.models import Currency
 from model_bakery import baker
 
@@ -43,6 +44,21 @@ class MiraklSalesChannelMetadataFactoriesTests(TestCase):
 
         self.assertEqual(self.sales_channel.raw_data["shop_name"], "Demo Shop")
         validate_credentials_mock.assert_called_once_with()
+
+    @override_settings(TESTING=False)
+    @patch.object(ValidateMiraklCredentialsFactory, "validate_credentials")
+    def test_sales_channel_connect_validates_dirty_credentials(self, validate_credentials_mock):
+        validate_credentials_mock.return_value = {
+            "shop_id": 123,
+            "shop_name": "Updated Shop",
+        }
+
+        self.sales_channel.api_key = "updated-secret-token"
+        self.sales_channel.save()
+        self.sales_channel.refresh_from_db()
+
+        validate_credentials_mock.assert_called_once_with()
+        self.assertEqual(self.sales_channel.raw_data["shop_name"], "Updated Shop")
 
     @patch.object(MiraklSalesChannelViewPullFactory, "mirakl_get")
     def test_view_pull_creates_views(self, mirakl_get_mock):
@@ -118,4 +134,3 @@ class MiraklSalesChannelMetadataFactoriesTests(TestCase):
         self.assertTrue(eur.is_default)
         self.assertEqual(eur.local_instance.iso_code, "EUR")
         self.assertFalse(usd.is_default)
-

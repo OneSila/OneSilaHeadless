@@ -1,5 +1,6 @@
 from .categories import MiraklCategory, MiraklProductCategory
 from .documents import MiraklDocumentType
+from .feeds import MiraklSalesChannelFeed
 from .imports import MiraklSalesChannelImport
 from .products import MiraklEanCode, MiraklPrice, MiraklProduct, MiraklProductContent
 from .properties import (
@@ -21,6 +22,7 @@ __all__ = [
     "MiraklCategory",
     "MiraklDocumentType",
     "MiraklEanCode",
+    "MiraklSalesChannelFeed",
     "MiraklInternalProperty",
     "MiraklInternalPropertyOption",
     "MiraklPrice",

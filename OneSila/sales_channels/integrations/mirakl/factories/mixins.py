@@ -189,6 +189,23 @@ class GetMiraklAPIMixin:
         )
         return self._json(response=response)
 
+    def mirakl_download(
+        self,
+        *,
+        path: str,
+        params: dict[str, Any] | None = None,
+        timeout: int | None = None,
+        expected_statuses: set[int] | None = None,
+    ) -> tuple[bytes, requests.Response]:
+        response = self._request(
+            method="GET",
+            path=path,
+            params=params,
+            timeout=timeout,
+            expected_statuses=expected_statuses or {200},
+        )
+        return response.content, response
+
     def mirakl_paginated_get(
         self,
         *,

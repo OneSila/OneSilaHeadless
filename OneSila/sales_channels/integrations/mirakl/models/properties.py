@@ -149,13 +149,7 @@ class MiraklProperty(RemoteProperty):
     class Meta:
         verbose_name = "Mirakl Property"
         verbose_name_plural = "Mirakl Properties"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["sales_channel", "code"],
-                name="unique_mirakl_property_code_per_channel",
-            ),
-        ]
-        search_terms = ["code", "name", "remote_id"]
+        search_terms = ["code", "name"]
 
     def save(self, *args, **kwargs):
         self.remote_id = self.code

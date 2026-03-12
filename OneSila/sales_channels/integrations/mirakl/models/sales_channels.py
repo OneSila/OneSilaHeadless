@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from core import models
+from sales_channels.integrations.mirakl.sub_type_constants import DEFAULT_MIRAKL_SUB_TYPE, MIRAKL_SUB_TYPE_CHOICES
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannel, SalesChannelView
 from sales_channels.models.taxes import RemoteCurrency
 
@@ -12,6 +14,12 @@ from sales_channels.models.taxes import RemoteCurrency
 class MiraklSalesChannel(SalesChannel):
     """Mirakl sales channel scoped to one Mirakl shop."""
 
+    sub_type = models.CharField(
+        max_length=128,
+        choices=MIRAKL_SUB_TYPE_CHOICES,
+        default=DEFAULT_MIRAKL_SUB_TYPE,
+        help_text="Known Mirakl operator subtype for frontend and integration-specific behavior.",
+    )
     shop_id = models.BigIntegerField(
         null=True,
         blank=True,
@@ -32,18 +40,32 @@ class MiraklSalesChannel(SalesChannel):
     class Meta:
         verbose_name = "Mirakl Sales Channel"
         verbose_name_plural = "Mirakl Sales Channels"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["multi_tenant_company", "hostname", "shop_id"],
-                name="unique_mirakl_shop_per_company",
-            ),
-        ]
 
     def __str__(self) -> str:
         return f"Mirakl Store: {self.hostname}"
 
-    def connect(self) -> bool:
+    @property
+    def connected(self) -> bool:
         return bool(self.hostname and self.shop_id and self.api_key)
+
+    def connect(self) -> bool:
+        if not self.connected:
+            return False
+
+        required_fields = {"hostname", "shop_id", "api_key"}
+        if required_fields.intersection(self.get_dirty_fields().keys()):
+            from sales_channels.integrations.mirakl.factories.sales_channels import ValidateMiraklCredentialsFactory
+
+            try:
+                account_info = ValidateMiraklCredentialsFactory(sales_channel=self).validate_credentials()
+                self.raw_data = account_info or {}
+
+            except Exception as exc:
+                raise Exception(
+                    _("Could not connect to Mirakl. Make sure the hostname, shop ID, and API key are correct.")
+                ) from exc
+
+        return True
 
     @property
     def normalized_base_url(self) -> str:
@@ -75,12 +97,6 @@ class MiraklSalesChannelView(SalesChannelView):
     class Meta:
         verbose_name = "Mirakl Sales Channel View"
         verbose_name_plural = "Mirakl Sales Channel Views"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["sales_channel", "remote_id"],
-                name="unique_mirakl_view_per_channel",
-            ),
-        ]
 
     def __str__(self) -> str:
         return self.name or self.remote_id or super().__str__()
@@ -108,12 +124,6 @@ class MiraklRemoteLanguage(RemoteLanguage):
     class Meta:
         verbose_name = "Mirakl Remote Language"
         verbose_name_plural = "Mirakl Remote Languages"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["sales_channel", "remote_code"],
-                name="unique_mirakl_language_per_channel",
-            ),
-        ]
 
     def __str__(self) -> str:
         return self.label or self.remote_code or super().__str__()
@@ -141,12 +151,6 @@ class MiraklRemoteCurrency(RemoteCurrency):
     class Meta:
         verbose_name = "Mirakl Remote Currency"
         verbose_name_plural = _("Mirakl Remote Currencies")
-        constraints = [
-            models.UniqueConstraint(
-                fields=["sales_channel", "remote_code"],
-                name="unique_mirakl_currency_per_channel",
-            ),
-        ]
 
     def __str__(self) -> str:
         return self.remote_code or super().__str__()
