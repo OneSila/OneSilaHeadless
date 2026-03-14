@@ -6,15 +6,13 @@ from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklDocumentType,
     MiraklEanCode,
-    MiraklInternalProperty,
-    MiraklInternalPropertyOption,
     MiraklPrice,
     MiraklProduct,
     MiraklProductCategory,
     MiraklProductContent,
+    MiraklProductType as MiraklProductTypeModel,
     MiraklProductTypeItem,
     MiraklProperty,
-    MiraklPropertyApplicability,
     MiraklPropertySelectValue,
     MiraklRemoteCurrency,
     MiraklRemoteLanguage,
@@ -26,14 +24,12 @@ from sales_channels.integrations.mirakl.schema.types.filters import (
     MiraklCategoryFilter,
     MiraklDocumentTypeFilter,
     MiraklEanCodeFilter,
-    MiraklInternalPropertyFilter,
-    MiraklInternalPropertyOptionFilter,
     MiraklPriceFilter,
     MiraklProductCategoryFilter,
     MiraklProductContentMiraklFilter,
     MiraklProductFilter,
+    MiraklProductTypeFilter,
     MiraklProductTypeItemFilter,
-    MiraklPropertyApplicabilityFilter,
     MiraklPropertyFilter,
     MiraklPropertySelectValueFilter,
     MiraklRemoteCurrencyFilter,
@@ -46,14 +42,12 @@ from sales_channels.integrations.mirakl.schema.types.ordering import (
     MiraklCategoryOrder,
     MiraklDocumentTypeOrder,
     MiraklEanCodeOrder,
-    MiraklInternalPropertyOptionOrder,
-    MiraklInternalPropertyOrder,
     MiraklPriceOrder,
     MiraklProductCategoryOrder,
     MiraklProductContentOrder,
     MiraklProductOrder,
+    MiraklProductTypeOrder,
     MiraklProductTypeItemOrder,
-    MiraklPropertyApplicabilityOrder,
     MiraklPropertyOrder,
     MiraklPropertySelectValueOrder,
     MiraklRemoteCurrencyOrder,
@@ -127,46 +121,6 @@ class MiraklRemoteLanguageType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(
-    MiraklInternalProperty,
-    filters=MiraklInternalPropertyFilter,
-    order=MiraklInternalPropertyOrder,
-    pagination=True,
-    fields="__all__",
-)
-class MiraklInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
-    sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
-    local_instance: Optional[Annotated["PropertyType", lazy("properties.schema.types.types")]]
-    options: List[Annotated["MiraklInternalPropertyOptionType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
-
-    @field()
-    def mapped_locally(self, info) -> bool:
-        annotated_value = getattr(self, "mapped_locally", None)
-        if annotated_value is None:
-            return bool(getattr(self, "local_instance_id", None))
-        return annotated_value
-
-    @field()
-    def mapped_remotely(self, info) -> bool:
-        annotated_value = getattr(self, "mapped_remotely", None)
-        if annotated_value is None:
-            return bool(getattr(self, "remote_id", None))
-        return annotated_value
-
-
-@type(
-    MiraklInternalPropertyOption,
-    filters=MiraklInternalPropertyOptionFilter,
-    order=MiraklInternalPropertyOptionOrder,
-    pagination=True,
-    fields="__all__",
-)
-class MiraklInternalPropertyOptionType(relay.Node, GetQuerysetMultiTenantMixin):
-    internal_property: Annotated["MiraklInternalPropertyType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
-    sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
-    local_instance: Optional[Annotated["PropertySelectValueType", lazy("properties.schema.types.types")]]
-
-
-@type(
     MiraklCategory,
     filters=MiraklCategoryFilter,
     order=MiraklCategoryOrder,
@@ -177,6 +131,19 @@ class MiraklCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
     parent: Optional[Annotated["MiraklCategoryType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
     children: List[Annotated["MiraklCategoryType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+    product_types: List[Annotated["MiraklProductTypeType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+
+
+@type(
+    MiraklDocumentType,
+    filters=MiraklDocumentTypeFilter,
+    order=MiraklDocumentTypeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class MiraklDocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    local_instance: Optional[Annotated["DocumentTypeType", lazy("media.schema.types.types")]]
 
 
 @type(
@@ -211,6 +178,7 @@ class MiraklPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     order=MiraklPropertySelectValueOrder,
     pagination=True,
     fields="__all__",
+    disable_optimization=True,
 )
 class MiraklPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
@@ -219,7 +187,7 @@ class MiraklPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def label(self, info) -> str:
-        return self.translated_value or self.value or self.code
+        return self.value or self.code
 
     @field()
     def mapped_locally(self, info) -> bool:
@@ -237,15 +205,33 @@ class MiraklPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(
-    MiraklPropertyApplicability,
-    filters=MiraklPropertyApplicabilityFilter,
-    order=MiraklPropertyApplicabilityOrder,
+    MiraklProductTypeModel,
+    filters=MiraklProductTypeFilter,
+    order=MiraklProductTypeOrder,
     pagination=True,
     fields="__all__",
 )
-class MiraklPropertyApplicabilityType(relay.Node, GetQuerysetMultiTenantMixin):
-    property: Annotated["MiraklPropertyType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
-    view: Annotated["MiraklSalesChannelViewType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+class MiraklProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    category: Optional[Annotated["MiraklCategoryType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+    local_instance: Optional[Annotated["ProductPropertiesRuleType", lazy("properties.schema.types.types")]]
+    items: List[Annotated["MiraklProductTypeItemType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+
+    @field()
+    def mapped_locally(self, info) -> bool:
+        return bool(getattr(self, "local_instance_id", None))
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        return bool(getattr(self, "remote_id", None))
+
+    @field()
+    def ready_to_push(self, info) -> bool:
+        return bool(getattr(self, "ready_to_push", False))
+
+    @field()
+    def template_url(self, info) -> str | None:
+        return getattr(self, "template_url", None)
 
 
 @type(
@@ -256,8 +242,9 @@ class MiraklPropertyApplicabilityType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class MiraklProductTypeItemType(relay.Node, GetQuerysetMultiTenantMixin):
-    category: Annotated["MiraklCategoryType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
-    property: Annotated["MiraklPropertyType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    product_type: Annotated["MiraklProductTypeType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    remote_property: Annotated["MiraklPropertyType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    local_instance: Optional[Annotated["ProductPropertiesRuleItemType", lazy("properties.schema.types.types")]]
 
 
 @type(
@@ -279,7 +266,7 @@ class MiraklProductCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
     pagination=True,
     fields="__all__",
 )
-class MiraklProductType(relay.Node, GetQuerysetMultiTenantMixin):
+class MiraklRemoteProductType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
     local_instance: Optional[Annotated["ProductType", lazy("products.schema.types.types")]]
     remote_parent_product: Optional[Annotated["RemoteProductType", lazy("sales_channels.schema.types.types")]]
@@ -293,7 +280,7 @@ class MiraklProductType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class MiraklProductContentType(relay.Node, GetQuerysetMultiTenantMixin):
-    remote_product: Annotated["MiraklProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    remote_product: Annotated["MiraklRemoteProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
 
 
 @type(
@@ -304,7 +291,7 @@ class MiraklProductContentType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class MiraklPriceType(relay.Node, GetQuerysetMultiTenantMixin):
-    remote_product: Annotated["MiraklProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    remote_product: Annotated["MiraklRemoteProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
 
 
 @type(
@@ -315,18 +302,7 @@ class MiraklPriceType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class MiraklEanCodeType(relay.Node, GetQuerysetMultiTenantMixin):
-    remote_product: Annotated["MiraklProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
-
-
-@type(
-    MiraklDocumentType,
-    filters=MiraklDocumentTypeFilter,
-    order=MiraklDocumentTypeOrder,
-    pagination=True,
-    fields="__all__",
-)
-class MiraklDocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
-    sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    remote_product: Annotated["MiraklRemoteProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
 
 
 @type(
@@ -338,20 +314,3 @@ class MiraklDocumentTypeType(relay.Node, GetQuerysetMultiTenantMixin):
 )
 class MiraklSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
-    feed: Optional[Annotated["SalesChannelFeedType", lazy("sales_channels.schema.types.types")]]
-
-    @field()
-    def error_report_file_url(self, info) -> str | None:
-        return self._get_file_url(field_name="error_report_file")
-
-    @field()
-    def new_product_report_file_url(self, info) -> str | None:
-        return self._get_file_url(field_name="new_product_report_file")
-
-    @field()
-    def transformed_file_url(self, info) -> str | None:
-        return self._get_file_url(field_name="transformed_file")
-
-    @field()
-    def transformation_error_report_file_url(self, info) -> str | None:
-        return self._get_file_url(field_name="transformation_error_report_file")

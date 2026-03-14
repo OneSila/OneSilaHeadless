@@ -2,23 +2,27 @@ from typing import Optional
 
 from core.schema.core.types.filters import SearchFilterMixin, filter, lazy
 from core.schema.core.types.types import auto
+from django.db.models import Q
 from currencies.schema.types.filters import CurrencyFilter
-from media.schema.types.filters import DocumentTypeFilter
 from products.schema.types.filters import ProductFilter
-from properties.schema.types.filters import PropertyFilter, PropertySelectValueFilter, ProductPropertiesRuleItemFilter
+from properties.schema.types.filters import PropertyFilter, PropertySelectValueFilter, ProductPropertiesRuleFilter, ProductPropertiesRuleItemFilter
+from strawberry import UNSET
+from strawberry_django import filter_field as custom_filter
+from sales_channels.integrations.mirakl.managers import (
+    MiraklPropertyQuerySet,
+    MiraklPropertySelectValueQuerySet,
+)
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklDocumentType,
     MiraklEanCode,
-    MiraklInternalProperty,
-    MiraklInternalPropertyOption,
     MiraklPrice,
     MiraklProduct,
     MiraklProductCategory,
     MiraklProductContent,
+    MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
-    MiraklPropertyApplicability,
     MiraklPropertySelectValue,
     MiraklRemoteCurrency,
     MiraklRemoteLanguage,
@@ -26,12 +30,12 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelImport,
     MiraklSalesChannelView,
 )
+from sales_channels.schema.types.filter_mixins import DependentMappedLocallyFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin
 from sales_channels.schema.types.filters import (
     RemoteProductContentFilter,
     RemoteProductFilter,
     SalesChannelFilter,
     SalesChannelImportFilter,
-    SalesChannelViewFilter,
 )
 
 
@@ -70,24 +74,6 @@ class MiraklRemoteLanguageFilter(SearchFilterMixin):
     is_default: auto
 
 
-@filter(MiraklInternalProperty)
-class MiraklInternalPropertyFilter(SearchFilterMixin):
-    id: auto
-    sales_channel: Optional[SalesChannelFilter]
-    local_instance: Optional[PropertyFilter]
-    code: auto
-    is_condition: auto
-
-
-@filter(MiraklInternalPropertyOption)
-class MiraklInternalPropertyOptionFilter(SearchFilterMixin):
-    id: auto
-    sales_channel: Optional[SalesChannelFilter]
-    internal_property: Optional["MiraklInternalPropertyFilter"]
-    local_instance: Optional[PropertySelectValueFilter]
-    is_active: auto
-
-
 @filter(MiraklCategory)
 class MiraklCategoryFilter(SearchFilterMixin):
     id: auto
@@ -98,8 +84,36 @@ class MiraklCategoryFilter(SearchFilterMixin):
     is_leaf: auto
 
 
+@filter(MiraklDocumentType)
+class MiraklDocumentTypeFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: auto
+    remote_id: auto
+    name: auto
+    entity: auto
+
+
+@filter(MiraklProductType)
+class MiraklProductTypeFilter(
+    SearchFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    category: Optional[MiraklCategoryFilter]
+    local_instance: Optional[ProductPropertiesRuleFilter]
+    remote_id: auto
+    name: auto
+
+
 @filter(MiraklProperty)
-class MiraklPropertyFilter(SearchFilterMixin):
+class MiraklPropertyFilter(
+    SearchFilterMixin,
+    DependentMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
@@ -107,29 +121,41 @@ class MiraklPropertyFilter(SearchFilterMixin):
     required: auto
     variant: auto
     type: auto
+    is_common: auto
+    representation_type: auto
+
+    def get_mapped_locally_querysets(self):
+        return (
+            (MiraklPropertyQuerySet, "filter_mapped_locally"),
+            (MiraklPropertySelectValueQuerySet, "filter_mirakl_property_mapped_locally"),
+        )
 
 
 @filter(MiraklPropertySelectValue)
-class MiraklPropertySelectValueFilter(SearchFilterMixin):
+class MiraklPropertySelectValueFilter(
+    SearchFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     remote_property: Optional["MiraklPropertyFilter"]
     local_instance: Optional[PropertySelectValueFilter]
     code: auto
+    is_property_value: Optional[bool]
 
-
-@filter(MiraklPropertyApplicability)
-class MiraklPropertyApplicabilityFilter(SearchFilterMixin):
-    id: auto
-    property: Optional["MiraklPropertyFilter"]
-    view: Optional[SalesChannelViewFilter]
+    @custom_filter
+    def is_property_value(self, queryset, value: bool, prefix: str) -> tuple[MiraklPropertySelectValueQuerySet, Q]:
+        if value not in (None, UNSET):
+            queryset = queryset.filter_is_property_value(value)
+        return queryset, Q()
 
 
 @filter(MiraklProductTypeItem)
 class MiraklProductTypeItemFilter(SearchFilterMixin):
     id: auto
-    category: Optional[MiraklCategoryFilter]
-    property: Optional[MiraklPropertyFilter]
+    product_type: Optional[MiraklProductTypeFilter]
+    remote_property: Optional[MiraklPropertyFilter]
     local_instance: Optional[ProductPropertiesRuleItemFilter]
 
 
@@ -167,15 +193,6 @@ class MiraklEanCodeFilter(SearchFilterMixin):
     ean_code: auto
 
 
-@filter(MiraklDocumentType)
-class MiraklDocumentTypeFilter(SearchFilterMixin):
-    id: auto
-    sales_channel: Optional[SalesChannelFilter]
-    local_instance: Optional[DocumentTypeFilter]
-
-
 @filter(MiraklSalesChannelImport)
 class MiraklSalesChannelImportFilter(SalesChannelImportFilter):
     type: auto
-    remote_import_id: auto
-    import_status: auto

@@ -12,7 +12,7 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     Model representing the remote mirror of a local Property.
     This model tracks the remote property associated with a local Property.
     """
-    local_instance = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True,
+    local_instance = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True, blank=True,
                                        help_text="The local property associated with this remote property.")
 
     allow_multiple = models.BooleanField(

@@ -21,29 +21,28 @@ class MiraklRemoteCurrencyPullFactory(GetMiraklAPIMixin, LocalCurrencyMappingMix
 
     def fetch_remote_instances(self):
         response = self.mirakl_get(path="/api/currencies")
-        account_info = self.get_account_info()
-        default_currency = str(account_info.get("currency_iso_code") or "").strip()
-
         currencies = response.get("currencies") or []
         self.remote_instances = [currency for currency in currencies if isinstance(currency, dict)]
-        for currency in self.remote_instances:
-            currency["is_default"] = str(currency.get("code") or "").strip() == default_currency
-
         self.add_local_currency()
 
     def create_remote_instance_mirror(self, remote_data, remote_instance_mirror):
         super().create_remote_instance_mirror(remote_data, remote_instance_mirror)
+        currency = remote_data.get("local_currency")
+        if currency and remote_instance_mirror.local_instance != currency:
+            remote_instance_mirror.local_instance = currency
         remote_instance_mirror.label = remote_data.get("label", "")
-        remote_instance_mirror.is_default = bool(remote_data.get("is_default"))
-        remote_instance_mirror.raw_data = remote_data or {}
-        remote_instance_mirror.save(update_fields=["label", "is_default", "raw_data"])
+        remote_instance_mirror.is_default = bool(remote_data.get("platform_default"))
+        remote_instance_mirror.save(update_fields=["local_instance", "label", "is_default"])
 
     def add_fields_to_remote_instance_mirror(self, remote_data, remote_instance_mirror):
         update_fields = []
+        currency = remote_data.get("local_currency")
+        if currency and remote_instance_mirror.local_instance != currency:
+            remote_instance_mirror.local_instance = currency
+            update_fields.append("local_instance")
         for field_name, value in {
             "label": remote_data.get("label", ""),
-            "is_default": bool(remote_data.get("is_default")),
-            "raw_data": remote_data or {},
+            "is_default": bool(remote_data.get("platform_default")),
         }.items():
             if getattr(remote_instance_mirror, field_name) != value:
                 setattr(remote_instance_mirror, field_name, value)

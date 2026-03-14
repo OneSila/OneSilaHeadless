@@ -2,12 +2,10 @@ from core.schema.core.types.input import NodeInput, input, partial
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklDocumentType,
-    MiraklInternalProperty,
-    MiraklInternalPropertyOption,
     MiraklProductCategory,
+    MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
-    MiraklPropertyApplicability,
     MiraklPropertySelectValue,
     MiraklRemoteCurrency,
     MiraklRemoteLanguage,
@@ -51,18 +49,18 @@ class MiraklRemoteLanguagePartialInput(NodeInput):
     pass
 
 
-@partial(MiraklInternalProperty, fields="__all__")
-class MiraklInternalPropertyPartialInput(NodeInput):
-    pass
-
-
-@partial(MiraklInternalPropertyOption, fields="__all__")
-class MiraklInternalPropertyOptionPartialInput(NodeInput):
-    pass
-
-
 @partial(MiraklCategory, fields="__all__")
 class MiraklCategoryPartialInput(NodeInput):
+    pass
+
+
+@partial(MiraklDocumentType, fields="__all__")
+class MiraklDocumentTypePartialInput(NodeInput):
+    pass
+
+
+@partial(MiraklProductType, fields="__all__")
+class MiraklProductTypePartialInput(NodeInput):
     pass
 
 
@@ -76,16 +74,6 @@ class MiraklPropertySelectValuePartialInput(NodeInput):
     pass
 
 
-@partial(MiraklPropertyApplicability, fields="__all__")
-class MiraklPropertyApplicabilityPartialInput(NodeInput):
-    pass
-
-
 @partial(MiraklProductTypeItem, fields="__all__")
 class MiraklProductTypeItemPartialInput(NodeInput):
-    pass
-
-
-@partial(MiraklDocumentType, fields="__all__")
-class MiraklDocumentTypePartialInput(NodeInput):
     pass

@@ -4,16 +4,14 @@ from sales_channels.integrations.mirakl.schema.types.types import (
     MiraklCategoryType,
     MiraklDocumentTypeType,
     MiraklEanCodeType,
-    MiraklInternalPropertyOptionType,
-    MiraklInternalPropertyType,
     MiraklPriceType,
     MiraklProductCategoryType,
     MiraklProductContentType,
-    MiraklProductType,
+    MiraklProductTypeType,
     MiraklProductTypeItemType,
-    MiraklPropertyApplicabilityType,
     MiraklPropertySelectValueType,
     MiraklPropertyType,
+    MiraklRemoteProductType,
     MiraklRemoteCurrencyType,
     MiraklRemoteLanguageType,
     MiraklSalesChannelImportType,
@@ -36,14 +34,14 @@ class MiraklSalesChannelsQuery:
     mirakl_remote_language: MiraklRemoteLanguageType = node()
     mirakl_remote_languages: DjangoListConnection[MiraklRemoteLanguageType] = connection()
 
-    mirakl_internal_property: MiraklInternalPropertyType = node()
-    mirakl_internal_properties: DjangoListConnection[MiraklInternalPropertyType] = connection()
-
-    mirakl_internal_property_option: MiraklInternalPropertyOptionType = node()
-    mirakl_internal_property_options: DjangoListConnection[MiraklInternalPropertyOptionType] = connection()
-
     mirakl_category: MiraklCategoryType = node()
     mirakl_categories: DjangoListConnection[MiraklCategoryType] = connection()
+
+    mirakl_document_type: MiraklDocumentTypeType = node()
+    mirakl_document_types: DjangoListConnection[MiraklDocumentTypeType] = connection()
+
+    mirakl_product_type: MiraklProductTypeType = node()
+    mirakl_product_types: DjangoListConnection[MiraklProductTypeType] = connection()
 
     mirakl_property: MiraklPropertyType = node()
     mirakl_properties: DjangoListConnection[MiraklPropertyType] = connection()
@@ -51,17 +49,14 @@ class MiraklSalesChannelsQuery:
     mirakl_property_select_value: MiraklPropertySelectValueType = node()
     mirakl_property_select_values: DjangoListConnection[MiraklPropertySelectValueType] = connection()
 
-    mirakl_property_applicability: MiraklPropertyApplicabilityType = node()
-    mirakl_property_applicabilities: DjangoListConnection[MiraklPropertyApplicabilityType] = connection()
-
     mirakl_product_type_item: MiraklProductTypeItemType = node()
     mirakl_product_type_items: DjangoListConnection[MiraklProductTypeItemType] = connection()
 
     mirakl_product_category: MiraklProductCategoryType = node()
     mirakl_product_categories: DjangoListConnection[MiraklProductCategoryType] = connection()
 
-    mirakl_product: MiraklProductType = node()
-    mirakl_products: DjangoListConnection[MiraklProductType] = connection()
+    mirakl_product: MiraklRemoteProductType = node()
+    mirakl_products: DjangoListConnection[MiraklRemoteProductType] = connection()
 
     mirakl_product_content: MiraklProductContentType = node()
     mirakl_product_contents: DjangoListConnection[MiraklProductContentType] = connection()
@@ -71,9 +66,6 @@ class MiraklSalesChannelsQuery:
 
     mirakl_ean_code: MiraklEanCodeType = node()
     mirakl_ean_codes: DjangoListConnection[MiraklEanCodeType] = connection()
-
-    mirakl_document_type: MiraklDocumentTypeType = node()
-    mirakl_document_types: DjangoListConnection[MiraklDocumentTypeType] = connection()
 
     mirakl_import_process: MiraklSalesChannelImportType = node()
     mirakl_import_processes: DjangoListConnection[MiraklSalesChannelImportType] = connection()

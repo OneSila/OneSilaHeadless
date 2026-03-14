@@ -42,14 +42,13 @@ class MiraklRemoteLanguagePullFactory(GetMiraklAPIMixin, PullRemoteInstanceMixin
         remote_instance_mirror.remote_code = remote_data.get("code", "")
         remote_instance_mirror.label = remote_data.get("label", "")
         remote_instance_mirror.local_instance = _map_local_language(code=remote_instance_mirror.remote_code)
-        remote_instance_mirror.is_default = False
+        remote_instance_mirror.is_default = bool(remote_data.get("platform_default"))
         remote_instance_mirror.sales_channel = self.sales_channel
         remote_instance_mirror.multi_tenant_company = self.sales_channel.multi_tenant_company
-        remote_instance_mirror.raw_data = remote_data or {}
         remote_instance_mirror.save()
 
     def add_fields_to_remote_instance_mirror(self, remote_data, remote_instance_mirror):
         remote_instance_mirror.label = remote_data.get("label", "")
         remote_instance_mirror.local_instance = _map_local_language(code=remote_data.get("code", ""))
-        remote_instance_mirror.raw_data = remote_data or {}
-        remote_instance_mirror.save(update_fields=["label", "local_instance", "raw_data"])
+        remote_instance_mirror.is_default = bool(remote_data.get("platform_default"))
+        remote_instance_mirror.save(update_fields=["label", "local_instance", "is_default"])

@@ -24,12 +24,3 @@ class MiraklSalesChannelViewPullFactory(GetMiraklAPIMixin, PullRemoteInstanceMix
         response = self.mirakl_get(path="/api/channels")
         channels = response.get("channels") or []
         self.remote_instances = [channel for channel in channels if isinstance(channel, dict)]
-
-    def create_remote_instance_mirror(self, remote_data, remote_instance_mirror):
-        super().create_remote_instance_mirror(remote_data, remote_instance_mirror)
-        remote_instance_mirror.raw_data = remote_data or {}
-        remote_instance_mirror.save(update_fields=["raw_data"])
-
-    def add_fields_to_remote_instance_mirror(self, remote_data, remote_instance_mirror):
-        remote_instance_mirror.raw_data = remote_data or {}
-        remote_instance_mirror.save(update_fields=["raw_data"])

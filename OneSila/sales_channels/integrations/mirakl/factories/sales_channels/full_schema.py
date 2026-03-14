@@ -12,8 +12,7 @@ from sales_channels.integrations.mirakl.factories.mixins import GetMiraklAPIMixi
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklDocumentType,
-    MiraklInternalProperty,
-    MiraklInternalPropertyOption,
+    MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
     MiraklPropertyApplicability,
@@ -33,11 +32,10 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self.import_process = import_process
         self._inline_property_values: dict[str, list[dict[str, Any]]] = {}
         self._value_list_labels: dict[str, str] = {}
+        self._value_list_single_defaults: dict[str, str] = {}
         self.summary_data = {
-            "internal_properties": 0,
-            "internal_property_options": 0,
-            "document_types": 0,
             "categories": 0,
+            "document_types": 0,
             "properties": 0,
             "product_type_items": 0,
             "property_applicabilities": 0,
@@ -47,35 +45,28 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self._progress_processed = 0
 
     def run(self) -> dict[str, int]:
-        additional_fields = self._get_additional_fields()
         document_types = self._get_document_types()
         hierarchies = self._get_hierarchies()
         attributes = self._get_attributes()
         value_lists = self._get_value_lists()
 
         self._prepare_progress(
-            additional_fields=additional_fields,
             document_types=document_types,
             hierarchies=hierarchies,
             attributes=attributes,
             value_lists=value_lists,
         )
+        self._index_value_lists(value_lists=value_lists)
 
-        self.sync_internal_properties(additional_fields=additional_fields)
         self.sync_document_types(document_types=document_types)
         self.sync_categories(hierarchies=hierarchies)
         self.sync_properties(attributes=attributes)
         self.sync_select_values(value_lists=value_lists)
-        self._save_summary()
         return self.summary_data
-
-    def _get_additional_fields(self) -> list[dict[str, Any]]:
-        response = self.mirakl_get(path="/api/additional_fields")
-        return self._normalize_records(response.get("additional_fields"))
 
     def _get_document_types(self) -> list[dict[str, Any]]:
         response = self.mirakl_get(path="/api/documents")
-        return self._normalize_records(response.get("documents"))
+        return self._normalize_records(response.get("document_types"))
 
     def _get_hierarchies(self) -> list[dict[str, Any]]:
         response = self.mirakl_get(path="/api/hierarchies")
@@ -95,7 +86,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
     def _prepare_progress(
         self,
         *,
-        additional_fields: list[dict[str, Any]],
         document_types: list[dict[str, Any]],
         hierarchies: list[dict[str, Any]],
         attributes: list[dict[str, Any]],
@@ -111,7 +101,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
 
         self._progress_total = max(
             1,
-            len(additional_fields) + len(document_types) + len(hierarchies) + len(attributes) + value_count,
+            len(document_types) + len(hierarchies) + len(attributes) + value_count,
         )
 
         if self.import_process is None:
@@ -121,6 +111,16 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self.import_process.processed_records = 0
         self.import_process.percentage = 0
         self.import_process.save(update_fields=["total_records", "processed_records", "percentage"])
+
+    def _index_value_lists(self, *, value_lists: list[dict[str, Any]]) -> None:
+        for value_list in value_lists:
+            value_list_code = self._clean_string(value_list.get("code"))
+            if not value_list_code:
+                continue
+            self._value_list_labels[value_list_code] = self._clean_string(value_list.get("label"))
+            parsed_values = self._parse_value_entries(value_list.get("values"))
+            if len(parsed_values) == 1:
+                self._value_list_single_defaults[value_list_code] = self._clean_string(parsed_values[0].get("code"))
 
     def _increment_progress(self, *, amount: int = 1) -> None:
         self._progress_processed += amount
@@ -135,97 +135,9 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self.import_process.percentage = percentage
         self.import_process.save(update_fields=["processed_records", "percentage"])
 
-    def _save_summary(self) -> None:
-        if self.import_process is None:
-            return
-
-        self.import_process.summary_data = self.summary_data
-        self.import_process.save(update_fields=["summary_data"])
-
-    def sync_internal_properties(self, *, additional_fields: list[dict[str, Any]]) -> None:
-        condition_code = self._resolve_condition_code(additional_fields=additional_fields)
-
-        for item in additional_fields:
-            code = self._clean_string(item.get("code"))
-            if not code:
-                continue
-
-            accepted_values = self._parse_accepted_values(item.get("accepted_values"))
-            property_type = self._map_remote_type(
-                remote_type=item.get("type"),
-                has_values=bool(accepted_values),
-            )
-            internal_property, _ = MiraklInternalProperty.objects.get_or_create(
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.sales_channel.multi_tenant_company,
-                code=code,
-                defaults={
-                    "type": property_type,
-                },
-            )
-            internal_property.code = code
-            internal_property.name = self._clean_string(item.get("label")) or code
-            internal_property.label = self._clean_string(item.get("label"))
-            internal_property.description = self._clean_string(item.get("description"))
-            internal_property.entity = self._clean_string(item.get("entity"))
-            internal_property.type = property_type
-            internal_property.required = bool(item.get("required"))
-            internal_property.editable = bool(item.get("editable"))
-            internal_property.accepted_values = accepted_values
-            internal_property.regex = self._clean_string(item.get("regex"))
-            internal_property.is_condition = bool(condition_code and code == condition_code)
-            internal_property.raw_data = item
-            internal_property.save()
-            self.summary_data["internal_properties"] += 1
-
-            active_option_values: set[str] = set()
-            for index, option_payload in enumerate(accepted_values):
-                option_value = self._clean_string(option_payload.get("value"))
-                if not option_value:
-                    continue
-                active_option_values.add(option_value)
-                option, _ = MiraklInternalPropertyOption.objects.get_or_create(
-                    internal_property=internal_property,
-                    value=option_value,
-                    defaults={
-                        "sales_channel": self.sales_channel,
-                        "multi_tenant_company": self.sales_channel.multi_tenant_company,
-                    },
-                )
-                option.sales_channel = self.sales_channel
-                option.multi_tenant_company = self.sales_channel.multi_tenant_company
-                option.label = self._clean_string(option_payload.get("label")) or option_value
-                option.description = self._clean_string(option_payload.get("description"))
-                option.sort_order = index
-                option.is_active = True
-                option.save()
-                self.summary_data["internal_property_options"] += 1
-
-            MiraklInternalPropertyOption.objects.filter(
-                internal_property=internal_property,
-            ).exclude(value__in=active_option_values).update(is_active=False)
-            self._increment_progress()
-
-    def sync_document_types(self, *, document_types: list[dict[str, Any]]) -> None:
-        for item in document_types:
-            code = self._clean_string(item.get("code"))
-            if not code:
-                continue
-
-            document_type, _ = MiraklDocumentType.objects.get_or_create(
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.sales_channel.multi_tenant_company,
-                remote_id=code,
-            )
-            document_type.name = self._clean_string(item.get("label")) or code
-            document_type.description = self._clean_string(item.get("description"))
-            document_type.raw_data = item
-            document_type.save()
-            self.summary_data["document_types"] += 1
-            self._increment_progress()
-
     def sync_categories(self, *, hierarchies: list[dict[str, Any]]) -> None:
         categories_by_code: dict[str, MiraklCategory] = {}
+        product_types_by_code: dict[str, MiraklProductType] = {}
         parent_codes: set[str] = set()
 
         for item in hierarchies:
@@ -248,6 +160,17 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             category.raw_data = item
             category.save()
             categories_by_code[code] = category
+
+            product_type, _ = MiraklProductType.objects.get_or_create(
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                remote_id=code,
+            )
+            product_type.category = category
+            product_type.name = category.name
+            product_type.imported = True
+            product_type.save()
+            product_types_by_code[code] = product_type
             self.summary_data["categories"] += 1
             self._increment_progress()
 
@@ -257,13 +180,56 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             category.is_leaf = code not in parent_codes
             category.save(update_fields=["parent", "is_leaf"])
 
+            product_type = product_types_by_code.get(code)
+            if product_type is not None:
+                update_fields: list[str] = []
+                if product_type.category_id != category.id:
+                    product_type.category = category
+                    update_fields.append("category")
+                if product_type.name != category.name:
+                    product_type.name = category.name
+                    update_fields.append("name")
+                if update_fields:
+                    product_type.save(update_fields=update_fields)
+
+    def sync_document_types(self, *, document_types: list[dict[str, Any]]) -> None:
+        for item in document_types:
+            code = self._clean_string(item.get("code"))
+            if not code:
+                continue
+
+            remote_document_type = self._get_existing_by_lookup(
+                model_class=MiraklDocumentType,
+                lookup={
+                    "sales_channel": self.sales_channel,
+                    "multi_tenant_company": self.sales_channel.multi_tenant_company,
+                    "remote_id": code,
+                },
+            )
+            if remote_document_type is None:
+                remote_document_type = MiraklDocumentType(
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    remote_id=code,
+                )
+
+            remote_document_type.name = self._clean_string(item.get("label")) or code
+            remote_document_type.description = self._clean_string(item.get("description"))
+            remote_document_type.entity = self._clean_string(item.get("entity"))
+            remote_document_type.mime_types = self._ensure_json_value(item.get("mime_types"), default=[])
+            remote_document_type.raw_data = item
+            remote_document_type.save()
+
+            self.summary_data["document_types"] += 1
+            self._increment_progress()
+
     def sync_properties(self, *, attributes: list[dict[str, Any]]) -> None:
         for item in attributes:
             code = self._clean_string(item.get("code"))
             if not code:
                 continue
 
-            values_list_code = self._clean_string(item.get("values_list"))
+            values_list_code = self._resolve_value_list_code(item=item)
             inline_values = self._parse_value_entries(item.get("values"))
             property_type = self._map_remote_type(
                 remote_type=item.get("type"),
@@ -272,24 +238,47 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 type_parameters=item.get("type_parameters"),
             )
 
-            remote_property, _ = MiraklProperty.objects.get_or_create(
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.sales_channel.multi_tenant_company,
-                code=code,
-                defaults={
-                    "type": property_type,
+            remote_property = self._get_existing_by_lookup(
+                model_class=MiraklProperty,
+                lookup={
+                    "sales_channel": self.sales_channel,
+                    "multi_tenant_company": self.sales_channel.multi_tenant_company,
+                    "code": code,
                 },
             )
+            if remote_property is None:
+                remote_property = MiraklProperty(
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    code=code,
+                )
             remote_property.code = code
             remote_property.name = self._clean_string(item.get("label")) or code
             remote_property.description = self._clean_string(item.get("description"))
+            remote_property.example = self._clean_string(item.get("example"))
+            remote_property.hierarchy_code = self._clean_string(item.get("hierarchy_code"))
+            remote_property.is_common = not bool(remote_property.hierarchy_code)
+            remote_property.unique_code = self._clean_string(item.get("unique_code"))
             remote_property.type = property_type
+            remote_property.representation_type = self._detect_representation_type(
+                item=item,
+                values_list_code=values_list_code,
+                inline_values=inline_values,
+            )
             remote_property.required = bool(item.get("required"))
             remote_property.variant = bool(item.get("variant"))
             remote_property.requirement_level = self._clean_string(item.get("requirement_level"))
-            remote_property.default_value = self._clean_string(item.get("default_value"))
+            remote_property.default_value = self._detect_default_value(
+                item=item,
+                values_list_code=values_list_code,
+                inline_values=inline_values,
+                representation_type=remote_property.representation_type,
+            )
             remote_property.value_list_code = values_list_code
             remote_property.value_list_label = self._value_list_labels.get(values_list_code, remote_property.value_list_label)
+            remote_property.description_translations = self._ensure_json_value(item.get("description_translations"), default=[])
+            remote_property.label_translations = self._ensure_json_value(item.get("label_translations"), default=[])
+            remote_property.type_parameters = self._ensure_json_value(item.get("type_parameters"), default=[])
             remote_property.validations = self._ensure_json_value(item.get("validations"), default={})
             remote_property.transformations = self._ensure_json_value(item.get("transformations"), default=[])
             remote_property.raw_data = item
@@ -301,18 +290,16 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
 
             hierarchy_code = self._clean_string(item.get("hierarchy_code"))
             if hierarchy_code:
-                category = MiraklCategory.objects.filter(
+                product_type = MiraklProductType.objects.filter(
                     sales_channel=self.sales_channel,
                     remote_id=hierarchy_code,
                 ).first()
-                if category is not None:
+                if product_type is not None:
                     product_type_item, _ = MiraklProductTypeItem.objects.get_or_create(
-                        category=category,
-                        property=remote_property,
-                        defaults={
-                            "sales_channel": self.sales_channel,
-                            "multi_tenant_company": self.sales_channel.multi_tenant_company,
-                        },
+                        sales_channel=self.sales_channel,
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                        product_type=product_type,
+                        remote_property=remote_property,
                     )
                     product_type_item.sales_channel = self.sales_channel
                     product_type_item.multi_tenant_company = self.sales_channel.multi_tenant_company
@@ -334,12 +321,10 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 if view is None:
                     continue
                 applicability, _ = MiraklPropertyApplicability.objects.get_or_create(
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
                     property=remote_property,
                     view=view,
-                    defaults={
-                        "sales_channel": self.sales_channel,
-                        "multi_tenant_company": self.sales_channel.multi_tenant_company,
-                    },
                 )
                 applicability.sales_channel = self.sales_channel
                 applicability.multi_tenant_company = self.sales_channel.multi_tenant_company
@@ -394,6 +379,9 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 )
                 self._increment_progress()
 
+    def _get_existing_by_lookup(self, *, model_class, lookup: dict[str, Any]):
+        return model_class.objects.filter(**lookup).order_by("id").first()
+
     def _upsert_select_value(
         self,
         *,
@@ -415,43 +403,109 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         )
         select_value.code = code
         select_value.value = label
-        select_value.translated_value = self._first_translation_text(value_payload.get("label_translations"))
+        translations = self._ensure_json_value(value_payload.get("label_translations"), default=[])
+        select_value.label_translations = translations
+        select_value.value_label_translations = translations
         select_value.value_list_code = value_list_code
         select_value.value_list_label = value_list_label
         select_value.raw_data = value_payload
         select_value.save()
         self.summary_data["property_select_values"] += 1
 
-    def _resolve_condition_code(self, *, additional_fields: list[dict[str, Any]]) -> str:
-        exact_candidates: list[str] = []
-        fuzzy_candidates: list[str] = []
+    def _resolve_value_list_code(self, *, item: dict[str, Any]) -> str:
+        direct_value = self._clean_string(item.get("values_list"))
+        if direct_value:
+            return direct_value
 
-        for item in additional_fields:
-            code = self._clean_string(item.get("code"))
-            label = self._clean_string(item.get("label"))
-            combined = " ".join(
-                filter(
-                    None,
-                    [
-                        self._normalize_lookup_token(code),
-                        self._normalize_lookup_token(label),
-                    ],
-                )
-            )
-            if not code:
+        for type_parameter in self._ensure_json_value(item.get("type_parameters"), default=[]):
+            if not isinstance(type_parameter, dict):
                 continue
-            if self._normalize_lookup_token(code) == "condition":
-                exact_candidates.append(code)
-            elif self._normalize_lookup_token(label) == "condition":
-                exact_candidates.append(code)
-            elif "condition" in combined:
-                fuzzy_candidates.append(code)
+            if self._normalize_lookup_token(type_parameter.get("name")) != "list_code":
+                continue
+            resolved_value = self._clean_string(type_parameter.get("value"))
+            if resolved_value:
+                return resolved_value
 
-        if exact_candidates:
-            return exact_candidates[0]
-        if fuzzy_candidates:
-            return fuzzy_candidates[0]
         return ""
+
+    def _detect_representation_type(
+        self,
+        *,
+        item: dict[str, Any],
+        values_list_code: str,
+        inline_values: list[dict[str, Any]],
+    ) -> str:
+        code = self._normalize_lookup_token(item.get("code"))
+        label = self._normalize_lookup_token(item.get("label"))
+        field_type = self._normalize_lookup_token(item.get("type"))
+        type_parameters = self._ensure_json_value(item.get("type_parameters"), default=[])
+        media_type = self._resolve_media_type(type_parameters=type_parameters)
+
+        if field_type in {"list", "list_multiple_values"}:
+            value_count = len(inline_values) or (1 if values_list_code in self._value_list_single_defaults else 0)
+            if value_count == 1:
+                return MiraklProperty.REPRESENTATION_DEFAULT_VALUE
+
+        if code.endswith("_uom") or label.endswith(" unit"):
+            return MiraklProperty.REPRESENTATION_UNIT
+        if any(token in code for token in {"product_title", "product_name"}) or code == "name":
+            return MiraklProperty.REPRESENTATION_PRODUCT_TITLE
+        if "subtitle" in code:
+            return MiraklProperty.REPRESENTATION_PRODUCT_SUBTITLE
+        if "short_description" in code:
+            return MiraklProperty.REPRESENTATION_PRODUCT_SHORT_DESCRIPTION
+        if "bullet" in code:
+            return MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT
+        if code in {"product_category", "category"}:
+            return MiraklProperty.REPRESENTATION_PRODUCT_CATEGORY
+        if code in {"sku", "product_sku", "shop_sku"}:
+            return MiraklProperty.REPRESENTATION_PRODUCT_SKU
+        if code in {"parent_product_id", "variant_group_code", "configurable_id"}:
+            return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_ID
+        if code in {"parent_sku", "configurable_sku"}:
+            return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU
+        if "url_key" in code:
+            return MiraklProperty.REPRESENTATION_PRODUCT_URL_KEY
+        if code == "ean" or code.endswith("_ean") or "ean_code" in code:
+            return MiraklProperty.REPRESENTATION_PRODUCT_EAN
+        if code in {"main_image", "thumbnail_image"}:
+            return MiraklProperty.REPRESENTATION_THUMBNAIL_IMAGE
+        if code == "swatch":
+            return MiraklProperty.REPRESENTATION_SWATCH_IMAGE
+        if field_type == "media" and media_type == "document":
+            return MiraklProperty.REPRESENTATION_DOCUMENT
+        if field_type == "media" and media_type == "image":
+            return MiraklProperty.REPRESENTATION_IMAGE
+        if "image" in code:
+            return MiraklProperty.REPRESENTATION_IMAGE
+        if "video" in code:
+            return MiraklProperty.REPRESENTATION_VIDEO
+        if "vat" in code or "tax_rate" in code:
+            return MiraklProperty.REPRESENTATION_VAT_RATE
+        if "backorder" in code:
+            return MiraklProperty.REPRESENTATION_ALLOW_BACKORDER
+        if code in {"long_description", "description"}:
+            return MiraklProperty.REPRESENTATION_PRODUCT_DESCRIPTION
+        if code == "active":
+            return MiraklProperty.REPRESENTATION_PRODUCT_ACTIVE
+        return MiraklProperty.REPRESENTATION_PROPERTY
+
+    def _detect_default_value(
+        self,
+        *,
+        item: dict[str, Any],
+        values_list_code: str,
+        inline_values: list[dict[str, Any]],
+        representation_type: str,
+    ) -> str:
+        explicit_default = self._clean_string(item.get("default_value"))
+        if explicit_default:
+            return explicit_default
+        if representation_type != MiraklProperty.REPRESENTATION_DEFAULT_VALUE:
+            return ""
+        if len(inline_values) == 1:
+            return self._clean_string(inline_values[0].get("code"))
+        return self._value_list_single_defaults.get(values_list_code, "")
 
     def _map_remote_type(
         self,
@@ -464,9 +518,15 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         normalized = self._normalize_lookup_token(remote_type)
         normalized_parameter = self._normalize_lookup_token(type_parameter)
         normalized_parameters = json.dumps(self._ensure_json_value(type_parameters, default=[])).lower()
+        has_multi_values = (
+            normalized == "list_multiple_values"
+            or "multi" in normalized
+            or "multi" in normalized_parameter
+            or "multi" in normalized_parameters
+        )
 
-        if has_values:
-            if "multi" in normalized or "multi" in normalized_parameter or "multi" in normalized_parameters:
+        if normalized in {"list", "list_multiple_values"} or has_values:
+            if has_multi_values:
                 return Property.TYPES.MULTISELECT
             return Property.TYPES.SELECT
 
@@ -474,53 +534,17 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             return Property.TYPES.BOOLEAN
         if normalized in {"integer", "int", "long"}:
             return Property.TYPES.INT
-        if normalized in {"decimal", "float", "number"}:
+        if normalized in {"decimal", "float", "number", "numeric"}:
             return Property.TYPES.FLOAT
         if normalized in {"date"}:
             return Property.TYPES.DATE
         if normalized in {"datetime", "timestamp"}:
             return Property.TYPES.DATETIME
-        if normalized in {"rich_text", "html", "textarea", "description"}:
+        if normalized in {"long_text", "rich_text", "html", "textarea", "description"}:
             return Property.TYPES.DESCRIPTION
+        if normalized in {"media", "link", "regex", "string"}:
+            return Property.TYPES.TEXT
         return Property.TYPES.TEXT
-
-    def _parse_accepted_values(self, raw_value: Any) -> list[dict[str, str]]:
-        if raw_value in (None, "", []):
-            return []
-
-        parsed_value = raw_value
-        if isinstance(raw_value, str):
-            stripped = raw_value.strip()
-            if not stripped:
-                return []
-            try:
-                parsed_value = json.loads(stripped)
-            except (TypeError, ValueError):
-                split_values = [
-                    part.strip()
-                    for part in re.split(r"[\n\r,;|]+", stripped)
-                    if part and part.strip()
-                ]
-                parsed_value = split_values
-
-        options: list[dict[str, str]] = []
-        for entry in self._normalize_records(parsed_value):
-            normalized = self._normalize_option_entry(entry)
-            if normalized is not None:
-                options.append(normalized)
-
-        if options:
-            return self._dedupe_option_entries(options=options)
-
-        if isinstance(parsed_value, list):
-            scalar_options = []
-            for entry in parsed_value:
-                normalized = self._normalize_option_entry(entry)
-                if normalized is not None:
-                    scalar_options.append(normalized)
-            return self._dedupe_option_entries(options=scalar_options)
-
-        return []
 
     def _parse_value_entries(self, raw_value: Any) -> list[dict[str, str]]:
         entries: list[dict[str, str]] = []
@@ -637,3 +661,14 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
     @staticmethod
     def _normalize_lookup_token(value: Any) -> str:
         return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
+
+    def _resolve_media_type(self, *, type_parameters: Any) -> str:
+        for item in self._ensure_json_value(type_parameters, default=[]):
+            if not isinstance(item, dict):
+                continue
+            if self._normalize_lookup_token(item.get("name")) != "type":
+                continue
+            resolved = self._normalize_lookup_token(item.get("value"))
+            if resolved:
+                return resolved
+        return ""

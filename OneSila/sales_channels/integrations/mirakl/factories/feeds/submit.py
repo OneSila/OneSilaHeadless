@@ -4,9 +4,7 @@ from pathlib import Path
 
 from django.utils import timezone
 
-from imports_exports.models import Import
 from sales_channels.integrations.mirakl.factories.mixins import GetMiraklAPIMixin
-from sales_channels.integrations.mirakl.models import MiraklSalesChannelImport
 from sales_channels.models import SalesChannelFeed
 
 
@@ -17,7 +15,7 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
         self.feed = feed
         self.sales_channel = feed.sales_channel
 
-    def run(self) -> MiraklSalesChannelImport:
+    def run(self):
         if not self.feed.file:
             raise ValueError("Feed file is missing.")
 
@@ -35,23 +33,26 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
             )
 
         remote_import_id = str(response.get("import_id") or response.get("id") or "")
-        import_process = MiraklSalesChannelImport.objects.create(
-            sales_channel=self.sales_channel,
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-            type=MiraklSalesChannelImport.TYPE_PRODUCT,
-            status=Import.STATUS_PENDING,
-            name=f"Mirakl product feed - {self.sales_channel.hostname}",
-            feed=self.feed,
-            remote_import_id=remote_import_id,
-            source_file_name=Path(self.feed.file.name).name,
-            raw_response=response,
-            summary_data=response,
-        )
+        raw_data = dict(self.feed.raw_data or {})
+        raw_data["product_submit_response"] = response
+        raw_data["product_import_succeeded"] = False
         self.feed.status = SalesChannelFeed.STATUS_SUBMITTED
+        self.feed.stage = self.feed.STAGE_PRODUCT
         self.feed.remote_id = remote_import_id
+        self.feed.product_remote_id = remote_import_id
         self.feed.last_submitted_at = timezone.now()
-        self.feed.save(update_fields=["status", "remote_id", "last_submitted_at"])
-        return import_process
+        self.feed.raw_data = raw_data
+        self.feed.save(
+            update_fields=[
+                "status",
+                "stage",
+                "remote_id",
+                "product_remote_id",
+                "last_submitted_at",
+                "raw_data",
+            ]
+        )
+        return self.feed
 
 
 class MiraklOfferSubmitFactory(GetMiraklAPIMixin):
@@ -62,7 +63,7 @@ class MiraklOfferSubmitFactory(GetMiraklAPIMixin):
         self.sales_channel = feed.sales_channel
         self.offers = offers
 
-    def run(self) -> MiraklSalesChannelImport | None:
+    def run(self):
         if not self.offers:
             return None
 
@@ -72,14 +73,23 @@ class MiraklOfferSubmitFactory(GetMiraklAPIMixin):
             expected_statuses={200, 201, 202},
         )
         remote_import_id = str(response.get("import_id") or response.get("id") or "")
-        return MiraklSalesChannelImport.objects.create(
-            sales_channel=self.sales_channel,
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-            type=MiraklSalesChannelImport.TYPE_OFFER,
-            status=Import.STATUS_PENDING,
-            name=f"Mirakl offer publish - {self.sales_channel.hostname}",
-            feed=self.feed,
-            remote_import_id=remote_import_id,
-            offer_response=response,
-            summary_data=response,
+        raw_data = dict(self.feed.raw_data or {})
+        raw_data["offer_submit_response"] = response
+        raw_data["offer_import_succeeded"] = False
+        self.feed.stage = self.feed.STAGE_OFFER
+        self.feed.status = SalesChannelFeed.STATUS_SUBMITTED
+        self.feed.remote_id = remote_import_id
+        self.feed.offer_remote_id = remote_import_id
+        self.feed.last_submitted_at = timezone.now()
+        self.feed.raw_data = raw_data
+        self.feed.save(
+            update_fields=[
+                "stage",
+                "status",
+                "remote_id",
+                "offer_remote_id",
+                "last_submitted_at",
+                "raw_data",
+            ]
         )
+        return self.feed

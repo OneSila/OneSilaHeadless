@@ -4,8 +4,7 @@ from .feeds import MiraklSalesChannelFeed
 from .imports import MiraklSalesChannelImport
 from .products import MiraklEanCode, MiraklPrice, MiraklProduct, MiraklProductContent
 from .properties import (
-    MiraklInternalProperty,
-    MiraklInternalPropertyOption,
+    MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
     MiraklPropertyApplicability,
@@ -23,12 +22,11 @@ __all__ = [
     "MiraklDocumentType",
     "MiraklEanCode",
     "MiraklSalesChannelFeed",
-    "MiraklInternalProperty",
-    "MiraklInternalPropertyOption",
     "MiraklPrice",
     "MiraklProduct",
     "MiraklProductCategory",
     "MiraklProductContent",
+    "MiraklProductType",
     "MiraklProductTypeItem",
     "MiraklProperty",
     "MiraklPropertyApplicability",

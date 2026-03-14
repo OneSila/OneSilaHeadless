@@ -14,6 +14,13 @@ from sales_channels.models.taxes import RemoteCurrency
 class MiraklSalesChannel(SalesChannel):
     """Mirakl sales channel scoped to one Mirakl shop."""
 
+    CSV_DELIMITER_COMMA = "COMMA"
+    CSV_DELIMITER_SEMICOLON = "SEMICOLON"
+    CSV_DELIMITER_CHOICES = [
+        (CSV_DELIMITER_COMMA, "Comma"),
+        (CSV_DELIMITER_SEMICOLON, "Semicolon"),
+    ]
+
     sub_type = models.CharField(
         max_length=128,
         choices=MIRAKL_SUB_TYPE_CHOICES,
@@ -36,6 +43,28 @@ class MiraklSalesChannel(SalesChannel):
         blank=True,
         help_text="Cached shop/account metadata returned by Mirakl.",
     )
+    product_import_only_on_leaf = models.BooleanField(
+        default=False,
+        help_text="Prevents the import of products into non-leaf categories when enabled by the operator.",
+    )
+    list_of_multiple_values_separator = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Separator used by the operator for multiple-values list fields.",
+    )
+    offer_prices_decimals = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Maximum number of decimals allowed in offer prices.",
+    )
+    operator_csv_delimiter = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=CSV_DELIMITER_CHOICES,
+        help_text="Delimiter expected in operator CSV files.",
+    )
 
     class Meta:
         verbose_name = "Mirakl Sales Channel"
@@ -57,8 +86,14 @@ class MiraklSalesChannel(SalesChannel):
             from sales_channels.integrations.mirakl.factories.sales_channels import ValidateMiraklCredentialsFactory
 
             try:
-                account_info = ValidateMiraklCredentialsFactory(sales_channel=self).validate_credentials()
+                factory = ValidateMiraklCredentialsFactory(sales_channel=self)
+                account_info = factory.validate_credentials()
+                platform_configuration = factory.get_platform_configuration()
                 self.raw_data = account_info or {}
+                factory.apply_platform_configuration(
+                    instance=self,
+                    platform_configuration=platform_configuration,
+                )
 
             except Exception as exc:
                 raise Exception(
@@ -79,6 +114,12 @@ class MiraklSalesChannel(SalesChannel):
             return hostname.rstrip("/")
         return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
+    @property
+    def csv_delimiter(self) -> str:
+        if self.operator_csv_delimiter == self.CSV_DELIMITER_SEMICOLON:
+            return ";"
+        return ","
+
 
 class MiraklSalesChannelView(SalesChannelView):
     """Mirakl channel exposed under a seller shop."""
@@ -87,11 +128,6 @@ class MiraklSalesChannelView(SalesChannelView):
         null=True,
         blank=True,
         help_text="Mirakl channel description.",
-    )
-    raw_data = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Original Mirakl channel payload.",
     )
 
     class Meta:
@@ -115,11 +151,6 @@ class MiraklRemoteLanguage(RemoteLanguage):
         default=False,
         help_text="Marks the default locale when known.",
     )
-    raw_data = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Original Mirakl locale payload.",
-    )
 
     class Meta:
         verbose_name = "Mirakl Remote Language"
@@ -141,11 +172,6 @@ class MiraklRemoteCurrency(RemoteCurrency):
     is_default = models.BooleanField(
         default=False,
         help_text="Marks the default currency for the Mirakl shop.",
-    )
-    raw_data = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Original Mirakl currency payload.",
     )
 
     class Meta:

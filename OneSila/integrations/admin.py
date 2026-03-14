@@ -19,7 +19,7 @@ from pygments import highlight
 from pygments.lexers import JsonLexer
 from pygments.formatters import HtmlFormatter
 from django.utils.safestring import mark_safe
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _, ngettext
 
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.models import SalesChannel, RemoteLog
@@ -178,6 +178,31 @@ class PublicIntegrationTypeAdmin(SharedModelAdmin):
     inlines = (PublicIntegrationTypeTranslationInline,)
     ordering = ("sort_order", "key")
     list_select_related = ("based_to",)
+    actions = ("enable_selected", "disable_selected")
+
+    @admin.action(description=_("Enable selected public integration types"))
+    def enable_selected(self, request, queryset):
+        updated_count = queryset.update(active=True)
+        self.message_user(
+            request,
+            ngettext(
+                "%(count)s public integration type was enabled.",
+                "%(count)s public integration types were enabled.",
+                updated_count,
+            ) % {"count": updated_count},
+        )
+
+    @admin.action(description=_("Disable selected public integration types"))
+    def disable_selected(self, request, queryset):
+        updated_count = queryset.update(active=False)
+        self.message_user(
+            request,
+            ngettext(
+                "%(count)s public integration type was disabled.",
+                "%(count)s public integration types were disabled.",
+                updated_count,
+            ) % {"count": updated_count},
+        )
 
     @admin.display(description="Name")
     def display_name(self, obj):

@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
 from core.tests import TestCase
@@ -16,6 +17,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklProduct,
     MiraklProductCategory,
+    MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
     MiraklSalesChannel,
@@ -123,12 +125,25 @@ class MiraklFeedFactoryTests(TestCase):
             name="Colour",
             type=Property.TYPES.SELECT,
         )
+        product_type = baker.make(
+            MiraklProductType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            category=category,
+            remote_id=category.remote_id,
+            name=category.name,
+            template=SimpleUploadedFile(
+                "mirakl-template.csv",
+                b"product_category,product_title,colour,sku,product-id,product-id-type,description,internal-description,price,price-additional-info,quantity,min-quantity-alert,state,available-start-date,available-end-date,logistic-class,discount-price,discount-start-date,discount-end-date,leadtime-to-ship,update-delete\n",
+                content_type="text/csv",
+            ),
+        )
         baker.make(
             MiraklProductTypeItem,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            category=category,
-            property=remote_colour_property,
+            product_type=product_type,
+            remote_property=remote_colour_property,
         )
 
         mark_remote_products_for_mirakl_feed_updates(product_ids=[self.product.id])
@@ -145,6 +160,7 @@ class MiraklFeedFactoryTests(TestCase):
         item = SalesChannelFeedItem.objects.get(feed=feed)
         self.assertEqual(item.action, SalesChannelFeedItem.ACTION_CREATE)
         self.assertTrue(item.payload_data["rows"])
+        self.assertEqual(item.sales_channel_view_id, self.view.id)
         with feed.file.open("r") as handle:
             rendered_csv = handle.read()
         self.assertIn("product_category", rendered_csv)

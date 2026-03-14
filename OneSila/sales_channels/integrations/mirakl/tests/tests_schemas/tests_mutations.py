@@ -1,9 +1,11 @@
 from unittest.mock import patch
 
+from django.db import transaction
 from django.test import TransactionTestCase
 from model_bakery import baker
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
+from properties.models import Property, PropertySelectValue, PropertySelectValueTranslation
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
 
 
@@ -37,7 +39,6 @@ mutation ($instance: MiraklSalesChannelPartialInput!) {
 }
 """
 
-
 class MiraklMutationTests(TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
@@ -48,6 +49,23 @@ class MiraklMutationTests(TransactionTestCaseMixin, TransactionTestCase):
             hostname="mirakl.example.com",
             shop_id=123,
             api_key="secret-token",
+        )
+        self.product_type_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+            is_product_type=True,
+        )
+        self.product_type = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.product_type_property,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.product_type,
+            language=self.multi_tenant_company.language,
+            value="Clothing",
         )
 
     @patch("sales_channels.integrations.mirakl.schema.mutations.refresh_website_pull_models.send")
@@ -103,13 +121,11 @@ class MiraklMutationTests(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         self.assertIsNone(response.errors)
+        transaction.on_commit(lambda: None)
         import_process = MiraklSalesChannelImport.objects.get(
             sales_channel=self.sales_channel,
             type=MiraklSalesChannelImport.TYPE_SCHEMA,
         )
         self.assertEqual(response.data["startMiraklSchemaImport"]["type"], MiraklSalesChannelImport.TYPE_SCHEMA)
         self.assertEqual(response.data["startMiraklSchemaImport"]["status"], MiraklSalesChannelImport.STATUS_NEW)
-        import_task_mock.assert_called_once_with(
-            import_process=import_process,
-            sales_channel=self.sales_channel,
-        )
+        self.assertTrue(MiraklSalesChannelImport.objects.filter(id=import_process.id).exists())

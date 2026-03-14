@@ -26,7 +26,7 @@ def mark_remote_products_for_mirakl_feed_updates(*, product_ids: list[int]) -> N
         .order_by("id")
     )
 
-    processed_remote_products: set[tuple[int, int]] = set()
+    processed_remote_products: set[tuple[int, int, int]] = set()
     for assignment in assignments.iterator():
         view = assignment.sales_channel_view
         sales_channel = getattr(view, "sales_channel", None)
@@ -40,30 +40,29 @@ def mark_remote_products_for_mirakl_feed_updates(*, product_ids: list[int]) -> N
             assignment.remote_product = remote_product
             assignment.save(update_fields=["remote_product"])
 
-        processed_key = (sales_channel.id, remote_product.id)
+        processed_key = (sales_channel.id, remote_product.id, view.id)
         if processed_key in processed_remote_products:
             continue
         processed_remote_products.add(processed_key)
 
-        _get_sync_factory(remote_product=remote_product).run()
+        _get_sync_factory(remote_product=remote_product, sales_channel_view=view).run()
 
 
 def _get_or_create_remote_product(*, sales_channel, product):
     remote_product, _created = MiraklProduct.objects.get_or_create(
         sales_channel=sales_channel,
+        multi_tenant_company=sales_channel.multi_tenant_company,
         local_instance=product,
         remote_parent_product=None,
-        defaults={
-            "remote_sku": getattr(product, "sku", "") or "",
-        },
+        remote_sku=getattr(product, "sku", "") or "",
     )
     return remote_product
 
 
-def _get_sync_factory(*, remote_product):
+def _get_sync_factory(*, remote_product, sales_channel_view):
     product = remote_product.local_instance
     if product is None or not product.active:
-        return MiraklProductDeleteFactory(remote_product=remote_product)
+        return MiraklProductDeleteFactory(remote_product=remote_product, sales_channel_view=sales_channel_view)
     if getattr(remote_product, "remote_id", None) or getattr(remote_product, "product_reference", ""):
-        return MiraklProductUpdateFactory(remote_product=remote_product)
-    return MiraklProductCreateFactory(remote_product=remote_product)
+        return MiraklProductUpdateFactory(remote_product=remote_product, sales_channel_view=sales_channel_view)
+    return MiraklProductCreateFactory(remote_product=remote_product, sales_channel_view=sales_channel_view)

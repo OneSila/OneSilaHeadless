@@ -12,7 +12,6 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProduct,
     MiraklSalesChannel,
     MiraklSalesChannelFeed,
-    MiraklSalesChannelImport,
     MiraklSalesChannelView,
 )
 from sales_channels.models import SalesChannelFeedItem, SalesChannelViewAssign, SyncRequest
@@ -117,19 +116,15 @@ class MiraklImportStatusSyncFactoryTests(TestCase):
             status=SalesChannelFeedItem.STATUS_PENDING,
             payload_data={"rows": [{"sku": "SKU-1", "ean": "123", "prices": [{"price": "10.00"}]}]},
         )
-        self.import_process = baker.make(
-            MiraklSalesChannelImport,
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            feed=self.feed,
-            type=MiraklSalesChannelImport.TYPE_PRODUCT,
-            remote_import_id="2005",
-            status=MiraklSalesChannelImport.STATUS_PENDING,
-        )
+        self.feed.remote_id = "2005"
+        self.feed.product_remote_id = "2005"
+        self.feed.stage = MiraklSalesChannelFeed.STAGE_PRODUCT
+        self.feed.status = MiraklSalesChannelFeed.STATUS_SUBMITTED
+        self.feed.save(update_fields=["remote_id", "product_remote_id", "stage", "status"])
 
     @patch("sales_channels.integrations.mirakl.factories.feeds.status.MiraklOfferSubmitFactory")
     def test_product_import_success_triggers_offer_submit(self, offer_submit_cls):
-        factory = MiraklImportStatusSyncFactory(import_process=self.import_process)
+        factory = MiraklImportStatusSyncFactory(feed=self.feed)
 
         with patch.object(
             factory,
@@ -145,5 +140,5 @@ class MiraklImportStatusSyncFactoryTests(TestCase):
             factory.run()
 
         self.feed.refresh_from_db()
-        self.assertEqual(self.feed.status, self.feed.STATUS_SUCCESS)
+        self.assertEqual(self.feed.status, self.feed.STATUS_PARTIAL)
         offer_submit_cls.assert_called_once()

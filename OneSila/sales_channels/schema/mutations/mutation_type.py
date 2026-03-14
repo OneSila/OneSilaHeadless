@@ -286,6 +286,8 @@ class SalesChannelsMutation:
         from sales_channels.integrations.amazon.tasks import amazon_map_perfect_match_select_values_db_task
         from sales_channels.integrations.ebay.models import EbaySalesChannel
         from sales_channels.integrations.ebay.tasks import ebay_map_perfect_match_select_values_db_task
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+        from sales_channels.integrations.mirakl.tasks import mirakl_map_perfect_match_select_values_db_task
         from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.shein.tasks import shein_map_perfect_match_select_values_db_task
 
@@ -313,6 +315,10 @@ class SalesChannelsMutation:
             shein_map_perfect_match_select_values_db_task(sales_channel_id=resolved_channel.id)
             return True
 
+        if isinstance(resolved_channel, MiraklSalesChannel):
+            mirakl_map_perfect_match_select_values_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
         raise ValidationError("Unsupported sales channel integration.")
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
@@ -326,6 +332,8 @@ class SalesChannelsMutation:
         from sales_channels.integrations.amazon.tasks import amazon_map_perfect_match_properties_db_task
         from sales_channels.integrations.ebay.models import EbaySalesChannel
         from sales_channels.integrations.ebay.tasks import ebay_map_perfect_match_properties_db_task
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+        from sales_channels.integrations.mirakl.tasks import mirakl_map_perfect_match_properties_db_task
         from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.shein.tasks import shein_map_perfect_match_properties_db_task
 
@@ -351,6 +359,10 @@ class SalesChannelsMutation:
 
         if isinstance(resolved_channel, SheinSalesChannel):
             shein_map_perfect_match_properties_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
+        if isinstance(resolved_channel, MiraklSalesChannel):
+            mirakl_map_perfect_match_properties_db_task(sales_channel_id=resolved_channel.id)
             return True
 
         raise ValidationError("Unsupported sales channel integration.")

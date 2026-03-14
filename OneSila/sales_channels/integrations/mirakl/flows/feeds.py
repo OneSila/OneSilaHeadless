@@ -11,7 +11,6 @@ from sales_channels.integrations.mirakl.factories.feeds import (
 from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannel,
     MiraklSalesChannelFeed,
-    MiraklSalesChannelImport,
 )
 from sales_channels.models import SalesChannelFeed, SalesChannelFeedItem
 
@@ -61,32 +60,42 @@ def sync_mirakl_product_feeds(*, sales_channel_id: int | None = None, force: boo
     )
 
 
-def refresh_mirakl_imports(*, import_process_id: int | None = None, sales_channel_id: int | None = None) -> list[MiraklSalesChannelImport]:
-    queryset = MiraklSalesChannelImport.objects.exclude(
-        status__in=[MiraklSalesChannelImport.STATUS_SUCCESS, MiraklSalesChannelImport.STATUS_FAILED],
+def refresh_mirakl_feed_statuses(*, feed_id: int | None = None, sales_channel_id: int | None = None) -> list[MiraklSalesChannelFeed]:
+    queryset = MiraklSalesChannelFeed.objects.filter(
+        sales_channel__active=True,
+        remote_id__gt="",
+        status__in=[
+            SalesChannelFeed.STATUS_PENDING,
+            SalesChannelFeed.STATUS_SUBMITTED,
+            SalesChannelFeed.STATUS_PROCESSING,
+        ],
     )
+    if feed_id is not None:
+        queryset = queryset.filter(id=feed_id)
+    if sales_channel_id is not None:
+        queryset = queryset.filter(sales_channel_id=sales_channel_id)
+
+    refreshed: list[MiraklSalesChannelFeed] = []
+    for feed in queryset.select_related("sales_channel").iterator():
+        refreshed.append(MiraklImportStatusSyncFactory(feed=feed).run())
+    return refreshed
+
+
+def refresh_mirakl_imports(*, import_process_id: int | None = None, sales_channel_id: int | None = None):
+    from sales_channels.integrations.mirakl.models import MiraklSalesChannelImport
+
+    queryset = MiraklSalesChannelImport.objects.all()
     if import_process_id is not None:
         queryset = queryset.filter(id=import_process_id)
     if sales_channel_id is not None:
         queryset = queryset.filter(sales_channel_id=sales_channel_id)
-
-    refreshed: list[MiraklSalesChannelImport] = []
-    for import_process in queryset.select_related("sales_channel", "feed").iterator():
-        refreshed.append(MiraklImportStatusSyncFactory(import_process=import_process).run())
-    return refreshed
+    return list(queryset)
 
 
 def retry_mirakl_feed(*, feed_id: int) -> SalesChannelFeed:
     feed = SalesChannelFeed.objects.select_related("sales_channel").get(id=feed_id)
-    product_import = (
-        MiraklSalesChannelImport.objects.filter(
-            feed=feed,
-            type=MiraklSalesChannelImport.TYPE_PRODUCT,
-        )
-        .order_by("-created_at")
-        .first()
-    )
-    if product_import and product_import.status == MiraklSalesChannelImport.STATUS_SUCCESS:
+    raw_data = dict(getattr(feed, "raw_data", {}) or {})
+    if raw_data.get("product_import_succeeded") and not raw_data.get("offer_import_succeeded"):
         from sales_channels.integrations.mirakl.factories.feeds import MiraklOfferPayloadFactory
 
         MiraklOfferSubmitFactory(feed=feed, offers=MiraklOfferPayloadFactory(feed=feed).build()).run()

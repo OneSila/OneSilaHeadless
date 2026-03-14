@@ -4,15 +4,13 @@ from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklDocumentType,
     MiraklEanCode,
-    MiraklInternalProperty,
-    MiraklInternalPropertyOption,
     MiraklPrice,
     MiraklProduct,
     MiraklProductCategory,
     MiraklProductContent,
+    MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
-    MiraklPropertyApplicability,
     MiraklPropertySelectValue,
     MiraklRemoteCurrency,
     MiraklRemoteLanguage,
@@ -42,21 +40,23 @@ class MiraklRemoteLanguageOrder:
     id: auto
 
 
-@order(MiraklInternalProperty)
-class MiraklInternalPropertyOrder:
-    id: auto
-
-
-@order(MiraklInternalPropertyOption)
-class MiraklInternalPropertyOptionOrder:
-    id: auto
-
-
 @order(MiraklCategory)
 class MiraklCategoryOrder:
     id: auto
     name: auto
     level: auto
+
+
+@order(MiraklDocumentType)
+class MiraklDocumentTypeOrder:
+    id: auto
+    name: auto
+
+
+@order(MiraklProductType)
+class MiraklProductTypeOrder:
+    id: auto
+    name: auto
 
 
 @order(MiraklProperty)
@@ -66,11 +66,6 @@ class MiraklPropertyOrder:
 
 @order(MiraklPropertySelectValue)
 class MiraklPropertySelectValueOrder:
-    id: auto
-
-
-@order(MiraklPropertyApplicability)
-class MiraklPropertyApplicabilityOrder:
     id: auto
 
 
@@ -101,11 +96,6 @@ class MiraklPriceOrder:
 
 @order(MiraklEanCode)
 class MiraklEanCodeOrder:
-    id: auto
-
-
-@order(MiraklDocumentType)
-class MiraklDocumentTypeOrder:
     id: auto
 
 

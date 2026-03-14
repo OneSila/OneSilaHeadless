@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from core.tests import TestCase
 from model_bakery import baker
+from properties.models import Property
 
 from sales_channels.integrations.mirakl.factories.imports.schema_imports import (
     MiraklSchemaImportProcessor,
@@ -11,9 +12,7 @@ from sales_channels.integrations.mirakl.factories.sales_channels.full_schema imp
 )
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
-    MiraklDocumentType,
-    MiraklInternalProperty,
-    MiraklInternalPropertyOption,
+    MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
     MiraklPropertyApplicability,
@@ -48,42 +47,35 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
             type=MiraklSalesChannelImport.TYPE_SCHEMA,
         )
 
+    def test_map_remote_type_handles_mirakl_specific_type_names(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        expected_types = {
+            "DATE": Property.TYPES.DATE,
+            "DECIMAL": Property.TYPES.FLOAT,
+            "LIST": Property.TYPES.SELECT,
+            "LIST_MULTIPLE_VALUES": Property.TYPES.MULTISELECT,
+            "LONG_TEXT": Property.TYPES.DESCRIPTION,
+            "MEDIA": Property.TYPES.TEXT,
+            "TEXT": Property.TYPES.TEXT,
+            "NUMERIC": Property.TYPES.FLOAT,
+            "TEXTAREA": Property.TYPES.DESCRIPTION,
+            "REGEX": Property.TYPES.TEXT,
+            "LINK": Property.TYPES.TEXT,
+        }
+
+        for remote_type, expected_property_type in expected_types.items():
+            with self.subTest(remote_type=remote_type):
+                self.assertEqual(
+                    factory._map_remote_type(remote_type=remote_type),
+                    expected_property_type,
+                )
+
     def _payloads_by_path(self):
         return {
-            "/api/additional_fields": {
-                "additional_fields": [
-                    {
-                        "code": "condition",
-                        "label": "Condition",
-                        "description": "Item condition",
-                        "entity": "OFFER",
-                        "type": "LIST",
-                        "required": True,
-                        "editable": True,
-                        "accepted_values": "NEW,USED",
-                    },
-                    {
-                        "code": "leadtime_to_ship",
-                        "label": "Lead Time",
-                        "description": "Shipping lead time",
-                        "entity": "OFFER",
-                        "type": "INTEGER",
-                        "required": False,
-                        "editable": True,
-                    },
-                ],
-            },
-            "/api/documents": {
-                "documents": [
-                    {
-                        "code": "MANUAL",
-                        "label": "Manual",
-                        "description": "User manual",
-                        "entity": "SHOP",
-                        "mime_types": "application/pdf",
-                    }
-                ],
-            },
             "/api/hierarchies": {
                 "hierarchies": [
                     {"code": "PARENT", "label": "Parent", "level": 1, "parent_code": ""},
@@ -96,12 +88,20 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
                         "code": "color",
                         "label": "Color",
                         "description": "Color attribute",
+                        "description_translations": [{"locale": "en_GB", "value": "Color attribute"}],
+                        "label_translations": [{"locale": "en_GB", "value": "Color"}],
+                        "example": "Red",
                         "hierarchy_code": "CHILD",
                         "required": True,
                         "variant": True,
                         "requirement_level": "REQUIRED",
                         "type": "LIST",
-                        "values_list": "COLOR_LIST",
+                        "type_parameters": [
+                            {"name": "LIST_CODE", "value": "COLOR_LIST"},
+                            {"name": "format", "value": "text"},
+                        ],
+                        "unique_code": "ATTR_COLOR",
+                        "values_list": "",
                         "channels": {"code": "WEB"},
                         "roles": [{"type": "PRODUCT", "parameters": [{"name": "scope", "value": "all"}]}],
                         "validations": '{"max": 10}',
@@ -118,6 +118,35 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
                         "values": [{"code": "SMALL", "label": "Small"}],
                         "channels": [{"code": "WEB"}],
                     },
+                    {
+                        "code": "height_7_uom",
+                        "label": "Height Unit",
+                        "hierarchy_code": "CHILD",
+                        "required": True,
+                        "variant": True,
+                        "type": "LIST",
+                        "values_list": "HEIGHT_UNITS",
+                        "channels": [{"code": "WEB"}],
+                    },
+                    {
+                        "code": "product_title",
+                        "label": "Product Title",
+                        "hierarchy_code": "",
+                        "required": True,
+                        "variant": False,
+                        "type": "TEXT",
+                        "channels": [{"code": "WEB"}],
+                    },
+                    {
+                        "code": "made_to_order",
+                        "label": "Made To Order",
+                        "hierarchy_code": "",
+                        "required": False,
+                        "variant": False,
+                        "type": "LIST",
+                        "values_list": "YES_ONLY",
+                        "channels": [{"code": "WEB"}],
+                    },
                 ],
             },
             "/api/values_lists": {
@@ -129,7 +158,21 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
                             {"code": "RED", "label": "Red"},
                             {"code": "BLU", "label": "Blue"},
                         ],
-                    }
+                    },
+                    {
+                        "code": "HEIGHT_UNITS",
+                        "label": "Height Units",
+                        "values": [
+                            {"code": "CM", "label": "Centimetres"},
+                        ],
+                    },
+                    {
+                        "code": "YES_ONLY",
+                        "label": "Yes Only",
+                        "values": [
+                            {"code": "yes", "label": "Yes"},
+                        ],
+                    },
                 ],
             },
         }
@@ -148,21 +191,6 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
         with patch.object(factory, "mirakl_get", side_effect=mirakl_get_side_effect):
             summary = factory.run()
 
-        condition_property = MiraklInternalProperty.objects.get(
-            sales_channel=self.sales_channel,
-            code="condition",
-        )
-        leadtime_property = MiraklInternalProperty.objects.get(
-            sales_channel=self.sales_channel,
-            code="leadtime_to_ship",
-        )
-        self.assertTrue(condition_property.is_condition)
-        self.assertFalse(leadtime_property.is_condition)
-        self.assertEqual(
-            MiraklInternalPropertyOption.objects.filter(internal_property=condition_property).count(),
-            2,
-        )
-
         parent = MiraklCategory.objects.get(sales_channel=self.sales_channel, remote_id="PARENT")
         child = MiraklCategory.objects.get(sales_channel=self.sales_channel, remote_id="CHILD")
         self.assertIsNone(parent.parent)
@@ -173,8 +201,25 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
         color_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="color")
         self.assertEqual(color_property.value_list_code, "COLOR_LIST")
         self.assertEqual(color_property.value_list_label, "Colors")
+        self.assertEqual(color_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
+        self.assertEqual(color_property.example, "Red")
+        self.assertEqual(color_property.hierarchy_code, "CHILD")
+        self.assertEqual(color_property.unique_code, "ATTR_COLOR")
+        self.assertEqual(color_property.description_translations, [{"locale": "en_GB", "value": "Color attribute"}])
+        self.assertEqual(color_property.label_translations, [{"locale": "en_GB", "value": "Color"}])
         self.assertEqual(
-            MiraklProductTypeItem.objects.filter(category=child, property=color_property).count(),
+            color_property.type_parameters,
+            [
+                {"name": "LIST_CODE", "value": "COLOR_LIST"},
+                {"name": "format", "value": "text"},
+            ],
+        )
+        child_product_type = MiraklProductType.objects.get(
+            sales_channel=self.sales_channel,
+            remote_id="CHILD",
+        )
+        self.assertEqual(
+            MiraklProductTypeItem.objects.filter(product_type=child_product_type, remote_property=color_property).count(),
             1,
         )
         self.assertEqual(
@@ -190,16 +235,18 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
             MiraklPropertySelectValue.objects.filter(remote_property=inline_property).count(),
             1,
         )
+        unit_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="height_7_uom")
+        self.assertEqual(unit_property.representation_type, MiraklProperty.REPRESENTATION_UNIT)
+        self.assertEqual(unit_property.default_value, "")
+        title_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="product_title")
+        self.assertEqual(title_property.representation_type, MiraklProperty.REPRESENTATION_PRODUCT_TITLE)
 
-        document_type = MiraklDocumentType.objects.get(
-            sales_channel=self.sales_channel,
-            remote_id="MANUAL",
-        )
-        self.assertEqual(document_type.name, "Manual")
+        made_to_order_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="made_to_order")
+        self.assertEqual(made_to_order_property.representation_type, MiraklProperty.REPRESENTATION_DEFAULT_VALUE)
+        self.assertEqual(made_to_order_property.default_value, "yes")
 
         self.import_process.refresh_from_db()
-        self.assertEqual(self.import_process.summary_data["internal_properties"], 2)
-        self.assertEqual(summary["properties"], 2)
+        self.assertEqual(summary["properties"], 4)
 
 
 class MiraklSchemaImportProcessorTests(TestCase):

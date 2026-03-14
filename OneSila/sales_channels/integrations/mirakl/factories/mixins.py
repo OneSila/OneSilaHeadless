@@ -246,5 +246,12 @@ class GetMiraklAPIMixin:
             self._mirakl_account_info = cached
         return cached
 
+    def get_platform_configuration(self) -> dict[str, Any]:
+        cached = getattr(self, "_mirakl_platform_configuration", None)
+        if cached is None:
+            cached = self.mirakl_get(path="/api/platform/configuration")
+            self._mirakl_platform_configuration = cached
+        return cached
+
     def validate_credentials(self) -> dict[str, Any]:
         return self.get_account_info()
