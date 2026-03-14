@@ -1,14 +1,20 @@
+import json
+
 from django.contrib import admin
+from django.urls import NoReverseMatch
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
+from core.admin import ModelAdmin
 from .factories import MiraklPublicDefinitionSyncFactory
 from .models import (
     MiraklCategory,
     MiraklProperty,
+    MiraklSalesChannelFeedItem,
     MiraklProductType,
     MiraklProductTypeItem,
     MiraklPublicDefinition,
+    MiraklSalesChannelFeed,
     MiraklSalesChannel,
 )
 
@@ -68,12 +74,23 @@ class MiraklProductTypeInline(admin.TabularInline):
         return obj.ready_to_push
 
 
-class MiraklProductTypeItemInline(admin.TabularInline):
+class MiraklProductTypeItemInline(admin.StackedInline):
     model = MiraklProductTypeItem
     extra = 0
-    fields = ("remote_property_code", "remote_property", "local_instance", "required", "variant", "role_data")
+    fields = (
+        "remote_property_code",
+        "remote_property",
+        "local_instance",
+        "hierarchy_code",
+        "requirement_level",
+        "required",
+        "variant",
+        "role_data",
+        "pretty_raw_data",
+    )
     readonly_fields = fields
     show_change_link = True
+    classes = ("collapse",)
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -85,6 +102,65 @@ class MiraklProductTypeItemInline(admin.TabularInline):
     def remote_property_code(self, obj):
         remote_property = getattr(obj, "remote_property", None)
         return getattr(remote_property, "code", None) or "-"
+
+    @admin.display(description="Raw Data")
+    def pretty_raw_data(self, obj):
+        rendered = json.dumps(obj.raw_data or {}, indent=2, sort_keys=True, default=str)
+        return format_html("<pre style='white-space: pre-wrap; max-width: 100%;'>{}</pre>", rendered)
+
+
+class MiraklFeedItemInline(admin.StackedInline):
+    model = MiraklSalesChannelFeedItem
+    extra = 0
+    fields = (
+        "remote_product_link",
+        "sales_channel_view",
+        "action",
+        "status",
+        "identifier",
+        "error_message",
+        "pretty_payload_data",
+        "pretty_result_data",
+    )
+    readonly_fields = fields
+    show_change_link = False
+    classes = ("collapse",)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Remote Product")
+    def remote_product_link(self, obj):
+        remote_product = getattr(obj, "remote_product", None)
+        if not getattr(remote_product, "pk", None):
+            return "-"
+        local_instance = getattr(remote_product, "local_instance", None)
+        label = (
+            getattr(local_instance, "sku", None)
+            or getattr(remote_product, "remote_sku", None)
+            or getattr(remote_product, "remote_id", None)
+            or str(remote_product.pk)
+        )
+        app_label = remote_product._meta.app_label
+        model_name = remote_product._meta.model_name
+        try:
+            url = reverse(f"admin:{app_label}_{model_name}_change", args=[remote_product.pk])
+        except NoReverseMatch:
+            return label
+        return format_html('<a href="{}">{}</a>', url, label)
+
+    @admin.display(description="Payload Data")
+    def pretty_payload_data(self, obj):
+        rendered = json.dumps(obj.payload_data or [], indent=2, sort_keys=True, default=str)
+        return format_html("<pre style='white-space: pre-wrap; max-width: 100%;'>{}</pre>", rendered)
+
+    @admin.display(description="Result Data")
+    def pretty_result_data(self, obj):
+        rendered = json.dumps(obj.result_data or {}, indent=2, sort_keys=True, default=str)
+        return format_html("<pre style='white-space: pre-wrap; max-width: 100%;'>{}</pre>", rendered)
 
 
 @admin.register(MiraklCategory)
@@ -210,3 +286,272 @@ class MiraklPublicDefinitionAdmin(admin.ModelAdmin):
     )
     list_filter = ("hostname", "representation_type")
     search_fields = ("hostname", "property_code")
+
+
+@admin.register(MiraklSalesChannelFeed)
+class MiraklSalesChannelFeedAdmin(ModelAdmin):
+    list_select_related = ("sales_channel", "multi_tenant_company")
+    inlines = (MiraklFeedItemInline,)
+    list_display = (
+        "id",
+        "sales_channel",
+        "type",
+        "stage",
+        "status",
+        "remote_id",
+        "import_status",
+        "reason_status",
+        "last_synced_at",
+        "created_at",
+    )
+    list_filter = ("type", "stage", "status", "import_status", "sales_channel")
+    search_fields = (
+        "remote_id",
+        "product_remote_id",
+        "offer_remote_id",
+        "import_status",
+        "reason_status",
+        "sales_channel__hostname",
+    )
+    raw_id_fields = ("sales_channel", "multi_tenant_company", "created_by_multi_tenant_user")
+    ordering = ("-created_at",)
+    readonly_fields = (
+        "sales_channel",
+        "multi_tenant_company",
+        "type",
+        "stage",
+        "status",
+        "remote_id",
+        "product_remote_id",
+        "offer_remote_id",
+        "import_status",
+        "reason_status",
+        "remote_date_created",
+        "remote_shop_id",
+        "has_error_report",
+        "has_new_product_report",
+        "has_transformation_error_report",
+        "has_transformed_file",
+        "transform_lines_read",
+        "transform_lines_in_success",
+        "transform_lines_in_error",
+        "transform_lines_with_warning",
+        "file_link",
+        "error_report_file_link",
+        "new_product_report_file_link",
+        "transformed_file_link",
+        "transformation_error_report_file_link",
+        "payload_data",
+        "summary_data",
+        "raw_data",
+        "error_message",
+        "last_synced_at",
+        "last_submitted_at",
+        "last_polled_at",
+        "created_at",
+        "updated_at",
+        "created_by_multi_tenant_user",
+        "last_update_by_multi_tenant_user",
+    )
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "sales_channel",
+                    "multi_tenant_company",
+                    "type",
+                    "stage",
+                    "status",
+                    "remote_id",
+                    "product_remote_id",
+                    "offer_remote_id",
+                    "import_status",
+                    "reason_status",
+                    "remote_date_created",
+                    "remote_shop_id",
+                    "error_message",
+                )
+            },
+        ),
+        (
+            "Files",
+            {
+                "fields": (
+                    "file_link",
+                    "error_report_file_link",
+                    "new_product_report_file_link",
+                    "transformed_file_link",
+                    "transformation_error_report_file_link",
+                )
+            },
+        ),
+        (
+            "Report Flags",
+            {
+                "fields": (
+                    "has_error_report",
+                    "has_new_product_report",
+                    "has_transformation_error_report",
+                    "has_transformed_file",
+                    "transform_lines_read",
+                    "transform_lines_in_success",
+                    "transform_lines_in_error",
+                    "transform_lines_with_warning",
+                )
+            },
+        ),
+        ("Payload", {"fields": ("payload_data", "summary_data", "raw_data")}),
+        (
+            "Timestamps",
+            {
+                "fields": (
+                    "last_synced_at",
+                    "last_submitted_at",
+                    "last_polled_at",
+                    "created_at",
+                    "updated_at",
+                    "created_by_multi_tenant_user",
+                    "last_update_by_multi_tenant_user",
+                )
+            },
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def _build_file_link(self, *, url: str | None, label: str) -> str:
+        if not url:
+            return "-"
+        return format_html('<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>', url, label)
+
+    @admin.display(description="Feed File")
+    def file_link(self, obj):
+        return self._build_file_link(url=obj.file_url, label="Open feed file")
+
+    @admin.display(description="Error Report")
+    def error_report_file_link(self, obj):
+        return self._build_file_link(url=obj.error_report_file_url, label="Open error report")
+
+    @admin.display(description="New Product Report")
+    def new_product_report_file_link(self, obj):
+        return self._build_file_link(url=obj.new_product_report_file_url, label="Open new product report")
+
+    @admin.display(description="Transformed File")
+    def transformed_file_link(self, obj):
+        return self._build_file_link(url=obj.transformed_file_url, label="Open transformed file")
+
+    @admin.display(description="Transformation Error Report")
+    def transformation_error_report_file_link(self, obj):
+        return self._build_file_link(
+            url=obj.transformation_error_report_file_url,
+            label="Open transformation error report",
+        )
+
+
+@admin.register(MiraklSalesChannelFeedItem)
+class MiraklSalesChannelFeedItemAdmin(ModelAdmin):
+    list_select_related = ("feed", "remote_product", "sales_channel_view")
+    list_display = (
+        "id",
+        "feed",
+        "remote_product_label",
+        "sales_channel_view",
+        "action",
+        "status",
+        "identifier",
+    )
+    list_filter = ("action", "status", "sales_channel_view", "feed__sales_channel")
+    search_fields = (
+        "identifier",
+        "error_message",
+        "remote_product__remote_sku",
+        "remote_product__remote_id",
+        "feed__remote_id",
+        "feed__sales_channel__hostname",
+    )
+    raw_id_fields = ("feed", "remote_product", "sales_channel_view", "multi_tenant_company")
+    readonly_fields = (
+        "feed",
+        "multi_tenant_company",
+        "remote_product_link",
+        "sales_channel_view",
+        "action",
+        "status",
+        "identifier",
+        "error_message",
+        "pretty_payload_data",
+        "pretty_result_data",
+        "created_at",
+        "updated_at",
+        "created_by_multi_tenant_user",
+        "last_update_by_multi_tenant_user",
+    )
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "feed",
+                    "multi_tenant_company",
+                    "remote_product_link",
+                    "sales_channel_view",
+                    "action",
+                    "status",
+                    "identifier",
+                    "error_message",
+                )
+            },
+        ),
+        ("Payload", {"fields": ("pretty_payload_data", "pretty_result_data")}),
+        (
+            "Timestamps",
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                    "created_by_multi_tenant_user",
+                    "last_update_by_multi_tenant_user",
+                )
+            },
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description="Remote Product")
+    def remote_product_label(self, obj):
+        remote_product = getattr(obj, "remote_product", None)
+        local_instance = getattr(remote_product, "local_instance", None)
+        return (
+            getattr(local_instance, "sku", None)
+            or getattr(remote_product, "remote_sku", None)
+            or getattr(remote_product, "remote_id", None)
+            or "-"
+        )
+
+    @admin.display(description="Remote Product")
+    def remote_product_link(self, obj):
+        remote_product = getattr(obj, "remote_product", None)
+        if not getattr(remote_product, "pk", None):
+            return "-"
+        label = self.remote_product_label(obj)
+        app_label = remote_product._meta.app_label
+        model_name = remote_product._meta.model_name
+        try:
+            url = reverse(f"admin:{app_label}_{model_name}_change", args=[remote_product.pk])
+        except NoReverseMatch:
+            return label
+        return format_html('<a href="{}">{}</a>', url, label)
+
+    @admin.display(description="Payload Data")
+    def pretty_payload_data(self, obj):
+        rendered = json.dumps(obj.payload_data or [], indent=2, sort_keys=True, default=str)
+        return format_html("<pre style='white-space: pre-wrap; max-width: 100%;'>{}</pre>", rendered)
+
+    @admin.display(description="Result Data")
+    def pretty_result_data(self, obj):
+        rendered = json.dumps(obj.result_data or {}, indent=2, sort_keys=True, default=str)
+        return format_html("<pre style='white-space: pre-wrap; max-width: 100%;'>{}</pre>", rendered)

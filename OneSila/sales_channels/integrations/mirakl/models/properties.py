@@ -83,18 +83,13 @@ class MiraklProperty(RemoteProperty):
     name = models.CharField(max_length=255, blank=True, default="", help_text="Mirakl attribute label.")
     description = models.TextField(blank=True, default="")
     example = models.TextField(blank=True, default="")
-    hierarchy_code = models.CharField(max_length=255, blank=True, default="")
     is_common = models.BooleanField(default=False)
-    unique_code = models.CharField(max_length=255, blank=True, default="")
     representation_type = models.CharField(
         max_length=64,
         choices=REPRESENTATION_TYPE_CHOICES,
         default=REPRESENTATION_PROPERTY,
     )
     representation_type_decided = models.BooleanField(default=False)
-    required = models.BooleanField(default=False)
-    variant = models.BooleanField(default=False)
-    requirement_level = models.CharField(max_length=64, blank=True, default="")
     default_value = models.CharField(max_length=255, blank=True, default="")
     value_list_code = models.CharField(max_length=255, blank=True, default="")
     value_list_label = models.CharField(max_length=255, blank=True, default="")
@@ -213,8 +208,10 @@ class MiraklProductTypeItem(RemoteObjectMixin, models.Model):
         null=True,
         blank=True,
     )
+    hierarchy_code = models.CharField(max_length=255, blank=True, default="")
     required = models.BooleanField(default=False)
     variant = models.BooleanField(default=False)
+    requirement_level = models.CharField(max_length=64, blank=True, default="")
     role_data = models.JSONField(default=list, blank=True)
     raw_data = models.JSONField(default=dict, blank=True)
 

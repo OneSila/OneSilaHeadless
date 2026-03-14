@@ -129,8 +129,6 @@ class MiraklPropertyFilter(
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
     code: auto
-    required: auto
-    variant: auto
     type: auto
     is_common: auto
     representation_type: auto
@@ -183,6 +181,10 @@ class MiraklProductTypeItemFilter(SearchFilterMixin):
     product_type: Optional[MiraklProductTypeFilter]
     remote_property: Optional[MiraklPropertyFilter]
     local_instance: Optional[ProductPropertiesRuleItemFilter]
+    hierarchy_code: auto
+    required: auto
+    variant: auto
+    requirement_level: auto
 
 
 @filter(MiraklProductCategory)

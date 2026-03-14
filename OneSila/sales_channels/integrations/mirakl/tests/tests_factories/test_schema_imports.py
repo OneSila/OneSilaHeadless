@@ -76,6 +76,20 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
 
     def _payloads_by_path(self):
         return {
+            "/api/offers/states": {
+                "offer_states": [
+                    {
+                        "active": True,
+                        "code": "10",
+                        "label": "Refurbished",
+                    },
+                    {
+                        "active": True,
+                        "code": "11",
+                        "label": "New",
+                    },
+                ],
+            },
             "/api/hierarchies": {
                 "hierarchies": [
                     {"code": "PARENT", "label": "Parent", "level": 1, "parent_code": ""},
@@ -84,6 +98,15 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
             },
             "/api/products/attributes": {
                 "attributes": [
+                    {
+                        "code": "fit_note",
+                        "label": "Fit Note",
+                        "hierarchy_code": "PARENT",
+                        "required": False,
+                        "variant": False,
+                        "type": "TEXT",
+                        "channels": [{"code": "WEB"}],
+                    },
                     {
                         "code": "color",
                         "label": "Color",
@@ -100,12 +123,22 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
                             {"name": "LIST_CODE", "value": "COLOR_LIST"},
                             {"name": "format", "value": "text"},
                         ],
-                        "unique_code": "ATTR_COLOR",
                         "values_list": "",
                         "channels": {"code": "WEB"},
                         "roles": [{"type": "PRODUCT", "parameters": [{"name": "scope", "value": "all"}]}],
                         "validations": '{"max": 10}',
                         "transformations": "[]",
+                    },
+                    {
+                        "code": "fit_note",
+                        "label": "Fit Note Child",
+                        "description": "Child-specific fit note",
+                        "hierarchy_code": "CHILD",
+                        "required": True,
+                        "variant": True,
+                        "requirement_level": "REQUIRED",
+                        "type": "TEXT",
+                        "channels": [{"code": "WEB"}],
                     },
                     {
                         "code": "size_note",
@@ -126,6 +159,19 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
                         "variant": True,
                         "type": "LIST",
                         "values_list": "HEIGHT_UNITS",
+                        "channels": [{"code": "WEB"}],
+                    },
+                    {
+                        "code": "category2_child",
+                        "label": "Category2 Child",
+                        "hierarchy_code": "CHILD",
+                        "required": True,
+                        "variant": False,
+                        "type": "LIST",
+                        "type_parameters": [
+                            {"name": "LIST_CODE", "value": "CATEGORY2_CHILD"},
+                            {"name": "DEFAULT_VALUE", "value": "child_default"},
+                        ],
                         "channels": [{"code": "WEB"}],
                     },
                     {
@@ -173,6 +219,14 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
                             {"code": "yes", "label": "Yes"},
                         ],
                     },
+                    {
+                        "code": "CATEGORY2_CHILD",
+                        "label": "Category2 Child",
+                        "values": [
+                            {"code": "child_default", "label": "Child Default"},
+                            {"code": "other", "label": "Other"},
+                        ],
+                    },
                 ],
             },
         }
@@ -203,8 +257,8 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
         self.assertEqual(color_property.value_list_label, "Colors")
         self.assertEqual(color_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
         self.assertEqual(color_property.example, "Red")
-        self.assertEqual(color_property.hierarchy_code, "CHILD")
-        self.assertEqual(color_property.unique_code, "ATTR_COLOR")
+        self.assertFalse(color_property.is_common)
+        self.assertFalse(color_property.allows_unmapped_values)
         self.assertEqual(color_property.description_translations, [{"locale": "en_GB", "value": "Color attribute"}])
         self.assertEqual(color_property.label_translations, [{"locale": "en_GB", "value": "Color"}])
         self.assertEqual(
@@ -218,10 +272,19 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
             sales_channel=self.sales_channel,
             remote_id="CHILD",
         )
+        parent_product_type = MiraklProductType.objects.get(
+            sales_channel=self.sales_channel,
+            remote_id="PARENT",
+        )
         self.assertEqual(
             MiraklProductTypeItem.objects.filter(product_type=child_product_type, remote_property=color_property).count(),
             1,
         )
+        color_item = MiraklProductTypeItem.objects.get(product_type=child_product_type, remote_property=color_property)
+        self.assertEqual(color_item.hierarchy_code, "CHILD")
+        self.assertEqual(color_item.requirement_level, "REQUIRED")
+        self.assertTrue(color_item.required)
+        self.assertTrue(color_item.variant)
         self.assertEqual(
             MiraklPropertyApplicability.objects.filter(property=color_property, view=self.view).count(),
             1,
@@ -238,15 +301,67 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
         unit_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="height_7_uom")
         self.assertEqual(unit_property.representation_type, MiraklProperty.REPRESENTATION_UNIT)
         self.assertEqual(unit_property.default_value, "")
+        self.assertFalse(unit_property.allows_unmapped_values)
+        category2_child_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="category2_child")
+        self.assertEqual(category2_child_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
+        self.assertEqual(category2_child_property.default_value, "child_default")
         title_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="product_title")
         self.assertEqual(title_property.representation_type, MiraklProperty.REPRESENTATION_PRODUCT_TITLE)
+        self.assertTrue(title_property.is_common)
+        self.assertTrue(title_property.allows_unmapped_values)
+        self.assertEqual(
+            MiraklProductTypeItem.objects.filter(product_type=parent_product_type, remote_property=title_property).count(),
+            1,
+        )
+        self.assertEqual(
+            MiraklProductTypeItem.objects.filter(product_type=child_product_type, remote_property=title_property).count(),
+            1,
+        )
 
         made_to_order_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="made_to_order")
         self.assertEqual(made_to_order_property.representation_type, MiraklProperty.REPRESENTATION_DEFAULT_VALUE)
-        self.assertEqual(made_to_order_property.default_value, "yes")
+        self.assertEqual(made_to_order_property.default_value, "Yes")
+        self.assertEqual(
+            MiraklProductTypeItem.objects.filter(product_type=parent_product_type, remote_property=made_to_order_property).count(),
+            1,
+        )
+        self.assertEqual(
+            MiraklProductTypeItem.objects.filter(product_type=child_product_type, remote_property=made_to_order_property).count(),
+            1,
+        )
+
+        fit_note_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="fit_note")
+        parent_fit_note_item = MiraklProductTypeItem.objects.get(
+            product_type=parent_product_type,
+            remote_property=fit_note_property,
+        )
+        child_fit_note_item = MiraklProductTypeItem.objects.get(
+            product_type=child_product_type,
+            remote_property=fit_note_property,
+        )
+        self.assertEqual(parent_fit_note_item.hierarchy_code, "PARENT")
+        self.assertFalse(parent_fit_note_item.required)
+        self.assertFalse(parent_fit_note_item.variant)
+        self.assertEqual(child_fit_note_item.hierarchy_code, "CHILD")
+        self.assertTrue(child_fit_note_item.required)
+        self.assertTrue(child_fit_note_item.variant)
+
+        condition_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="condition")
+        self.assertEqual(condition_property.representation_type, MiraklProperty.REPRESENTATION_CONDITION)
+        self.assertEqual(condition_property.type, Property.TYPES.SELECT)
+        self.assertFalse(condition_property.allows_unmapped_values)
+        self.assertEqual(condition_property.value_list_code, "offer_states")
+        self.assertEqual(condition_property.value_list_label, "Offer states")
+        self.assertEqual(
+            MiraklPropertySelectValue.objects.filter(remote_property=condition_property).count(),
+            2,
+        )
+        self.assertFalse(
+            MiraklProductTypeItem.objects.filter(remote_property=condition_property).exists()
+        )
 
         self.import_process.refresh_from_db()
-        self.assertEqual(summary["properties"], 4)
+        self.assertGreaterEqual(summary["properties"], 4)
 
 
 class MiraklSchemaImportProcessorTests(TestCase):

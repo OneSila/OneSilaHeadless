@@ -2,11 +2,19 @@ from core import models
 from core.upload_paths import tenant_upload_to
 from get_absolute_url.helpers import generate_absolute_url
 
-from sales_channels.models.feeds import SalesChannelFeed
+from sales_channels.models.feeds import SalesChannelFeed, SalesChannelFeedItem
 
 
 class MiraklSalesChannelFeed(SalesChannelFeed):
     """Mirakl-specific feed batch artifact."""
+
+    TYPE_PRODUCT = "product"
+    TYPE_OFFER = "offer"
+    TYPE_COMBINED = "combined"
+
+    STATUS_GATHERING_PRODUCTS = "gathering_products"
+    STATUS_GATHERING_OFFERS = "gathering_offers"
+    STATUS_READY_TO_RENDER = "ready_to_render"
 
     STAGE_PRODUCT = "product"
     STAGE_OFFER = "offer"
@@ -16,6 +24,20 @@ class MiraklSalesChannelFeed(SalesChannelFeed):
         (STAGE_OFFER, "Offer"),
     ]
 
+    product_type = models.ForeignKey(
+        "mirakl.MiraklProductType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="feeds",
+    )
+    sales_channel_view = models.ForeignKey(
+        "mirakl.MiraklSalesChannelView",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="feeds",
+    )
     stage = models.CharField(max_length=32, choices=STAGE_CHOICES, default=STAGE_PRODUCT)
     product_remote_id = models.CharField(max_length=255, blank=True, default="")
     offer_remote_id = models.CharField(max_length=255, blank=True, default="")
@@ -65,3 +87,15 @@ class MiraklSalesChannelFeed(SalesChannelFeed):
     @property
     def transformation_error_report_file_url(self) -> str | None:
         return self._get_file_url(field_name="transformation_error_report_file")
+
+    @classmethod
+    def get_gathering_status_for_type(cls, *, feed_type: str) -> str:
+        if feed_type == cls.TYPE_OFFER:
+            return cls.STATUS_GATHERING_OFFERS
+        return cls.STATUS_GATHERING_PRODUCTS
+
+
+class MiraklSalesChannelFeedItem(SalesChannelFeedItem):
+    class Meta:
+        verbose_name = "Mirakl Sales Channel Feed Item"
+        verbose_name_plural = "Mirakl Sales Channel Feed Items"

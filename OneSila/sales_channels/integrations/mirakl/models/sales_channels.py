@@ -7,6 +7,14 @@ from django.utils.translation import gettext_lazy as _
 
 from core import models
 from sales_channels.integrations.mirakl.sub_type_constants import DEFAULT_MIRAKL_SUB_TYPE, MIRAKL_SUB_TYPE_CHOICES
+from sales_channels.exceptions import (
+    InspectorMissingInformationError,
+    MissingMappingError,
+    PreFlightCheckError,
+    RemotePropertyValueNotMapped,
+    SkipSyncBecauseOfStatusException,
+    VariationAlreadyExistsOnWebsite,
+)
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannel, SalesChannelView
 from sales_channels.models.taxes import RemoteCurrency
 
@@ -69,6 +77,14 @@ class MiraklSalesChannel(SalesChannel):
     class Meta:
         verbose_name = "Mirakl Sales Channel"
         verbose_name_plural = "Mirakl Sales Channels"
+        user_exceptions = (
+            InspectorMissingInformationError,
+            MissingMappingError,
+            PreFlightCheckError,
+            RemotePropertyValueNotMapped,
+            SkipSyncBecauseOfStatusException,
+            VariationAlreadyExistsOnWebsite,
+        )
 
     def __str__(self) -> str:
         return f"Mirakl Store: {self.hostname}"

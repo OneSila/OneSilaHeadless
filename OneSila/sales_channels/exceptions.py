@@ -24,6 +24,13 @@ class PreFlightCheckError(Exception):
     pass
 
 
+class MissingMappingError(PreFlightCheckError):
+    """
+    Exception raised when a required channel mapping is missing.
+    """
+    pass
+
+
 class VariationAlreadyExistsOnWebsite(Exception):
     """Raised when attempting to create a variation that already exists as a
     standalone product on the remote sales channel."""

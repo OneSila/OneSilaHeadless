@@ -4,18 +4,22 @@ from django.core.files.base import ContentFile
 
 from sales_channels.integrations.mirakl.factories.feeds import (
     MiraklImportStatusSyncFactory,
-    MiraklOfferSubmitFactory,
     MiraklProductFeedBuildFactory,
-    mark_remote_products_for_mirakl_feed_updates,
 )
 from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannel,
     MiraklSalesChannelFeed,
+    MiraklSalesChannelFeedItem,
 )
 from sales_channels.models import SalesChannelFeed, SalesChannelFeedItem
 
 
-def process_mirakl_gathering_product_feeds(*, sales_channel_id: int | None = None, force: bool = False) -> list[SalesChannelFeed]:
+def process_mirakl_gathering_product_feeds(
+    *,
+    sales_channel_id: int | None = None,
+    remote_product_ids: list[int] | None = None,
+    force: bool = False,
+) -> list[SalesChannelFeed]:
     queryset = MiraklSalesChannelFeed.objects.filter(
         type=MiraklSalesChannelFeed.TYPE_PRODUCT,
         stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
@@ -24,38 +28,41 @@ def process_mirakl_gathering_product_feeds(*, sales_channel_id: int | None = Non
     ).select_related("sales_channel")
     if sales_channel_id is not None:
         queryset = queryset.filter(sales_channel_id=sales_channel_id)
+    if remote_product_ids:
+        feed_ids = MiraklSalesChannelFeedItem.objects.filter(
+            remote_product_id__in=remote_product_ids,
+        ).values_list("feed_id", flat=True)
+        queryset = queryset.filter(id__in=feed_ids)
 
-    processed_feeds: list[SalesChannelFeed] = []
+    processed: list[SalesChannelFeed] = []
     processed_channel_ids: set[int] = set()
-    for gathering_feed in queryset.order_by("created_at").iterator():
-        sales_channel = gathering_feed.sales_channel
-        if sales_channel.id in processed_channel_ids:
+    for sales_channel_id_value in queryset.order_by("sales_channel_id").values_list("sales_channel_id", flat=True).distinct():
+        if sales_channel_id_value in processed_channel_ids:
             continue
-        processed_channel_ids.add(sales_channel.id)
+        processed_channel_ids.add(sales_channel_id_value)
 
-        if not sales_channel.connected:
+        sales_channel = MiraklSalesChannel.objects.filter(id=sales_channel_id_value).first()
+        if sales_channel is None:
             continue
-        if SalesChannelFeed.objects.filter(
+
+        feed_factory = MiraklProductFeedBuildFactory(
             sales_channel=sales_channel,
-            type=SalesChannelFeed.TYPE_PRODUCT,
-            status__in=[
-                SalesChannelFeed.STATUS_PENDING,
-                SalesChannelFeed.STATUS_SUBMITTED,
-                SalesChannelFeed.STATUS_PROCESSING,
-            ],
-        ).exists():
-            continue
-        feed = MiraklProductFeedBuildFactory(sales_channel=sales_channel, force_full=force).run()
-        if feed is None:
-            continue
-        processed_feeds.append(feed)
-    return processed_feeds
+            remote_product_ids=remote_product_ids,
+            force_full=force,
+        )
+        processed.extend(feed_factory.run_all())
+    return processed
 
 
-def sync_mirakl_product_feeds(*, sales_channel_id: int | None = None, force: bool = False) -> list[SalesChannelFeed]:
-    """Backward-compatible alias; the real source of truth is gathering feeds."""
+def sync_mirakl_product_feeds(
+    *,
+    sales_channel_id: int | None = None,
+    remote_product_ids: list[int] | None = None,
+    force: bool = False,
+) -> list[SalesChannelFeed]:
     return process_mirakl_gathering_product_feeds(
         sales_channel_id=sales_channel_id,
+        remote_product_ids=remote_product_ids,
         force=force,
     )
 
@@ -93,14 +100,7 @@ def refresh_mirakl_imports(*, import_process_id: int | None = None, sales_channe
 
 
 def retry_mirakl_feed(*, feed_id: int) -> SalesChannelFeed:
-    feed = SalesChannelFeed.objects.select_related("sales_channel").get(id=feed_id)
-    raw_data = dict(getattr(feed, "raw_data", {}) or {})
-    if raw_data.get("product_import_succeeded") and not raw_data.get("offer_import_succeeded"):
-        from sales_channels.integrations.mirakl.factories.feeds import MiraklOfferPayloadFactory
-
-        MiraklOfferSubmitFactory(feed=feed, offers=MiraklOfferPayloadFactory(feed=feed).build()).run()
-        return feed
-
+    feed = MiraklSalesChannelFeed.objects.select_related("sales_channel", "product_type", "sales_channel_view").get(id=feed_id)
     retry_feed = feed.__class__.objects.create(
         sales_channel=feed.sales_channel,
         multi_tenant_company=feed.multi_tenant_company,
@@ -108,8 +108,10 @@ def retry_mirakl_feed(*, feed_id: int) -> SalesChannelFeed:
         status=SalesChannelFeed.STATUS_NEW,
         summary_data=feed.summary_data,
         error_message="",
-        stage=getattr(feed, "stage", "product"),
-        raw_data=getattr(feed, "raw_data", {}),
+        stage=getattr(feed, "stage", feed.STAGE_PRODUCT),
+        raw_data={},
+        product_type=feed.product_type,
+        sales_channel_view=feed.sales_channel_view,
     )
     if feed.file:
         with feed.file.open("rb") as file_handle:
@@ -118,9 +120,9 @@ def retry_mirakl_feed(*, feed_id: int) -> SalesChannelFeed:
         retry_feed.save(update_fields=["file"])
 
     items = []
-    for item in feed.items.select_related("remote_product").iterator():
+    for item in MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related("remote_product").iterator():
         items.append(
-            SalesChannelFeedItem(
+            MiraklSalesChannelFeedItem(
                 feed=retry_feed,
                 multi_tenant_company=retry_feed.multi_tenant_company,
                 remote_product=item.remote_product,
@@ -132,15 +134,9 @@ def retry_mirakl_feed(*, feed_id: int) -> SalesChannelFeed:
                 result_data={},
             )
         )
-    SalesChannelFeedItem.objects.bulk_create(items)
+    MiraklSalesChannelFeedItem.objects.bulk_create(items)
+
     from sales_channels.integrations.mirakl.factories.feeds import MiraklProductFeedSubmitFactory
 
     MiraklProductFeedSubmitFactory(feed=retry_feed).run()
     return retry_feed
-
-
-def mark_product_property_for_mirakl_feed_update(*, product_property) -> None:
-    product = getattr(product_property, "product", None)
-    if product is None:
-        return
-    mark_remote_products_for_mirakl_feed_updates(product_ids=[product.id])

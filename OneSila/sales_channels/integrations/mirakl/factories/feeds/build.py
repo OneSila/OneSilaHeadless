@@ -8,30 +8,65 @@ from django.utils import timezone
 
 from sales_channels.integrations.mirakl.factories.feeds.renderer import MiraklProductFeedFileFactory
 from sales_channels.integrations.mirakl.factories.feeds.submit import MiraklProductFeedSubmitFactory
-from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeed
+from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeed, MiraklSalesChannelFeedItem
 
 
 class MiraklProductFeedFactory:
-    """Close a gathering Mirakl product feed and submit it."""
+    """Close gathering Mirakl feeds, render their CSV, and submit them."""
 
     gather_window = timedelta(minutes=20)
 
-    def __init__(self, *, sales_channel, remote_product_ids: Iterable[int] | None = None, force_full: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        sales_channel,
+        remote_product_ids: Iterable[int] | None = None,
+        force_full: bool = False,
+    ) -> None:
         self.sales_channel = sales_channel
         self.remote_product_ids = [remote_product_id for remote_product_id in (remote_product_ids or []) if remote_product_id]
         self.force_full = force_full
 
-    def run(self):
-        feed = self._get_gathering_feed()
-        if feed is None:
-            return None
+    def run(self) -> MiraklSalesChannelFeed | None:
+        processed_feeds = self.run_all()
+        return processed_feeds[-1] if processed_feeds else None
 
+    def run_all(self) -> list[MiraklSalesChannelFeed]:
+        processed_feeds: list[MiraklSalesChannelFeed] = []
+        for feed in self._get_candidate_feeds():
+            processed_feed = self._process_feed(feed=feed)
+            if processed_feed is not None:
+                processed_feeds.append(processed_feed)
+        return processed_feeds
+
+    def _get_candidate_feeds(self):
+        queryset = (
+            MiraklSalesChannelFeed.objects.filter(
+                sales_channel=self.sales_channel,
+                type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+                stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+                status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
+            )
+            .select_related("product_type", "sales_channel_view")
+            .order_by("created_at")
+        )
+        if not self.force_full:
+            cutoff = timezone.now() - self.gather_window
+            queryset = queryset.filter(updated_at__lte=cutoff)
+        if self.remote_product_ids:
+            feed_ids = MiraklSalesChannelFeedItem.objects.filter(
+                remote_product_id__in=self.remote_product_ids,
+            ).values_list("feed_id", flat=True)
+            queryset = queryset.filter(id__in=feed_ids)
+        return queryset
+
+    def _process_feed(self, *, feed: MiraklSalesChannelFeed) -> MiraklSalesChannelFeed | None:
         feed = self._lock_feed_for_processing(feed=feed)
         if feed is None:
             return None
 
         self._persist_feed_payload(feed=feed)
-        if not self._feed_has_items(feed=feed):
+        if not self._feed_has_rows(feed=feed):
             self._delete_empty_feed(feed=feed)
             return None
 
@@ -39,63 +74,69 @@ class MiraklProductFeedFactory:
         self._submit_feed_if_possible(feed=feed)
         return feed
 
-    def _get_gathering_feed(self):
-        queryset = MiraklSalesChannelFeed.objects.filter(
-            sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
-            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
-            status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
-        ).order_by("created_at")
-        if not self.force_full:
-            cutoff = timezone.now() - self.gather_window
-            queryset = queryset.filter(updated_at__lte=cutoff)
-        if self.remote_product_ids:
-            queryset = queryset.filter(items__remote_product_id__in=self.remote_product_ids).distinct()
-        return queryset.first()
-
-    def _lock_feed_for_processing(self, *, feed):
+    def _lock_feed_for_processing(self, *, feed: MiraklSalesChannelFeed) -> MiraklSalesChannelFeed | None:
         with transaction.atomic():
-            locked_feed = MiraklSalesChannelFeed.objects.select_for_update().get(id=feed.id)
+            locked_feed = (
+                MiraklSalesChannelFeed.objects.select_for_update()
+                .get(id=feed.id)
+            )
             if locked_feed.status != MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS:
+                return None
+            if self._has_pending_feed_for_group(feed=locked_feed):
                 return None
             locked_feed.status = MiraklSalesChannelFeed.STATUS_READY_TO_RENDER
             locked_feed.save(update_fields=["status", "updated_at"])
             return locked_feed
 
-    def _persist_feed_payload(self, *, feed) -> None:
-        payload_data = self._build_payload_data(feed=feed)
+    def _has_pending_feed_for_group(self, *, feed: MiraklSalesChannelFeed) -> bool:
+        return MiraklSalesChannelFeed.objects.filter(
+            sales_channel_id=feed.sales_channel_id,
+            product_type_id=feed.product_type_id,
+            sales_channel_view_id=feed.sales_channel_view_id,
+            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            status__in=[
+                MiraklSalesChannelFeed.STATUS_PENDING,
+                MiraklSalesChannelFeed.STATUS_SUBMITTED,
+                MiraklSalesChannelFeed.STATUS_PROCESSING,
+            ],
+        ).exclude(id=feed.id).exists()
+
+    def _persist_feed_payload(self, *, feed: MiraklSalesChannelFeed) -> None:
+        payload_data: list[dict[str, str]] = []
+        items_count = 0
+        for item in self._get_feed_items(feed=feed):
+            items_count += 1
+            payload_data.extend(item.payload_data or [])
+
         feed.payload_data = payload_data
-        feed.summary_data = self._build_summary_data(feed=feed, payload_data=payload_data)
+        feed.summary_data = {
+            "items_count": items_count,
+            "rows_count": len(payload_data),
+            "product_type_id": feed.product_type_id,
+            "sales_channel_view_id": feed.sales_channel_view_id,
+        }
         feed.save(update_fields=["payload_data", "summary_data"])
 
-    def _build_payload_data(self, *, feed) -> list[dict]:
-        payload_data = []
-        for item in self._get_feed_items(feed=feed):
-            payload_data.extend(item.payload_data.get("rows") or [])
-        return payload_data
-
-    def _build_summary_data(self, *, feed, payload_data: list[dict]) -> dict[str, int]:
-        return {
-            "items_count": feed.items.count(),
-            "rows_count": len(payload_data),
-        }
-
-    def _get_feed_items(self, *, feed):
-        queryset = feed.items.select_related("remote_product", "remote_product__local_instance").all()
+    def _get_feed_items(self, *, feed: MiraklSalesChannelFeed):
+        queryset = MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related(
+            "remote_product",
+            "remote_product__local_instance",
+            "sales_channel_view",
+        ).order_by("id")
         if self.remote_product_ids:
             queryset = queryset.filter(remote_product_id__in=self.remote_product_ids)
         return queryset
 
-    def _feed_has_items(self, *, feed) -> bool:
-        return feed.items.exists()
+    def _feed_has_rows(self, *, feed: MiraklSalesChannelFeed) -> bool:
+        return bool(feed.payload_data)
 
-    def _delete_empty_feed(self, *, feed) -> None:
+    def _delete_empty_feed(self, *, feed: MiraklSalesChannelFeed) -> None:
         feed.delete()
 
-    def _render_feed_file(self, *, feed) -> None:
+    def _render_feed_file(self, *, feed: MiraklSalesChannelFeed) -> None:
         MiraklProductFeedFileFactory(feed=feed).run()
 
-    def _submit_feed_if_possible(self, *, feed) -> None:
+    def _submit_feed_if_possible(self, *, feed: MiraklSalesChannelFeed) -> None:
         if not self.sales_channel.connected:
             return
         MiraklProductFeedSubmitFactory(feed=feed).run()

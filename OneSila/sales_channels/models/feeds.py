@@ -13,19 +13,6 @@ from core.upload_paths import tenant_upload_to
 class SalesChannelFeed(PolymorphicModel, models.Model):
     """Reusable batch artifact for feed-style integrations."""
 
-    TYPE_PRODUCT = "product"
-    TYPE_OFFER = "offer"
-    TYPE_COMBINED = "combined"
-
-    TYPE_CHOICES = [
-        (TYPE_PRODUCT, "Product"),
-        (TYPE_OFFER, "Offer"),
-        (TYPE_COMBINED, "Combined"),
-    ]
-
-    STATUS_GATHERING_PRODUCTS = "gathering_products"
-    STATUS_GATHERING_OFFERS = "gathering_offers"
-    STATUS_READY_TO_RENDER = "ready_to_render"
     STATUS_NEW = "new"
     STATUS_PENDING = "pending"
     STATUS_SUBMITTED = "submitted"
@@ -36,9 +23,6 @@ class SalesChannelFeed(PolymorphicModel, models.Model):
     STATUS_CANCELLED = "cancelled"
 
     STATUS_CHOICES = [
-        (STATUS_GATHERING_PRODUCTS, "Gathering products"),
-        (STATUS_GATHERING_OFFERS, "Gathering offers"),
-        (STATUS_READY_TO_RENDER, "Ready to render"),
         (STATUS_NEW, "New"),
         (STATUS_PENDING, "Pending"),
         (STATUS_SUBMITTED, "Submitted"),
@@ -54,8 +38,8 @@ class SalesChannelFeed(PolymorphicModel, models.Model):
         on_delete=models.CASCADE,
         related_name="feed_batches",
     )
-    type = models.CharField(max_length=32, choices=TYPE_CHOICES)
-    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_NEW)
+    type = models.CharField(max_length=32)
+    status = models.CharField(max_length=32, default=STATUS_NEW)
     remote_id = models.CharField(max_length=255, blank=True, default="")
     file = models.FileField(
         upload_to=tenant_upload_to("sales_channel_feeds"),
@@ -83,9 +67,7 @@ class SalesChannelFeed(PolymorphicModel, models.Model):
 
     @classmethod
     def get_gathering_status_for_type(cls, *, feed_type: str) -> str:
-        if feed_type == cls.TYPE_OFFER:
-            return cls.STATUS_GATHERING_OFFERS
-        return cls.STATUS_GATHERING_PRODUCTS
+        raise NotImplementedError(f"{cls.__name__} must define get_gathering_status_for_type().")
 
     @property
     def file_url(self) -> Optional[str]:

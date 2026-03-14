@@ -10,7 +10,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProduct,
     MiraklProductCategory,
     MiraklProductContent,
-    MiraklProductType as MiraklProductTypeModel,
+    MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
     MiraklPropertySelectValue,
@@ -205,7 +205,7 @@ class MiraklPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(
-    MiraklProductTypeModel,
+    MiraklProductType,
     filters=MiraklProductTypeFilter,
     order=MiraklProductTypeOrder,
     pagination=True,
@@ -232,11 +232,6 @@ class MiraklProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def template_url(self, info) -> str | None:
         return getattr(self, "template_url", None)
-
-    @field()
-    def ready_to_push(self, info) -> bool:
-        print(self.ready_to_push)
-        return bool(self.ready_to_push)
 
 
 @type(
