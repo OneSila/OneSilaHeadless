@@ -233,6 +233,11 @@ class MiraklProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
     def template_url(self, info) -> str | None:
         return getattr(self, "template_url", None)
 
+    @field()
+    def ready_to_push(self, info) -> bool:
+        print(self.ready_to_push)
+        return bool(self.ready_to_push)
+
 
 @type(
     MiraklProductTypeItem,

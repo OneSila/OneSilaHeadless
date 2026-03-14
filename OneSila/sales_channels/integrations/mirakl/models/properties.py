@@ -91,6 +91,7 @@ class MiraklProperty(RemoteProperty):
         choices=REPRESENTATION_TYPE_CHOICES,
         default=REPRESENTATION_PROPERTY,
     )
+    representation_type_decided = models.BooleanField(default=False)
     required = models.BooleanField(default=False)
     variant = models.BooleanField(default=False)
     requirement_level = models.CharField(max_length=64, blank=True, default="")

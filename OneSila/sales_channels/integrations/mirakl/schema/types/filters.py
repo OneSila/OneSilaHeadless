@@ -106,6 +106,17 @@ class MiraklProductTypeFilter(
     local_instance: Optional[ProductPropertiesRuleFilter]
     remote_id: auto
     name: auto
+    ready_to_push: Optional[bool]
+
+    @custom_filter
+    def ready_to_push(self, queryset, value: bool, prefix: str):
+        if value not in (None, UNSET):
+            if value:
+                queryset = queryset.exclude(template="")
+                queryset = queryset.exclude(template__isnull=True)
+            else:
+                queryset = queryset.filter(Q(template="") | Q(template__isnull=True))
+        return queryset, Q()
 
 
 @filter(MiraklProperty)
@@ -123,12 +134,27 @@ class MiraklPropertyFilter(
     type: auto
     is_common: auto
     representation_type: auto
+    show_property: Optional[bool]
 
     def get_mapped_locally_querysets(self):
         return (
             (MiraklPropertyQuerySet, "filter_mapped_locally"),
             (MiraklPropertySelectValueQuerySet, "filter_mirakl_property_mapped_locally"),
         )
+
+    @custom_filter
+    def show_property(self, queryset, value: bool, prefix: str):
+        if value not in (None, UNSET) and value:
+            queryset = queryset.filter(
+                Q(representation_type_decided=False)
+                | Q(
+                    representation_type__in=[
+                        MiraklProperty.REPRESENTATION_PROPERTY,
+                        MiraklProperty.REPRESENTATION_CONDITION,
+                    ]
+                )
+            )
+        return queryset, Q()
 
 
 @filter(MiraklPropertySelectValue)

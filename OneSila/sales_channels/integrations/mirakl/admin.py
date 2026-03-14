@@ -2,7 +2,44 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
-from .models import MiraklCategory, MiraklProductType, MiraklProductTypeItem
+from .factories import MiraklPublicDefinitionSyncFactory
+from .models import (
+    MiraklCategory,
+    MiraklProperty,
+    MiraklProductType,
+    MiraklProductTypeItem,
+    MiraklPublicDefinition,
+    MiraklSalesChannel,
+)
+
+
+@admin.action(description="Create Mirakl public definitions from undecided properties")
+def sync_mirakl_public_definitions(modeladmin, request, queryset):
+    total_synced = 0
+    for sales_channel in queryset:
+        total_synced += MiraklPublicDefinitionSyncFactory(sales_channel=sales_channel).run()
+    modeladmin.message_user(
+        request,
+        f"Created or refreshed public definitions for {total_synced} Mirakl properties.",
+    )
+
+
+@admin.register(MiraklSalesChannel)
+class MiraklSalesChannelAdmin(admin.ModelAdmin):
+    list_display = ("hostname", "shop_id", "sub_type", "active", "representation_status")
+    list_filter = ("active", "sub_type")
+    search_fields = ("hostname", "shop_id")
+    actions = (sync_mirakl_public_definitions,)
+
+    @admin.display(description="Representation Status")
+    def representation_status(self, obj):
+        undecided = MiraklProperty.objects.filter(
+            sales_channel=obj,
+            representation_type_decided=False,
+        ).count()
+        if undecided:
+            return f"{undecided} undecided"
+        return "All decided"
 
 
 class MiraklProductTypeInline(admin.TabularInline):
@@ -159,3 +196,17 @@ class MiraklProductTypeAdmin(admin.ModelAdmin):
     @admin.display(boolean=True, description="Ready To Push")
     def ready_to_push(self, obj):
         return obj.ready_to_push
+
+
+@admin.register(MiraklPublicDefinition)
+class MiraklPublicDefinitionAdmin(admin.ModelAdmin):
+    list_display = (
+        "hostname",
+        "property_code",
+        "representation_type",
+        "default_value",
+        "yes_text_value",
+        "no_text_value",
+    )
+    list_filter = ("hostname", "representation_type")
+    search_fields = ("hostname", "property_code")

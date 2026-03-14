@@ -17,6 +17,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
     MiraklPropertyApplicability,
     MiraklPropertySelectValue,
+    MiraklPublicDefinition,
     MiraklSalesChannelView,
 )
 
@@ -282,6 +283,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             remote_property.validations = self._ensure_json_value(item.get("validations"), default={})
             remote_property.transformations = self._ensure_json_value(item.get("transformations"), default=[])
             remote_property.raw_data = item
+            self._apply_public_definition(remote_property=remote_property)
             remote_property.save()
             self.summary_data["properties"] += 1
 
@@ -672,3 +674,21 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             if resolved:
                 return resolved
         return ""
+
+    def _apply_public_definition(self, *, remote_property: MiraklProperty) -> None:
+        public_definition = (
+            MiraklPublicDefinition.objects.filter(
+                hostname=self.sales_channel.hostname,
+                property_code=remote_property.code,
+            )
+            .order_by("id")
+            .first()
+        )
+        if public_definition is None:
+            return
+
+        remote_property.representation_type = public_definition.representation_type
+        remote_property.default_value = public_definition.default_value or remote_property.default_value
+        remote_property.yes_text_value = public_definition.yes_text_value or remote_property.yes_text_value
+        remote_property.no_text_value = public_definition.no_text_value or remote_property.no_text_value
+        remote_property.representation_type_decided = True

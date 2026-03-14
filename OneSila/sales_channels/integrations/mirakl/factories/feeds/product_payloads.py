@@ -12,6 +12,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProductType,
     MiraklProperty,
     MiraklPropertySelectValue,
+    MiraklPublicDefinition,
 )
 from sales_channels.models import SalesChannelFeedItem
 
@@ -31,6 +32,7 @@ class _BaseMiraklProductPayloadFactory:
         self.source_data_loader = MiraklProductSourceDataLoader(remote_product=remote_product)
         self._category_cache: dict[str, MiraklCategory | None] = {}
         self._product_type_cache: dict[str, MiraklProductType | None] = {}
+        self._public_definition_cache: dict[str, MiraklPublicDefinition | None] = {}
 
     def build(self) -> list[dict[str, Any]]:
         if self.local_product is None:
@@ -223,8 +225,9 @@ class _BaseMiraklProductPayloadFactory:
     ) -> str:
         product_property = product_context["property_by_id"].get(remote_property.local_instance_id)
         if product_property is None:
-            if remote_property.default_value:
-                return remote_property.default_value
+            default_value = self._get_effective_default_value(remote_property=remote_property)
+            if default_value:
+                return default_value
             if remote_property.local_instance_id is None and not self._is_required_remote_property(remote_property=remote_property):
                 return ""
             raise ValidationError(
@@ -254,7 +257,7 @@ class _BaseMiraklProductPayloadFactory:
         bullet_index: int | None = None,
         image_index: int | None = None,
     ) -> str:
-        return remote_property.default_value or ""
+        return self._get_effective_default_value(remote_property=remote_property)
 
     def _resolve_product_title(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
         return product_context["name"]
@@ -443,11 +446,12 @@ class _BaseMiraklProductPayloadFactory:
         return self._stringify(product_property.get_serialised_value(self.language))
 
     def _resolve_boolean_value(self, *, remote_property: MiraklProperty, value: bool) -> str:
+        yes_text_value, no_text_value = self._get_effective_boolean_text_values(remote_property=remote_property)
         if remote_property.type == "BOOLEAN":
-            if value and remote_property.yes_text_value:
-                return self._stringify(remote_property.yes_text_value)
-            if not value and remote_property.no_text_value:
-                return self._stringify(remote_property.no_text_value)
+            if value and yes_text_value:
+                return self._stringify(yes_text_value)
+            if not value and no_text_value:
+                return self._stringify(no_text_value)
             return "true" if value else "false"
 
         if remote_property.type == "SELECT":
@@ -568,6 +572,35 @@ class _BaseMiraklProductPayloadFactory:
 
     def _is_required_remote_property(self, *, remote_property: MiraklProperty) -> bool:
         return bool(remote_property.required or str(remote_property.requirement_level or "").upper() == "REQUIRED")
+
+    def _get_effective_default_value(self, *, remote_property: MiraklProperty) -> str:
+        public_definition = self._get_public_definition(remote_property=remote_property)
+        if public_definition is not None and public_definition.default_value:
+            return public_definition.default_value
+        return remote_property.default_value or ""
+
+    def _get_effective_boolean_text_values(self, *, remote_property: MiraklProperty) -> tuple[str, str]:
+        public_definition = self._get_public_definition(remote_property=remote_property)
+        if public_definition is not None:
+            return (
+                public_definition.yes_text_value or remote_property.yes_text_value or "",
+                public_definition.no_text_value or remote_property.no_text_value or "",
+            )
+        return remote_property.yes_text_value or "", remote_property.no_text_value or ""
+
+    def _get_public_definition(self, *, remote_property: MiraklProperty) -> MiraklPublicDefinition | None:
+        if not getattr(remote_property, "representation_type_decided", False):
+            return None
+        if remote_property.code not in self._public_definition_cache:
+            self._public_definition_cache[remote_property.code] = (
+                MiraklPublicDefinition.objects.filter(
+                    hostname=self.sales_channel.hostname,
+                    property_code=remote_property.code,
+                )
+                .order_by("id")
+                .first()
+            )
+        return self._public_definition_cache[remote_property.code]
 
     def _stringify(self, value: Any) -> str:
         if value in (None, ""):

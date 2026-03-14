@@ -21,6 +21,11 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
     MiraklPropertySelectValue,
 )
+from .product_payloads import (
+    MiraklProductCreatePayloadFactory,
+    MiraklProductDeletePayloadFactory,
+    MiraklProductUpdatePayloadFactory,
+)
 
 
 class MiraklProductFeedFileFactory:
@@ -93,6 +98,7 @@ class MiraklProductFeedFileFactory:
         self._category_cache: dict[str, MiraklCategory | None] = {}
         self._product_type_items_cache: dict[tuple[int, int | None], list[MiraklProductTypeItem]] = {}
         self._template_headers_cache: dict[int, list[str]] = {}
+        self._resolved_payload_rows_cache: dict[tuple[int, int | None, str], dict[int | None, dict[str, str]]] = {}
 
     def run(self) -> str:
         rendered_rows, template_headers = self._build_rendered_rows()
@@ -180,6 +186,12 @@ class MiraklProductFeedFileFactory:
             product_row = self._build_base_product_columns(row=row, context=context)
             product_row.update(self._build_schema_columns(context=context))
 
+        product_row = self._backfill_missing_template_headers(
+            item=item,
+            row=row,
+            product_row=product_row,
+            template_headers=template_headers,
+        )
         product_row.update(self._build_offer_columns(row=row, offer_payload=offer_payload, context=context))
         if not template_headers:
             return product_row
@@ -195,6 +207,57 @@ class MiraklProductFeedFileFactory:
             )
 
         return {header: product_row.get(header, "") for header in template_headers}
+
+    def _backfill_missing_template_headers(self, *, item, row: dict, product_row: dict[str, str], template_headers: list[str]) -> dict[str, str]:
+        if not template_headers:
+            return product_row
+
+        missing_headers = [
+            header
+            for header in template_headers
+            if header not in product_row and header not in self.OFFER_COLUMNS
+        ]
+        if not missing_headers:
+            return product_row
+
+        resolved_row = self._get_resolved_payload_row(item=item, row=row)
+        if not resolved_row:
+            return product_row
+
+        for header in missing_headers:
+            if header in resolved_row:
+                product_row[header] = resolved_row.get(header, "")
+
+        return product_row
+
+    def _get_resolved_payload_row(self, *, item, row: dict) -> dict[str, str]:
+        cache_key = (item.remote_product_id, item.sales_channel_view_id, item.action)
+        if cache_key not in self._resolved_payload_rows_cache:
+            payload_factory_class = self._get_payload_factory_class(action=item.action)
+            payload_factory = payload_factory_class(
+                remote_product=item.remote_product,
+                sales_channel_view=item.sales_channel_view,
+            )
+            payload_rows = payload_factory.build()
+            self._resolved_payload_rows_cache[cache_key] = {
+                payload_row.get("local_product_id"): payload_row
+                for payload_row in payload_rows
+            }
+
+        cached_rows = self._resolved_payload_rows_cache[cache_key]
+        local_product_id = row.get("local_product_id")
+        if local_product_id in cached_rows:
+            return cached_rows[local_product_id]
+        if len(cached_rows) == 1:
+            return next(iter(cached_rows.values()))
+        return {}
+
+    def _get_payload_factory_class(self, *, action: str):
+        if action == "create":
+            return MiraklProductCreatePayloadFactory
+        if action == "delete":
+            return MiraklProductDeletePayloadFactory
+        return MiraklProductUpdatePayloadFactory
 
     def _build_base_product_columns(self, *, row: dict, context: dict) -> dict[str, str]:
         images = list(row.get("images") or [])
