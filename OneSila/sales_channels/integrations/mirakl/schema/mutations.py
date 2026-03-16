@@ -20,6 +20,8 @@ from sales_channels.integrations.mirakl.schema.types.input import (
     MiraklPropertySelectValuePartialInput,
     MiraklRemoteCurrencyPartialInput,
     MiraklRemoteLanguagePartialInput,
+    MiraklSalesChannelImportInput,
+    MiraklSalesChannelImportPartialInput,
     MiraklSalesChannelInput,
     MiraklSalesChannelPartialInput,
     MiraklSalesChannelViewPartialInput,
@@ -60,6 +62,9 @@ class MiraklSalesChannelMutation:
         MiraklPropertySelectValuePartialInput,
     )
     update_mirakl_product_type_item: MiraklProductTypeItemType = update(MiraklProductTypeItemPartialInput)
+    create_mirakl_import_process: MiraklSalesChannelImportType = create(MiraklSalesChannelImportInput)
+    update_mirakl_import_process: MiraklSalesChannelImportType = update(MiraklSalesChannelImportPartialInput)
+
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def validate_mirakl_credentials(
         self,
@@ -96,35 +101,6 @@ class MiraklSalesChannelMutation:
         refresh_website_pull_models.send(sender=sales_channel.__class__, instance=sales_channel)
         sales_channel.refresh_from_db()
         return sales_channel
-
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
-    def start_mirakl_schema_import(
-        self,
-        instance: MiraklSalesChannelPartialInput,
-        info: Info,
-    ) -> MiraklSalesChannelImportType:
-        from imports_exports.models import Import
-
-        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        sales_channel = MiraklSalesChannel.objects.get(
-            id=instance.id.node_id,
-            multi_tenant_company=multi_tenant_company,
-        )
-
-        if not sales_channel.connected:
-            raise ValidationError("Mirakl sales channel is missing credentials.")
-
-        if sales_channel.is_importing:
-            raise ValidationError("Mirakl sales channel is already importing.")
-
-        import_process = MiraklSalesChannelImport.objects.create(
-            sales_channel=sales_channel,
-            multi_tenant_company=multi_tenant_company,
-            type=MiraklSalesChannelImport.TYPE_SCHEMA,
-            status=Import.STATUS_NEW,
-            name=f"Mirakl schema import - {sales_channel.hostname}",
-        )
-        return import_process
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def start_mirakl_product_feed(
@@ -166,25 +142,6 @@ class MiraklSalesChannelMutation:
             raise ValidationError("Feed does not belong to a Mirakl sales channel.")
         return retry_mirakl_feed(feed_id=feed.id)
 
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
-    def refresh_mirakl_import(
-        self,
-        instance: MiraklSalesChannelPartialInput,
-        import_process: SalesChannelImportPartialInput,
-        info: Info,
-    ) -> MiraklSalesChannelImportType:
-        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        sales_channel = MiraklSalesChannel.objects.get(
-            id=instance.id.node_id,
-            multi_tenant_company=multi_tenant_company,
-        )
-        mirakl_import = MiraklSalesChannelImport.objects.get(
-            id=import_process.id.node_id,
-            sales_channel=sales_channel,
-            multi_tenant_company=multi_tenant_company,
-        )
-        mirakl_import.refresh_from_db()
-        return mirakl_import
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def refresh_mirakl_import_status(

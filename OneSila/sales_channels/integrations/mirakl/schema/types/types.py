@@ -2,12 +2,14 @@ from typing import Annotated, List, Optional
 
 from core.schema.core.types.types import GetQuerysetMultiTenantMixin, field, lazy, relay, type
 from currencies.schema.types.types import CurrencyType
+from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklDocumentType,
     MiraklEanCode,
     MiraklPrice,
     MiraklProduct,
+    MiraklProductIssue,
     MiraklProductCategory,
     MiraklProductContent,
     MiraklProductType,
@@ -25,6 +27,7 @@ from sales_channels.integrations.mirakl.schema.types.filters import (
     MiraklDocumentTypeFilter,
     MiraklEanCodeFilter,
     MiraklPriceFilter,
+    MiraklProductIssueFilter,
     MiraklProductCategoryFilter,
     MiraklProductContentMiraklFilter,
     MiraklProductFilter,
@@ -43,6 +46,7 @@ from sales_channels.integrations.mirakl.schema.types.ordering import (
     MiraklDocumentTypeOrder,
     MiraklEanCodeOrder,
     MiraklPriceOrder,
+    MiraklProductIssueOrder,
     MiraklProductCategoryOrder,
     MiraklProductContentOrder,
     MiraklProductOrder,
@@ -56,6 +60,7 @@ from sales_channels.integrations.mirakl.schema.types.ordering import (
     MiraklSalesChannelOrder,
     MiraklSalesChannelViewOrder,
 )
+from strawberry.relay import to_base64
 
 
 @type(
@@ -273,6 +278,18 @@ class MiraklRemoteProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(
+    MiraklProductIssue,
+    filters=MiraklProductIssueFilter,
+    order=MiraklProductIssueOrder,
+    pagination=True,
+    fields="__all__",
+)
+class MiraklProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
+    remote_product: Annotated["MiraklRemoteProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    views: List[Annotated["MiraklSalesChannelViewType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+
+
+@type(
     MiraklProductContent,
     filters=MiraklProductContentMiraklFilter,
     order=MiraklProductContentOrder,
@@ -314,3 +331,13 @@ class MiraklEanCodeType(relay.Node, GetQuerysetMultiTenantMixin):
 )
 class MiraklSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+
+    @field()
+    def import_id(self, info) -> str:
+        return to_base64(ImportType, self.pk)
+
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import SalesChannelImportType
+
+        return to_base64(SalesChannelImportType, self.pk)

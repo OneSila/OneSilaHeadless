@@ -5,6 +5,7 @@ from sales_channels.integrations.mirakl.schema.types.types import (
     MiraklDocumentTypeType,
     MiraklEanCodeType,
     MiraklPriceType,
+    MiraklProductIssueType,
     MiraklProductCategoryType,
     MiraklProductContentType,
     MiraklProductTypeType,
@@ -57,6 +58,9 @@ class MiraklSalesChannelsQuery:
 
     mirakl_product: MiraklRemoteProductType = node()
     mirakl_products: DjangoListConnection[MiraklRemoteProductType] = connection()
+
+    mirakl_product_issue: MiraklProductIssueType = node()
+    mirakl_product_issues: DjangoListConnection[MiraklProductIssueType] = connection()
 
     mirakl_product_content: MiraklProductContentType = node()
     mirakl_product_contents: DjangoListConnection[MiraklProductContentType] = connection()

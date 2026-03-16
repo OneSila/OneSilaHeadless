@@ -18,6 +18,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklEanCode,
     MiraklPrice,
     MiraklProduct,
+    MiraklProductIssue,
     MiraklProductCategory,
     MiraklProductContent,
     MiraklProductType,
@@ -201,6 +202,19 @@ class MiraklProductFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[ProductFilter]
     remote_parent_product: Optional[RemoteProductFilter]
+
+
+@filter(MiraklProductIssue)
+class MiraklProductIssueFilter(SearchFilterMixin):
+    id: auto
+    remote_product: Optional[RemoteProductFilter]
+    views: Optional[MiraklSalesChannelViewFilter]
+    main_code: auto
+    code: auto
+    severity: auto
+    reason_label: auto
+    attribute_code: auto
+    is_rejected: auto
 
 
 @filter(MiraklProductContent)

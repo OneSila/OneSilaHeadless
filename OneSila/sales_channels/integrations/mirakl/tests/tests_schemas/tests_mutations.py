@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-from django.db import transaction
 from django.test import TransactionTestCase
 from model_bakery import baker
 
@@ -28,13 +27,25 @@ mutation ($instance: MiraklSalesChannelPartialInput!) {
 }
 """
 
-START_MIRAKL_SCHEMA_IMPORT_MUTATION = """
-mutation ($instance: MiraklSalesChannelPartialInput!) {
-  startMiraklSchemaImport(instance: $instance) {
+CREATE_SALES_IMPORT_PROCESS_MUTATION = """
+mutation ($data: SalesChannelImportInput!) {
+  createSalesImportProcess(data: $data) {
     id
-    type
+    importId
     status
-    name
+    percentage
+    __typename
+  }
+}
+"""
+
+CREATE_MIRAKL_IMPORT_PROCESS_MUTATION = """
+mutation ($data: MiraklSalesChannelImportInput!) {
+  createMiraklImportProcess(data: $data) {
+    id
+    status
+    type
+    __typename
   }
 }
 """
@@ -109,23 +120,47 @@ class MiraklMutationTests(TransactionTestCaseMixin, TransactionTestCase):
             instance=self.sales_channel,
         )
 
-    @patch("sales_channels.integrations.mirakl.tasks.mirakl_import_db_task")
-    def test_start_schema_import_creates_import_and_dispatches_task(self, import_task_mock):
+    def test_create_sales_import_process_creates_mirakl_products_import(self):
         response = self.strawberry_test_client(
-            query=START_MIRAKL_SCHEMA_IMPORT_MUTATION,
+            query=CREATE_SALES_IMPORT_PROCESS_MUTATION,
             variables={
-                "instance": {
-                    "id": self.to_global_id(self.sales_channel),
+                "data": {
+                    "salesChannel": {
+                        "id": self.to_global_id(self.sales_channel),
+                    },
+                    "name": MiraklSalesChannelImport.TYPE_PRODUCTS,
+                    "status": MiraklSalesChannelImport.STATUS_PENDING,
+                    "skipBrokenRecords": True,
+                    "updateOnly": True,
                 },
             },
         )
 
         self.assertIsNone(response.errors)
-        transaction.on_commit(lambda: None)
-        import_process = MiraklSalesChannelImport.objects.get(
-            sales_channel=self.sales_channel,
-            type=MiraklSalesChannelImport.TYPE_SCHEMA,
+        created_import = MiraklSalesChannelImport.objects.latest("id")
+        self.assertEqual(created_import.type, MiraklSalesChannelImport.TYPE_PRODUCTS)
+        self.assertTrue(created_import.skip_broken_records)
+        self.assertTrue(created_import.update_only)
+
+    def test_create_mirakl_import_process_creates_typed_import(self):
+        response = self.strawberry_test_client(
+            query=CREATE_MIRAKL_IMPORT_PROCESS_MUTATION,
+            variables={
+                "data": {
+                    "salesChannel": {
+                        "id": self.to_global_id(self.sales_channel),
+                    },
+                    "name": MiraklSalesChannelImport.TYPE_PRODUCTS,
+                    "status": MiraklSalesChannelImport.STATUS_PENDING,
+                    "type": MiraklSalesChannelImport.TYPE_PRODUCTS,
+                },
+            },
         )
-        self.assertEqual(response.data["startMiraklSchemaImport"]["type"], MiraklSalesChannelImport.TYPE_SCHEMA)
-        self.assertEqual(response.data["startMiraklSchemaImport"]["status"], MiraklSalesChannelImport.STATUS_NEW)
-        self.assertTrue(MiraklSalesChannelImport.objects.filter(id=import_process.id).exists())
+
+        self.assertIsNone(response.errors)
+        self.assertEqual(
+            response.data["createMiraklImportProcess"]["type"],
+            MiraklSalesChannelImport.TYPE_PRODUCTS,
+        )
+        created_import = MiraklSalesChannelImport.objects.latest("id")
+        self.assertEqual(created_import.type, MiraklSalesChannelImport.TYPE_PRODUCTS)

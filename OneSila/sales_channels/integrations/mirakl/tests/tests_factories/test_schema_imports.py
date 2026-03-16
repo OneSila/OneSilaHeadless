@@ -346,7 +346,7 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
         self.assertTrue(child_fit_note_item.required)
         self.assertTrue(child_fit_note_item.variant)
 
-        condition_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="condition")
+        condition_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="offer_state")
         self.assertEqual(condition_property.representation_type, MiraklProperty.REPRESENTATION_CONDITION)
         self.assertEqual(condition_property.type, Property.TYPES.SELECT)
         self.assertFalse(condition_property.allows_unmapped_values)

@@ -77,6 +77,16 @@ class MiraklSalesChannel(SalesChannel):
         choices=CSV_DELIMITER_CHOICES,
         help_text="Delimiter expected in operator CSV files.",
     )
+    last_differential_issues_fetch = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last successful Mirakl differential issues fetch boundary.",
+    )
+    last_full_fetch = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last successful Mirakl full issues fetch boundary.",
+    )
 
     class Meta:
         verbose_name = "Mirakl Sales Channel"

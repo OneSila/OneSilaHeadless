@@ -6,6 +6,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklEanCode,
     MiraklPrice,
     MiraklProduct,
+    MiraklProductIssue,
     MiraklProductCategory,
     MiraklProductContent,
     MiraklProductType,
@@ -82,6 +83,15 @@ class MiraklProductCategoryOrder:
 @order(MiraklProduct)
 class MiraklProductOrder:
     id: auto
+
+
+@order(MiraklProductIssue)
+class MiraklProductIssueOrder:
+    id: auto
+    main_code: auto
+    code: auto
+    severity: auto
+    is_rejected: auto
 
 
 @order(MiraklProductContent)

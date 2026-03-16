@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django.test import TransactionTestCase
 from model_bakery import baker
 
@@ -8,7 +9,9 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
     MiraklPropertySelectValue,
     MiraklProductType,
+    MiraklProductIssue,
     MiraklRemoteCurrency,
+    MiraklProduct,
     MiraklSalesChannel,
     MiraklSalesChannelView,
 )
@@ -24,6 +27,8 @@ query {
         shopId
         apiKey
         connected
+        lastDifferentialIssuesFetch
+        lastFullFetch
       }
     }
   }
@@ -123,6 +128,41 @@ query ($mappedLocally: Boolean!) {
 }
 """
 
+MIRAKL_PRODUCT_ISSUES_FILTER_QUERY = """
+query ($view: ID!, $isRejected: Boolean!) {
+  miraklProductIssues(filters: {views: {id: {exact: $view}}, isRejected: {exact: $isRejected}}) {
+    edges {
+      node {
+        id
+        mainCode
+        code
+        severity
+        isRejected
+        views {
+          remoteId
+        }
+      }
+    }
+  }
+}
+"""
+
+MIRAKL_PRODUCT_ISSUE_NODE_QUERY = """
+query ($id: ID!) {
+  miraklProductIssue(id: $id) {
+    id
+    mainCode
+    code
+    views {
+      remoteId
+    }
+    remoteProduct {
+      id
+    }
+  }
+}
+"""
+
 
 class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
@@ -160,6 +200,9 @@ class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
         )
 
     def test_mirakl_sales_channel_query_exposes_api_key_and_connected(self):
+        self.sales_channel.last_differential_issues_fetch = timezone.now()
+        self.sales_channel.last_full_fetch = timezone.now()
+        self.sales_channel.save(update_fields=["last_differential_issues_fetch", "last_full_fetch"])
         response = self.strawberry_test_client(query=MIRAKL_CHANNELS_QUERY)
 
         self.assertIsNone(response.errors)
@@ -167,6 +210,8 @@ class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
         self.assertEqual(node["shopId"], self.sales_channel.shop_id)
         self.assertEqual(node["apiKey"], self.sales_channel.api_key)
         self.assertTrue(node["connected"])
+        self.assertIsNotNone(node["lastDifferentialIssuesFetch"])
+        self.assertIsNotNone(node["lastFullFetch"])
 
     def test_mirakl_mapping_queries_expose_concrete_nested_types_and_mapping_flags(self):
         baker.make(
@@ -342,3 +387,85 @@ class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
         edges = response.data["miraklProductTypes"]["edges"]
         self.assertEqual(len(edges), 1)
         self.assertEqual(edges[0]["node"]["id"], self.to_global_id(mapped_product_type))
+
+    def test_mirakl_product_issues_can_filter_by_view_and_is_rejected(self):
+        remote_product = baker.make(
+            MiraklProduct,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_sku="shopSku1",
+        )
+        view = baker.make(
+            MiraklSalesChannelView,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="FR",
+            name="France",
+        )
+        matching_issue = baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=remote_product,
+            main_code="MCM-04012",
+            code="2",
+            severity="ERROR",
+            is_rejected=True,
+        )
+        matching_issue.views.add(view)
+        other_issue = baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=remote_product,
+            main_code="MCM-05000",
+            code="MCM-05000",
+            severity="WARNING",
+            is_rejected=False,
+        )
+
+        response = self.strawberry_test_client(
+            query=MIRAKL_PRODUCT_ISSUES_FILTER_QUERY,
+            variables={"view": self.to_global_id(view), "isRejected": True},
+        )
+
+        self.assertIsNone(response.errors)
+        edges = response.data["miraklProductIssues"]["edges"]
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["node"]["id"], self.to_global_id(matching_issue))
+        self.assertEqual(edges[0]["node"]["views"][0]["remoteId"], "FR")
+        self.assertNotEqual(edges[0]["node"]["id"], self.to_global_id(other_issue))
+
+    def test_mirakl_product_issue_node_query_returns_views_and_remote_product(self):
+        remote_product = baker.make(
+            MiraklProduct,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_sku="shopSku1",
+        )
+        view = baker.make(
+            MiraklSalesChannelView,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="BE",
+            name="Belgium",
+        )
+        issue = baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=remote_product,
+            main_code="MCM-04012",
+            code="2",
+            severity="ERROR",
+            is_rejected=True,
+        )
+        issue.views.add(view)
+
+        response = self.strawberry_test_client(
+            query=MIRAKL_PRODUCT_ISSUE_NODE_QUERY,
+            variables={"id": self.to_global_id(issue)},
+        )
+
+        self.assertIsNone(response.errors)
+        node = response.data["miraklProductIssue"]
+        self.assertEqual(node["id"], self.to_global_id(issue))
+        self.assertEqual(node["remoteProduct"]["id"], self.to_global_id(remote_product))
+        self.assertEqual(node["views"][0]["remoteId"], "BE")

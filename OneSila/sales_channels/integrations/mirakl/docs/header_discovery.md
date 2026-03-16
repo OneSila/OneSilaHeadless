@@ -77,6 +77,33 @@ Known risk areas:
 - media / image handling may differ per operator subtype
 - units / measurement fields may require extra semantic pairing logic
 
+## Notable `type_parameters` signatures
+
+Across the Mirakl channels we've inspected there are recurring `type_parameters` combinations that encode broad field families. These are useful to recognize during schema import because they tell us whether the property behaves like a select, image, numeric, date, etc. The following table summarizes the ones we have already seen and what they typically mean on Mirakl:
+
+| Signature                          | Meaning (typical Mirakl usage)               |
+| ---------------------------------- | -------------------------------------------- |
+| `[]`                               | Plain field (text, boolean, etc.)            |
+| `[LIST_CODE=**]`                   | Select / multiselect list attribute          |
+| `[DEFAULT_VALUE=**, LIST_CODE=**]` | Select list with default                     |
+| `[PRECISION=**]`                   | Numeric field                                |
+| `[PRECISION=**, UNIT=**]`          | Numeric with unit (dimensions, weight, etc.) |
+| `[PATTERN=dd/MM/yyyy]`             | Date field                                   |
+| `[MAX_SIZE=**, TYPE=**]`           | File/image upload                            |
+
+### Common validation signatures
+
+When importing the schema we also capture Mirakl’s `validations` metadata. The most frequent patterns we’ve seen include:
+
+- `MAX_LENGTH|255` — limits text to 255 characters.
+- `MIN_LENGTH|3` — enforces a minimum of 3 characters.
+- `PRODUCT_REFERENCE|EAN-8|UPC|EAN-13` — restricts the value to one of the listed identifier types.
+- `FORBIDDEN_WORDS|"word1,word2"` — blocks titles or descriptions containing the comma-separated list of substrings (often used for product titles).
+
+We will need to preserve these when recreating field mappings and when building import payloads, so we know how to validate or coerce the local data before sending it to Mirakl.
+
+We will need to keep these in mind during schema import and CSV payload generation so we can consistently apply validation, defaulting, and serialization according to Mirakl’s expectations.
+
 ## Possible fallback
 
 If schema-only reconstruction is not reliable enough, we should introduce a dedicated model such as:

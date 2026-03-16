@@ -39,6 +39,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self._value_list_single_defaults: dict[str, str] = {}
         self._offer_states_value_list_code = "offer_states"
         self._offer_states_value_list_label = "Offer states"
+        self._offer_state_property_code = "offer_state"
         self.summary_data = {
             "categories": 0,
             "document_types": 0,
@@ -441,17 +442,17 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             lookup={
                 "sales_channel": self.sales_channel,
                 "multi_tenant_company": self.sales_channel.multi_tenant_company,
-                "code": "condition",
+                "code": self._offer_state_property_code,
             },
         )
         if remote_property is None:
             remote_property = MiraklProperty(
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
-                code="condition",
+                code=self._offer_state_property_code,
             )
 
-        remote_property.code = "condition"
+        remote_property.code = self._offer_state_property_code
         remote_property.name = "Condition"
         remote_property.description = "Offer state / condition values imported from OF61."
         remote_property.example = ""

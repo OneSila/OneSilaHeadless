@@ -6,6 +6,9 @@ from integrations.factories.remote_task import BaseRemoteTask
 from sales_channels.integrations.mirakl.factories.imports.schema_imports import (
     MiraklSchemaImportProcessor,
 )
+from sales_channels.integrations.mirakl.factories.imports.products import (
+    MiraklProductsImportProcessor,
+)
 from sales_channels.decorators import remote_task
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
 
@@ -16,6 +19,12 @@ def mirakl_import_db_task(*, import_process, sales_channel):
     import_type = getattr(import_process, "type", MiraklSalesChannelImport.TYPE_SCHEMA)
     if import_type == MiraklSalesChannelImport.TYPE_SCHEMA:
         factory = MiraklSchemaImportProcessor(
+            import_process=import_process,
+            sales_channel=sales_channel,
+        )
+        factory.run()
+    elif import_type == MiraklSalesChannelImport.TYPE_PRODUCTS:
+        factory = MiraklProductsImportProcessor(
             import_process=import_process,
             sales_channel=sales_channel,
         )
@@ -56,6 +65,20 @@ def sales_channels__tasks__refresh_mirakl_imports__cronjob():
     refresh_mirakl_feed_statuses()
 
 
+@db_periodic_task(crontab(minute="*/30"))
+def sales_channels__tasks__refresh_mirakl_product_issues_differential__cronjob():
+    from sales_channels.integrations.mirakl.flows import refresh_mirakl_product_issues_differential
+
+    return refresh_mirakl_product_issues_differential()
+
+
+@db_periodic_task(crontab(hour="*/12", minute="0"))
+def sales_channels__tasks__refresh_mirakl_product_issues_full__cronjob():
+    from sales_channels.integrations.mirakl.flows import refresh_mirakl_product_issues_full
+
+    return refresh_mirakl_product_issues_full()
+
+
 @db_task()
 def sales_channels__tasks__sync_mirakl_product_feeds(*, sales_channel_id: int | None = None, force: bool = False):
     from sales_channels.integrations.mirakl.flows import process_mirakl_gathering_product_feeds
@@ -78,6 +101,20 @@ def sales_channels__tasks__retry_mirakl_feed(*, feed_id: int):
     from sales_channels.integrations.mirakl.flows import retry_mirakl_feed
 
     return retry_mirakl_feed(feed_id=feed_id)
+
+
+@db_task()
+def sales_channels__tasks__refresh_mirakl_product_issues_differential(*, sales_channel_id: int | None = None):
+    from sales_channels.integrations.mirakl.flows import refresh_mirakl_product_issues_differential
+
+    return refresh_mirakl_product_issues_differential(sales_channel_id=sales_channel_id)
+
+
+@db_task()
+def sales_channels__tasks__refresh_mirakl_product_issues_full(*, sales_channel_id: int | None = None):
+    from sales_channels.integrations.mirakl.flows import refresh_mirakl_product_issues_full
+
+    return refresh_mirakl_product_issues_full(sales_channel_id=sales_channel_id)
 
 
 def _get_mirakl_remote_product_ids_for_product(*, sales_channel_id: int, product_id: int) -> list[int]:

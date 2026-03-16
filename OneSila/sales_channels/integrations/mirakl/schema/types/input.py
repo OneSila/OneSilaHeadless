@@ -10,6 +10,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklRemoteCurrency,
     MiraklRemoteLanguage,
     MiraklSalesChannel,
+    MiraklSalesChannelImport,
     MiraklSalesChannelView,
 )
 
@@ -21,6 +22,16 @@ class MiraklSalesChannelInput:
 
 @partial(MiraklSalesChannel, fields="__all__")
 class MiraklSalesChannelPartialInput(NodeInput):
+    pass
+
+
+@input(MiraklSalesChannelImport, exclude=["saleschannelimport_ptr", "import_ptr"])
+class MiraklSalesChannelImportInput:
+    pass
+
+
+@partial(MiraklSalesChannelImport, fields="__all__")
+class MiraklSalesChannelImportPartialInput(NodeInput):
     pass
 
 
