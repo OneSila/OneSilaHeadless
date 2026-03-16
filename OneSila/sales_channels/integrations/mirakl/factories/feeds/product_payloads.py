@@ -18,6 +18,7 @@ from sales_channels.factories.products.products import (
     RemoteProductDeleteFactory,
     RemoteProductSyncFactory,
 )
+from sales_channels.helpers import _content_is_empty, build_content_data
 from sales_channels.integrations.mirakl.factories.mixins import GetMiraklAPIMixin
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
@@ -155,6 +156,8 @@ class MiraklProductPayloadBuilder:
             product=product,
             prices=prices,
         )
+        content_payload = self._resolve_content_payload(product=product)
+        fallback_name = getattr(translation, "name", None) or getattr(product, "name", "") or ""
 
         return {
             "product": product,
@@ -170,9 +173,10 @@ class MiraklProductPayloadBuilder:
             "ean": ean,
             "price_data": price_data,
             "sku": getattr(product, "sku", "") or "",
-            "name": getattr(translation, "name", None) or getattr(product, "name", "") or "",
-            "short_description": getattr(translation, "short_description", None) or "",
-            "description": getattr(translation, "description", None) or "",
+            "name": self._stringify(content_payload.get("name")) or fallback_name,
+            "short_description": self._normalize_content_value(content_payload.get("shortDescription")),
+            "description": self._normalize_content_value(content_payload.get("description")),
+            "bullet_points": [self._stringify(point) for point in content_payload.get("bulletPoints", []) if self._stringify(point)],
             "url_key": getattr(translation, "url_key", None) or "",
         }
 
@@ -446,6 +450,7 @@ class MiraklProductPayloadBuilder:
                 {
                     "url": url,
                     "is_main": bool(item.is_main_image),
+                    "is_swatch": media.image_type == Media.COLOR_SHOT,
                     "sort_order": item.sort_order,
                 }
             )
@@ -526,9 +531,42 @@ class MiraklProductPayloadBuilder:
                     f"Map Mirakl field '{remote_property.code}'"
                 )
             raise PreFlightCheckError(
-                f"Mirakl required field '{remote_property.code}' is missing for product {product_context['sku']}."
+                self._build_missing_required_value_message(
+                    remote_property=remote_property,
+                    product_context=product_context,
+                )
             )
         return self._stringify(value)
+
+    def _build_missing_required_value_message(
+        self,
+        *,
+        remote_property: MiraklProperty,
+        product_context: dict[str, Any],
+    ) -> str:
+        product = product_context.get("product")
+        product_label = product_context["sku"]
+        local_instance = getattr(remote_property, "local_instance", None)
+        if local_instance is None:
+            return (
+                f"Mirakl required field '{remote_property.code}' is missing for product {product_label}."
+            )
+
+        local_property_label = (
+            getattr(local_instance, "internal_name", None)
+            or getattr(local_instance, "name", None)
+            or str(local_instance.id)
+        )
+        parent_product = product_context.get("parent_product")
+        if product is not None and parent_product is not None and getattr(product, "id", None) != getattr(parent_product, "id", None):
+            return (
+                f"Mirakl required property '{remote_property.code}' (local '{local_property_label}') "
+                f"has no value for variation product {product_label}."
+            )
+        return (
+            f"Mirakl required property '{remote_property.code}' (local '{local_property_label}') "
+            f"has no value for product {product_label}."
+        )
 
     def _is_missing_required_mapping(
         self,
@@ -582,9 +620,7 @@ class MiraklProductPayloadBuilder:
                 return default_value
             if remote_property.local_instance_id is None:
                 return ""
-            raise MissingMappingError(
-                f"Map Mirakl field '{remote_property.code}' to a OneSila property or set a default value."
-            )
+            return ""
         return self._serialize_property_value(
             product_property=product_property,
             remote_property=remote_property,
@@ -625,10 +661,12 @@ class MiraklProductPayloadBuilder:
         return product_context["short_description"]
 
     def _resolve_product_bullet_point(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
-        bullet_points = self._split_bullet_points(
-            product_context["short_description"],
-            product_context["description"],
-        )
+        bullet_points = list(product_context.get("bullet_points") or [])
+        if not bullet_points:
+            bullet_points = self._split_bullet_points(
+                product_context["short_description"],
+                product_context["description"],
+            )
         if bullet_index is not None:
             index = bullet_index
         else:
@@ -969,6 +1007,30 @@ class MiraklProductPayloadBuilder:
             return value.date().isoformat()
         if hasattr(value, "isoformat"):
             return value.isoformat()
+        return self._stringify(value)
+
+    def _resolve_content_payload(self, *, product: Product) -> dict[str, Any]:
+        content_data = build_content_data(
+            product=product,
+            sales_channel=self.sales_channel,
+        )
+        if not content_data:
+            return {}
+
+        preferred_languages: list[str] = []
+        if self.language:
+            preferred_languages.append(str(self.language))
+        preferred_languages.extend([language for language in content_data.keys() if language not in preferred_languages])
+
+        for language in preferred_languages:
+            payload = content_data.get(language)
+            if payload:
+                return payload
+        return {}
+
+    def _normalize_content_value(self, value: Any) -> str:
+        if _content_is_empty(value):
+            return ""
         return self._stringify(value)
 
     def _stringify(self, value: Any) -> str:

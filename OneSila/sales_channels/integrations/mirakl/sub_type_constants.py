@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 DEFAULT_MIRAKL_SUB_TYPE = "mirakl"
 
 MIRAKL_SUB_TYPE_CHOICES = [
@@ -381,3 +383,41 @@ MIRAKL_SUB_TYPE_CHOICES = [
     ("zoro", "Zoro"),
     ("zupply", "Zupply"),
 ]
+
+
+def infer_mirakl_sub_type_from_hostname(*, hostname: str) -> str:
+    raw_hostname = str(hostname or "").strip().lower()
+    if not raw_hostname:
+        return DEFAULT_MIRAKL_SUB_TYPE
+
+    parsed = urlparse(raw_hostname if "://" in raw_hostname else f"https://{raw_hostname}")
+    host = parsed.netloc or parsed.path or raw_hostname
+    host = host.strip("/").lower()
+    if not host:
+        return DEFAULT_MIRAKL_SUB_TYPE
+
+    normalized_host = host.replace("-", "_").replace(".", "_")
+    candidate_types = [choice[0] for choice in MIRAKL_SUB_TYPE_CHOICES if choice[0] != DEFAULT_MIRAKL_SUB_TYPE]
+
+    exact_matches = [candidate for candidate in candidate_types if candidate in {host, normalized_host}]
+    if exact_matches:
+        return max(exact_matches, key=len)
+
+    token_matches = [
+        candidate
+        for candidate in candidate_types
+        if f"_{candidate}_" in f"_{normalized_host}_"
+    ]
+    if token_matches:
+        return max(token_matches, key=len)
+
+    compact_host = normalized_host.replace("_", "")
+    compact_matches = [
+        candidate
+        for candidate in candidate_types
+        if candidate.replace("_", "") and candidate.replace("_", "") in compact_host
+    ]
+    if compact_matches:
+        return max(compact_matches, key=len)
+
+    return DEFAULT_MIRAKL_SUB_TYPE

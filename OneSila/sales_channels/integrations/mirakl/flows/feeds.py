@@ -17,7 +17,6 @@ from sales_channels.models import SalesChannelFeed, SalesChannelFeedItem
 def process_mirakl_gathering_product_feeds(
     *,
     sales_channel_id: int | None = None,
-    remote_product_ids: list[int] | None = None,
     force: bool = False,
 ) -> list[SalesChannelFeed]:
     queryset = MiraklSalesChannelFeed.objects.filter(
@@ -28,11 +27,6 @@ def process_mirakl_gathering_product_feeds(
     ).select_related("sales_channel")
     if sales_channel_id is not None:
         queryset = queryset.filter(sales_channel_id=sales_channel_id)
-    if remote_product_ids:
-        feed_ids = MiraklSalesChannelFeedItem.objects.filter(
-            remote_product_id__in=remote_product_ids,
-        ).values_list("feed_id", flat=True)
-        queryset = queryset.filter(id__in=feed_ids)
 
     processed: list[SalesChannelFeed] = []
     processed_channel_ids: set[int] = set()
@@ -47,7 +41,6 @@ def process_mirakl_gathering_product_feeds(
 
         feed_factory = MiraklProductFeedBuildFactory(
             sales_channel=sales_channel,
-            remote_product_ids=remote_product_ids,
             force_full=force,
         )
         processed.extend(feed_factory.run_all())
@@ -57,12 +50,10 @@ def process_mirakl_gathering_product_feeds(
 def sync_mirakl_product_feeds(
     *,
     sales_channel_id: int | None = None,
-    remote_product_ids: list[int] | None = None,
     force: bool = False,
 ) -> list[SalesChannelFeed]:
     return process_mirakl_gathering_product_feeds(
         sales_channel_id=sales_channel_id,
-        remote_product_ids=remote_product_ids,
         force=force,
     )
 

@@ -16,18 +16,27 @@ class MiraklProductFeedFileFactory:
 
     def __init__(self, *, feed) -> None:
         self.feed = feed
-        self.sales_channel = feed.sales_channel
+        self.sales_channel = self._resolve_sales_channel_instance(feed=feed)
         self.product_type = getattr(feed, "product_type", None)
+        self._template_delimiter: str | None = None
+
+    def _resolve_sales_channel_instance(self, *, feed):
+        sales_channel = feed.sales_channel
+        get_real_instance = getattr(sales_channel, "get_real_instance", None)
+        if callable(get_real_instance):
+            return get_real_instance()
+        return sales_channel
 
     def run(self) -> str:
         headers = self._get_template_headers()
         rows = self._get_rows()
+        delimiter = self._template_delimiter or self.sales_channel.csv_delimiter
 
         buffer = io.StringIO()
         writer = csv.DictWriter(
             buffer,
             fieldnames=headers,
-            delimiter=self.sales_channel.csv_delimiter,
+            delimiter=delimiter,
             quoting=csv.QUOTE_MINIMAL,
             lineterminator="\n",
         )
@@ -50,16 +59,43 @@ class MiraklProductFeedFileFactory:
             raise ValidationError(f"Mirakl product type '{self.product_type}' is missing a CSV template.")
 
         with self.product_type.template.open("r") as file_handle:
-            reader = csv.reader(file_handle, delimiter=self.sales_channel.csv_delimiter)
             try:
-                headers = next(reader)
+                first_line = file_handle.readline()
             except StopIteration as exc:
                 raise ValidationError(f"Mirakl template for '{self.product_type}' is empty.") from exc
+
+        if first_line == "":
+            raise ValidationError(f"Mirakl template for '{self.product_type}' is empty.")
+
+        delimiter = self._resolve_template_delimiter(first_line=first_line)
+        self._template_delimiter = delimiter
+        headers = next(csv.reader([first_line], delimiter=delimiter))
 
         normalized_headers = [str(header or "").strip() for header in headers]
         if not any(normalized_headers):
             raise ValidationError(f"Mirakl template for '{self.product_type}' has no headers.")
         return normalized_headers
+
+    def _resolve_template_delimiter(self, *, first_line: str) -> str:
+        configured_delimiter = getattr(self.sales_channel, "csv_delimiter", ",") or ","
+        configured_headers = next(csv.reader([first_line], delimiter=configured_delimiter))
+        if len(configured_headers) > 1:
+            return configured_delimiter
+
+        try:
+            dialect = csv.Sniffer().sniff(first_line, delimiters=",;|\t")
+            detected_delimiter = str(getattr(dialect, "delimiter", "") or "")
+            if detected_delimiter:
+                return detected_delimiter
+        except csv.Error:
+            pass
+
+        for fallback_delimiter in [",", ";", "|", "\t"]:
+            fallback_headers = next(csv.reader([first_line], delimiter=fallback_delimiter))
+            if len(fallback_headers) > 1:
+                return fallback_delimiter
+
+        return configured_delimiter
 
     def _get_rows(self) -> list[dict[str, str]]:
         rows: list[dict[str, str]] = []

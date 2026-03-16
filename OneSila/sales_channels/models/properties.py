@@ -96,7 +96,7 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     def save(self, *args, **kwargs):
         app_label = self._resolve_sales_channel_app_label()
 
-        if app_label in {"amazon", "shein", "ebay"} and self.allow_multiple is not True:
+        if app_label in {"amazon", "shein", "ebay", "mirakl"} and self.allow_multiple is not True:
             self.allow_multiple = True
 
         if app_label in {"magento2", "woocommerce"} and self.local_instance and self.local_instance.type:

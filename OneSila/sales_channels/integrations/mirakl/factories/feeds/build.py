@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Iterable
 
 from django.db import transaction
 from django.utils import timezone
@@ -20,11 +19,9 @@ class MiraklProductFeedFactory:
         self,
         *,
         sales_channel,
-        remote_product_ids: Iterable[int] | None = None,
         force_full: bool = False,
     ) -> None:
         self.sales_channel = sales_channel
-        self.remote_product_ids = [remote_product_id for remote_product_id in (remote_product_ids or []) if remote_product_id]
         self.force_full = force_full
 
     def run(self) -> MiraklSalesChannelFeed | None:
@@ -53,11 +50,6 @@ class MiraklProductFeedFactory:
         if not self.force_full:
             cutoff = timezone.now() - self.gather_window
             queryset = queryset.filter(updated_at__lte=cutoff)
-        if self.remote_product_ids:
-            feed_ids = MiraklSalesChannelFeedItem.objects.filter(
-                remote_product_id__in=self.remote_product_ids,
-            ).values_list("feed_id", flat=True)
-            queryset = queryset.filter(id__in=feed_ids)
         return queryset
 
     def _process_feed(self, *, feed: MiraklSalesChannelFeed) -> MiraklSalesChannelFeed | None:
@@ -123,8 +115,6 @@ class MiraklProductFeedFactory:
             "remote_product__local_instance",
             "sales_channel_view",
         ).order_by("id")
-        if self.remote_product_ids:
-            queryset = queryset.filter(remote_product_id__in=self.remote_product_ids)
         return queryset
 
     def _feed_has_rows(self, *, feed: MiraklSalesChannelFeed) -> bool:

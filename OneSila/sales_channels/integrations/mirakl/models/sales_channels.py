@@ -6,7 +6,11 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from core import models
-from sales_channels.integrations.mirakl.sub_type_constants import DEFAULT_MIRAKL_SUB_TYPE, MIRAKL_SUB_TYPE_CHOICES
+from sales_channels.integrations.mirakl.sub_type_constants import (
+    DEFAULT_MIRAKL_SUB_TYPE,
+    MIRAKL_SUB_TYPE_CHOICES,
+    infer_mirakl_sub_type_from_hostname,
+)
 from sales_channels.exceptions import (
     InspectorMissingInformationError,
     MissingMappingError,
@@ -88,6 +92,13 @@ class MiraklSalesChannel(SalesChannel):
 
     def __str__(self) -> str:
         return f"Mirakl Store: {self.hostname}"
+
+    def save(self, *args, **kwargs):
+        if self.sub_type == DEFAULT_MIRAKL_SUB_TYPE and self.hostname:
+            inferred_sub_type = infer_mirakl_sub_type_from_hostname(hostname=self.hostname)
+            if inferred_sub_type != DEFAULT_MIRAKL_SUB_TYPE:
+                self.sub_type = inferred_sub_type
+        super().save(*args, **kwargs)
 
     @property
     def connected(self) -> bool:
