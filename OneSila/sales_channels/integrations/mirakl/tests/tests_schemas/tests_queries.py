@@ -1,9 +1,11 @@
+from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.test import TransactionTestCase
 from model_bakery import baker
 
 from currencies.models import Currency
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
+from products.models import Product
 from properties.models import Property, PropertySelectValue, ProductPropertiesRule
 from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
@@ -13,6 +15,8 @@ from sales_channels.integrations.mirakl.models import (
     MiraklRemoteCurrency,
     MiraklProduct,
     MiraklSalesChannel,
+    MiraklSalesChannelFeed,
+    MiraklSalesChannelFeedItem,
     MiraklSalesChannelView,
 )
 
@@ -28,7 +32,7 @@ query {
         apiKey
         connected
         lastDifferentialIssuesFetch
-        lastFullFetch
+        lastFullIssuesFetch
       }
     }
   }
@@ -163,6 +167,36 @@ query ($id: ID!) {
 }
 """
 
+MIRAKL_FEEDS_QUERY = """
+query ($status: String!, $importStatus: String!) {
+  miraklFeeds(filters: {status: {exact: $status}, importStatus: {exact: $importStatus}}) {
+    edges {
+      node {
+        id
+        status
+        importStatus
+        conversionType
+        conversionOptionsAiEnrichmentEnabled
+        conversionOptionsAiRewriteEnabled
+        integrationDetailsInvalidProducts
+        itemsCount
+        rowsCount
+        fileUrl
+        errorReportFileUrl
+        newProductReportFileUrl
+        transformedFileUrl
+        transformationErrorReportFileUrl
+        products {
+          id
+          sku
+          name
+        }
+      }
+    }
+  }
+}
+"""
+
 
 class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
@@ -201,8 +235,8 @@ class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
 
     def test_mirakl_sales_channel_query_exposes_api_key_and_connected(self):
         self.sales_channel.last_differential_issues_fetch = timezone.now()
-        self.sales_channel.last_full_fetch = timezone.now()
-        self.sales_channel.save(update_fields=["last_differential_issues_fetch", "last_full_fetch"])
+        self.sales_channel.last_full_issues_fetch = timezone.now()
+        self.sales_channel.save(update_fields=["last_differential_issues_fetch", "last_full_issues_fetch"])
         response = self.strawberry_test_client(query=MIRAKL_CHANNELS_QUERY)
 
         self.assertIsNone(response.errors)
@@ -211,7 +245,7 @@ class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
         self.assertEqual(node["apiKey"], self.sales_channel.api_key)
         self.assertTrue(node["connected"])
         self.assertIsNotNone(node["lastDifferentialIssuesFetch"])
-        self.assertIsNotNone(node["lastFullFetch"])
+        self.assertIsNotNone(node["lastFullIssuesFetch"])
 
     def test_mirakl_mapping_queries_expose_concrete_nested_types_and_mapping_flags(self):
         baker.make(
@@ -469,3 +503,71 @@ class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
         self.assertEqual(node["id"], self.to_global_id(issue))
         self.assertEqual(node["remoteProduct"]["id"], self.to_global_id(remote_product))
         self.assertEqual(node["views"][0]["remoteId"], "BE")
+
+    def test_mirakl_feeds_query_exposes_mirakl_specific_fields(self):
+        product_type = baker.make(
+            MiraklProductType,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        feed = baker.make(
+            MiraklSalesChannelFeed,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            import_status="COMPLETE",
+            conversion_type="AI_CONVERTER",
+            conversion_options_ai_enrichment_enabled=True,
+            conversion_options_ai_rewrite_enabled=False,
+            integration_details_invalid_products=3,
+            items_count=2,
+            rows_count=5,
+            product_type=product_type,
+        )
+        feed.file.save("feed.csv", ContentFile("feed"), save=True)
+        feed.error_report_file.save("errors.csv", ContentFile("err"), save=True)
+        feed.new_product_report_file.save("new.csv", ContentFile("new"), save=True)
+        feed.transformed_file.save("transformed.csv", ContentFile("transformed"), save=True)
+        feed.transformation_error_report_file.save("transform-errors.csv", ContentFile("transform"), save=True)
+
+        baker.make(
+            MiraklSalesChannelFeedItem,
+            feed=feed,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=baker.make(
+                MiraklProduct,
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+                local_instance=baker.make(
+                    Product,
+                    multi_tenant_company=self.multi_tenant_company,
+                    sku="LOCAL-SKU-1",
+                    name="Local Product 1",
+                ),
+            ),
+        )
+
+        response = self.strawberry_test_client(
+            query=MIRAKL_FEEDS_QUERY,
+            variables={
+                "status": MiraklSalesChannelFeed.STATUS_SUBMITTED,
+                "importStatus": "COMPLETE",
+            },
+        )
+
+        self.assertIsNone(response.errors)
+        node = response.data["miraklFeeds"]["edges"][0]["node"]
+        self.assertEqual(node["conversionType"], "AI_CONVERTER")
+        self.assertTrue(node["conversionOptionsAiEnrichmentEnabled"])
+        self.assertFalse(node["conversionOptionsAiRewriteEnabled"])
+        self.assertEqual(node["integrationDetailsInvalidProducts"], 3)
+        self.assertEqual(node["itemsCount"], 2)
+        self.assertEqual(node["rowsCount"], 5)
+        self.assertIsNotNone(node["fileUrl"])
+        self.assertIsNotNone(node["errorReportFileUrl"])
+        self.assertIsNotNone(node["newProductReportFileUrl"])
+        self.assertIsNotNone(node["transformedFileUrl"])
+        self.assertIsNotNone(node["transformationErrorReportFileUrl"])
+        self.assertEqual(len(node["products"]), 1)
+        self.assertEqual(node["products"][0]["sku"], "LOCAL-SKU-1")

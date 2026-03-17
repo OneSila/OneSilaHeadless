@@ -82,10 +82,15 @@ class MiraklSalesChannel(SalesChannel):
         blank=True,
         help_text="Last successful Mirakl differential issues fetch boundary.",
     )
-    last_full_fetch = models.DateTimeField(
+    last_full_issues_fetch = models.DateTimeField(
         null=True,
         blank=True,
         help_text="Last successful Mirakl full issues fetch boundary.",
+    )
+    last_product_imports_request_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last successful Mirakl P51 product imports polling boundary.",
     )
 
     class Meta:

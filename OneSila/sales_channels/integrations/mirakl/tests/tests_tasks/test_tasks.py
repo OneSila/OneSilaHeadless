@@ -9,6 +9,8 @@ from sales_channels.integrations.mirakl.models import (
 )
 from sales_channels.integrations.mirakl.tasks import (
     mirakl_import_db_task,
+    sales_channels__tasks__sync_mirakl_product_import_statuses,
+    sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob,
     sales_channels__tasks__refresh_mirakl_product_issues_differential,
     sales_channels__tasks__refresh_mirakl_product_issues_differential__cronjob,
     sales_channels__tasks__refresh_mirakl_product_issues_full,
@@ -47,6 +49,20 @@ class MiraklImportTaskTests(TestCase):
             sales_channel=self.sales_channel,
         )
         mock_processor.return_value.run.assert_called_once_with()
+
+    @patch("sales_channels.integrations.mirakl.flows.sync_mirakl_product_import_statuses")
+    def test_manual_product_import_status_sync_task_calls_flow(self, flow_mock):
+        sales_channels__tasks__sync_mirakl_product_import_statuses(
+            sales_channel_id=self.sales_channel.id,
+        )
+
+        flow_mock.assert_called_once_with(sales_channel_id=self.sales_channel.id)
+
+    @patch("sales_channels.integrations.mirakl.flows.sync_mirakl_product_import_statuses")
+    def test_product_import_status_sync_cronjob_calls_flow(self, flow_mock):
+        sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob()
+
+        flow_mock.assert_called_once_with()
 
     @patch("sales_channels.integrations.mirakl.flows.refresh_mirakl_product_issues_differential")
     def test_manual_differential_issue_refresh_task_calls_flow(self, flow_mock):

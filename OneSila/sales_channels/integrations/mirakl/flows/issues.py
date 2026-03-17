@@ -16,7 +16,7 @@ def refresh_mirakl_product_issues_differential(*, sales_channel_id: int | None =
     else:
         cutoff = timezone.now() - timedelta(minutes=30)
         queryset = queryset.filter(
-            last_full_fetch__isnull=False,
+            last_full_issues_fetch__isnull=False,
         ).filter(
             Q(last_differential_issues_fetch__isnull=True)
             | Q(last_differential_issues_fetch__lt=cutoff)
@@ -39,7 +39,7 @@ def refresh_mirakl_product_issues_full(*, sales_channel_id: int | None = None) -
         queryset = queryset.filter(id=sales_channel_id)
     else:
         cutoff = timezone.now() - timedelta(hours=12)
-        queryset = queryset.filter(Q(last_full_fetch__isnull=True) | Q(last_full_fetch__lt=cutoff))
+        queryset = queryset.filter(Q(last_full_issues_fetch__isnull=True) | Q(last_full_issues_fetch__lt=cutoff))
 
     results: list[dict] = []
     for sales_channel in queryset.order_by("id").iterator():

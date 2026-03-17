@@ -16,6 +16,8 @@ from sales_channels.integrations.mirakl.schema.types.types import (
     MiraklRemoteCurrencyType,
     MiraklRemoteLanguageType,
     MiraklSalesChannelImportType,
+    MiraklSalesChannelFeedItemType,
+    MiraklSalesChannelFeedType,
     MiraklSalesChannelType,
     MiraklSalesChannelViewType,
 )
@@ -73,3 +75,9 @@ class MiraklSalesChannelsQuery:
 
     mirakl_import_process: MiraklSalesChannelImportType = node()
     mirakl_import_processes: DjangoListConnection[MiraklSalesChannelImportType] = connection()
+
+    mirakl_feed: MiraklSalesChannelFeedType = node()
+    mirakl_feeds: DjangoListConnection[MiraklSalesChannelFeedType] = connection()
+
+    mirakl_feed_item: MiraklSalesChannelFeedItemType = node()
+    mirakl_feed_items: DjangoListConnection[MiraklSalesChannelFeedItemType] = connection()

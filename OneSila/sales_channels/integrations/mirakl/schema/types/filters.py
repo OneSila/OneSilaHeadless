@@ -28,6 +28,8 @@ from sales_channels.integrations.mirakl.models import (
     MiraklRemoteCurrency,
     MiraklRemoteLanguage,
     MiraklSalesChannel,
+    MiraklSalesChannelFeed,
+    MiraklSalesChannelFeedItem,
     MiraklSalesChannelImport,
     MiraklSalesChannelView,
 )
@@ -215,6 +217,34 @@ class MiraklProductIssueFilter(SearchFilterMixin):
     reason_label: auto
     attribute_code: auto
     is_rejected: auto
+
+
+@filter(MiraklSalesChannelFeed)
+class MiraklSalesChannelFeedFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    type: auto
+    stage: auto
+    status: auto
+    remote_id: auto
+    import_status: auto
+    product_type: Optional[MiraklProductTypeFilter]
+    sales_channel_view: Optional[MiraklSalesChannelViewFilter]
+    has_error_report: auto
+    has_new_product_report: auto
+    has_transformation_error_report: auto
+    has_transformed_file: auto
+
+
+@filter(MiraklSalesChannelFeedItem)
+class MiraklSalesChannelFeedItemFilter(SearchFilterMixin):
+    id: auto
+    feed: Optional["MiraklSalesChannelFeedFilter"]
+    remote_product: Optional[MiraklProductFilter]
+    sales_channel_view: Optional[MiraklSalesChannelViewFilter]
+    action: auto
+    status: auto
+    identifier: auto
 
 
 @filter(MiraklProductContent)

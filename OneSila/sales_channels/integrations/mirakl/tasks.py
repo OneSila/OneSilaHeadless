@@ -58,11 +58,11 @@ def sales_channels__tasks__sync_mirakl_product_feeds__cronjob():
     process_mirakl_gathering_product_feeds()
 
 
-@db_periodic_task(crontab(minute="*/5"))
-def sales_channels__tasks__refresh_mirakl_imports__cronjob():
-    from sales_channels.integrations.mirakl.flows import refresh_mirakl_feed_statuses
+@db_periodic_task(crontab(minute="*/15"))
+def sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob():
+    from sales_channels.integrations.mirakl.flows import sync_mirakl_product_import_statuses
 
-    refresh_mirakl_feed_statuses()
+    sync_mirakl_product_import_statuses()
 
 
 @db_periodic_task(crontab(minute="*/30"))
@@ -87,20 +87,10 @@ def sales_channels__tasks__sync_mirakl_product_feeds(*, sales_channel_id: int | 
 
 
 @db_task()
-def sales_channels__tasks__refresh_mirakl_imports(*, import_process_id: int | None = None, sales_channel_id: int | None = None):
-    from sales_channels.integrations.mirakl.flows import refresh_mirakl_feed_statuses
+def sales_channels__tasks__sync_mirakl_product_import_statuses(*, sales_channel_id: int | None = None):
+    from sales_channels.integrations.mirakl.flows import sync_mirakl_product_import_statuses
 
-    return refresh_mirakl_feed_statuses(
-        feed_id=import_process_id,
-        sales_channel_id=sales_channel_id,
-    )
-
-
-@db_task()
-def sales_channels__tasks__retry_mirakl_feed(*, feed_id: int):
-    from sales_channels.integrations.mirakl.flows import retry_mirakl_feed
-
-    return retry_mirakl_feed(feed_id=feed_id)
+    return sync_mirakl_product_import_statuses(sales_channel_id=sales_channel_id)
 
 
 @db_task()

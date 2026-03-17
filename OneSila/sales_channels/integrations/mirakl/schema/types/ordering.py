@@ -16,6 +16,8 @@ from sales_channels.integrations.mirakl.models import (
     MiraklRemoteCurrency,
     MiraklRemoteLanguage,
     MiraklSalesChannel,
+    MiraklSalesChannelFeed,
+    MiraklSalesChannelFeedItem,
     MiraklSalesChannelImport,
     MiraklSalesChannelView,
 )
@@ -92,6 +94,22 @@ class MiraklProductIssueOrder:
     code: auto
     severity: auto
     is_rejected: auto
+
+
+@order(MiraklSalesChannelFeed)
+class MiraklSalesChannelFeedOrder:
+    id: auto
+    created_at: auto
+    status: auto
+    import_status: auto
+    remote_date_created: auto
+
+
+@order(MiraklSalesChannelFeedItem)
+class MiraklSalesChannelFeedItemOrder:
+    id: auto
+    created_at: auto
+    status: auto
 
 
 @order(MiraklProductContent)

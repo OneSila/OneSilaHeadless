@@ -227,5 +227,5 @@ class MiraklProductIssuesFetchFactoryTests(TestCase):
 
         self.assertFalse(MiraklProductIssue.objects.filter(remote_product=self.remote_product).exists())
         self.sales_channel.refresh_from_db()
-        self.assertEqual(self.sales_channel.last_full_fetch, boundary)
+        self.assertEqual(self.sales_channel.last_full_issues_fetch, boundary)
         self.assertEqual(self.sales_channel.last_differential_issues_fetch, boundary)

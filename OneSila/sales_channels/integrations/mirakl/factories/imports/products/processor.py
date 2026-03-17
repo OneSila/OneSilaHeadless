@@ -458,6 +458,8 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
                 if sku:
                     products_by_sku[sku] = product
 
+        products_by_reference = self._load_p31_products(products_by_sku=products_by_sku)
+
         hydrated: list[dict[str, Any]] = []
         for sku, export_rows in rows_by_sku.items():
             product_payload = products_by_sku.get(sku)
@@ -468,6 +470,10 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
                     data={"sku": sku, "export_rows": export_rows},
                 )
                 continue
+            product_payload = self._merge_p31_product_data(
+                product_payload=product_payload,
+                products_by_reference=products_by_reference,
+            )
             matched_offers = self._match_p11_offers(product_payload=product_payload, export_rows=export_rows)
             hydrated.append(
                 {
@@ -501,3 +507,55 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             if shop_sku and shop_sku in shop_skus:
                 matched.append(offer)
         return matched
+
+    def _load_p31_products(self, *, products_by_sku: dict[str, dict[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
+        references: list[tuple[str, str]] = []
+        seen_references: set[tuple[str, str]] = set()
+        for product_payload in products_by_sku.values():
+            for reference in product_payload.get("product_references") or []:
+                if not isinstance(reference, dict):
+                    continue
+                reference_type = str(reference.get("reference_type") or "").strip().upper()
+                reference_value = str(reference.get("reference") or "").strip()
+                reference_key = (reference_type, reference_value)
+                if not reference_type or not reference_value or reference_key in seen_references:
+                    continue
+                seen_references.add(reference_key)
+                references.append(reference_key)
+
+        products_by_reference: dict[tuple[str, str], dict[str, Any]] = {}
+        for start in range(0, len(references), 100):
+            batch = references[start:start + 100]
+            for product in self.client.get_products_by_references(product_references=batch):
+                for reference in product.get("product_references") or []:
+                    if not isinstance(reference, dict):
+                        continue
+                    reference_type = str(reference.get("reference_type") or "").strip().upper()
+                    reference_value = str(reference.get("reference") or "").strip()
+                    if reference_type and reference_value:
+                        products_by_reference[(reference_type, reference_value)] = product
+        return products_by_reference
+
+    def _merge_p31_product_data(
+        self,
+        *,
+        product_payload: dict[str, Any],
+        products_by_reference: dict[tuple[str, str], dict[str, Any]],
+    ) -> dict[str, Any]:
+        for reference in product_payload.get("product_references") or []:
+            if not isinstance(reference, dict):
+                continue
+            reference_type = str(reference.get("reference_type") or "").strip().upper()
+            reference_value = str(reference.get("reference") or "").strip()
+            if not reference_type or not reference_value:
+                continue
+            p31_product = products_by_reference.get((reference_type, reference_value))
+            if p31_product is None:
+                continue
+
+            merged_payload = dict(product_payload)
+            for key, value in p31_product.items():
+                if merged_payload.get(key) in (None, "", [], {}) and value not in (None, "", [], {}):
+                    merged_payload[key] = value
+            return merged_payload
+        return product_payload

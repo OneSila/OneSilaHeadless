@@ -21,6 +21,12 @@ class SalesChannelFeed(PolymorphicModel, models.Model):
     STATUS_PARTIAL = "partial"
     STATUS_FAILED = "failed"
     STATUS_CANCELLED = "cancelled"
+    CONCLUDED_STATUSES = (
+        STATUS_SUCCESS,
+        STATUS_PARTIAL,
+        STATUS_FAILED,
+        STATUS_CANCELLED,
+    )
 
     STATUS_CHOICES = [
         (STATUS_NEW, "New"),
@@ -48,7 +54,8 @@ class SalesChannelFeed(PolymorphicModel, models.Model):
         help_text="Generated file uploaded to the remote integration when applicable.",
     )
     payload_data = models.JSONField(default=list, blank=True)
-    summary_data = models.JSONField(default=dict, blank=True)
+    items_count = models.PositiveIntegerField(default=0)
+    rows_count = models.PositiveIntegerField(default=0)
     error_message = models.TextField(blank=True, default="")
     last_synced_at = models.DateTimeField(null=True, blank=True)
     last_submitted_at = models.DateTimeField(null=True, blank=True)

@@ -59,6 +59,7 @@ class MiraklProductsImportClient(GetMiraklAPIMixin):
         self.sales_channel = sales_channel
 
     def _debug_print_response(self, *, label: str, payload: Any) -> None:
+        # @TODO: Remove this before deploy
         print(f"------------------------------------------------- RESPONSE FOR {label}")
         pprint.pprint(payload)
         if label.startswith("A01 "):
@@ -142,6 +143,28 @@ class MiraklProductsImportClient(GetMiraklAPIMixin):
         )
         self._debug_print_response(
             label=f"P11 /api/products/offers product_ids={','.join(product_ids)}",
+            payload=payload,
+        )
+        products = payload.get("products") or []
+        if not isinstance(products, list):
+            return []
+        return [item for item in products if isinstance(item, dict)]
+
+    def get_products_by_references(self, *, product_references: list[tuple[str, str]]) -> list[dict[str, Any]]:
+        serialized_references = [
+            f"{reference_type}|{reference}"
+            for reference_type, reference in product_references
+            if str(reference_type or "").strip() and str(reference or "").strip()
+        ]
+        if not serialized_references:
+            return []
+
+        payload = self.mirakl_get(
+            path="/api/products",
+            params={"product_references": ",".join(serialized_references)},
+        )
+        self._debug_print_response(
+            label=f"P31 /api/products product_references={','.join(serialized_references)}",
             payload=payload,
         )
         products = payload.get("products") or []

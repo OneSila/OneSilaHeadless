@@ -1128,11 +1128,9 @@ class _MiraklFeedPersistenceMixin:
         items = list(
             MiraklSalesChannelFeedItem.objects.filter(feed=feed).only("payload_data")
         )
-        feed.summary_data = {
-            "items_count": len(items),
-            "rows_count": sum(len(item.payload_data or []) for item in items),
-        }
-        feed.save(update_fields=["summary_data", "updated_at"])
+        feed.items_count = len(items)
+        feed.rows_count = sum(len(item.payload_data or []) for item in items)
+        feed.save(update_fields=["items_count", "rows_count", "updated_at"])
 
     def _get_identifier(self) -> str:
         local_product = getattr(self.remote_instance, "local_instance", None)

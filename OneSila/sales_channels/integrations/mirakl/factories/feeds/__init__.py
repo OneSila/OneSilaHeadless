@@ -9,11 +9,13 @@ from .product_payloads import (
     MiraklProductUpdateFactory,
     MiraklProductUpdatePayloadFactory,
 )
+from .resync import MiraklFeedResyncFactory
 from .renderer import MiraklProductFeedFileFactory
 from .status import MiraklImportStatusSyncFactory
 from .submit import MiraklProductFeedSubmitFactory
 
 __all__ = [
+    "MiraklFeedResyncFactory",
     "MiraklImportStatusSyncFactory",
     "MiraklProductCreateFactory",
     "MiraklProductCreatePayloadFactory",

@@ -51,10 +51,27 @@ class MiraklProductsImportProcessorTests(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             type=Property.TYPES.SELECT,
         )
+        self.brand_property = Property.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="brand",
+        ).first()
+        if self.brand_property is None:
+            self.brand_property = baker.make(
+                Property,
+                multi_tenant_company=self.multi_tenant_company,
+                internal_name="brand",
+                type=Property.TYPES.SELECT,
+            )
         self.color_option = baker.make(
             PropertySelectValue,
             multi_tenant_company=self.multi_tenant_company,
             property=self.color_property,
+        )
+        self.brand_option = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.brand_property,
+            value="Acme",
         )
         self.remote_color = baker.make(
             MiraklProperty,
@@ -72,6 +89,23 @@ class MiraklProductsImportProcessorTests(TestCase):
             code="RED",
             value="Red",
             local_instance=self.color_option,
+        )
+        self.remote_brand = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="brand",
+            type=Property.TYPES.SELECT,
+            local_instance=self.brand_property,
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=self.remote_brand,
+            code="ACME",
+            value="Acme",
+            local_instance=self.brand_option,
         )
         PublicCurrency.objects.get_or_create(
             iso_code="EUR",
@@ -92,11 +126,15 @@ class MiraklProductsImportProcessorTests(TestCase):
         "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_offers"
     )
     @patch(
+        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_by_references"
+    )
+    @patch(
         "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_account_info"
     )
     def test_run_imports_products_and_mirrors(
         self,
         get_account_info_mock,
+        get_products_by_references_mock,
         get_products_offers_mock,
         download_chunk_mock,
         get_status_mock,
@@ -140,6 +178,15 @@ class MiraklProductsImportProcessorTests(TestCase):
                 ],
             }
         ]
+        get_products_by_references_mock.return_value = [
+            {
+                "product_sku": "MKP-1",
+                "product_brand": "Acme",
+                "product_references": [
+                    {"reference_type": "EAN", "reference": "1234567890123"},
+                ],
+            }
+        ]
 
         processor = MiraklProductsImportProcessor(
             import_process=self.import_process,
@@ -153,6 +200,12 @@ class MiraklProductsImportProcessorTests(TestCase):
             remote_product.local_instance.productproperty_set.filter(
                 property=self.color_property,
                 value_select=self.color_option,
+            ).exists()
+        )
+        self.assertTrue(
+            remote_product.local_instance.productproperty_set.filter(
+                property=self.brand_property,
+                value_select=self.brand_option,
             ).exists()
         )
         content = MiraklProductContent.objects.get(remote_product=remote_product)

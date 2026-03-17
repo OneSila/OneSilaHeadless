@@ -103,11 +103,9 @@ class SalesChannelFeedGatheringFactory:
         return feed, item
 
     def refresh_summary(self, *, feed) -> None:
-        feed.summary_data = {
-            "items_count": feed.items.count(),
-            "rows_count": sum(len(item.payload_data.get("rows") or []) for item in feed.items.all()),
-        }
-        feed.save(update_fields=["summary_data", "updated_at"])
+        feed.items_count = feed.items.count()
+        feed.rows_count = sum(len(item.payload_data.get("rows") or []) for item in feed.items.all())
+        feed.save(update_fields=["items_count", "rows_count", "updated_at"])
 
     def _merge_action(self, *, existing_item, new_action: str, existing_feed, remote_product, sales_channel_view):
         if existing_item is None:

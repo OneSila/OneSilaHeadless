@@ -6,9 +6,12 @@ from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.core.mutations import List, create, delete, type, update
 from sales_channels.integrations.mirakl.factories.sales_channels import ValidateMiraklCredentialsFactory
-from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
-from sales_channels.schema.types.input import SalesChannelFeedPartialInput, SalesChannelImportPartialInput
-from sales_channels.schema.types.types import SalesChannelFeedType
+from sales_channels.integrations.mirakl.models import (
+    MiraklSalesChannel,
+    MiraklSalesChannelFeed,
+    MiraklSalesChannelImport,
+)
+from sales_channels.schema.types.input import SalesChannelFeedPartialInput
 from sales_channels.integrations.mirakl.schema.types.input import (
     MiraklCategoryPartialInput,
     MiraklDocumentTypePartialInput,
@@ -37,6 +40,7 @@ from sales_channels.integrations.mirakl.schema.types.types import (
     MiraklRemoteCurrencyType,
     MiraklRemoteLanguageType,
     MiraklSalesChannelType,
+    MiraklSalesChannelFeedType,
     MiraklSalesChannelImportType,
     MiraklSalesChannelViewType,
 )
@@ -103,55 +107,16 @@ class MiraklSalesChannelMutation:
         return sales_channel
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
-    def start_mirakl_product_feed(
-        self,
-        instance: MiraklSalesChannelPartialInput,
-        info: Info,
-    ) -> SalesChannelFeedType:
-        from sales_channels.integrations.mirakl.flows import process_mirakl_gathering_product_feeds
-
-        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        sales_channel = MiraklSalesChannel.objects.get(
-            id=instance.id.node_id,
-            multi_tenant_company=multi_tenant_company,
-        )
-
-        if not sales_channel.connected:
-            raise ValidationError("Mirakl sales channel is missing credentials.")
-
-        feeds = process_mirakl_gathering_product_feeds(sales_channel_id=sales_channel.id, force=True)
-        if not feeds:
-            raise ValidationError("No Mirakl gathering product feed was ready to process.")
-        return feeds[-1]
-
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
-    def retry_mirakl_feed(
+    def resync_mirakl_feed(
         self,
         instance: SalesChannelFeedPartialInput,
         info: Info,
-    ) -> SalesChannelFeedType:
-        from sales_channels.integrations.mirakl.flows import retry_mirakl_feed
-        from sales_channels.models import SalesChannelFeed
+    ) -> MiraklSalesChannelFeedType:
+        from sales_channels.integrations.mirakl.flows import resync_mirakl_feed
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        feed = SalesChannelFeed.objects.get(
+        feed = MiraklSalesChannelFeed.objects.select_related("sales_channel").get(
             id=instance.id.node_id,
             multi_tenant_company=multi_tenant_company,
         )
-        if not isinstance(feed.sales_channel.get_real_instance(), MiraklSalesChannel):
-            raise ValidationError("Feed does not belong to a Mirakl sales channel.")
-        return retry_mirakl_feed(feed_id=feed.id)
-
-
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
-    def refresh_mirakl_import_status(
-        self,
-        instance: MiraklSalesChannelPartialInput,
-        import_process: SalesChannelImportPartialInput,
-        info: Info,
-    ) -> MiraklSalesChannelImportType:
-        return self.refresh_mirakl_import(
-            instance=instance,
-            import_process=import_process,
-            info=info,
-        )
+        return resync_mirakl_feed(feed_id=feed.id)

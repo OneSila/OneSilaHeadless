@@ -101,13 +101,9 @@ class MiraklProductFeedFactory:
             payload_data.extend(item.payload_data or [])
 
         feed.payload_data = payload_data
-        feed.summary_data = {
-            "items_count": items_count,
-            "rows_count": len(payload_data),
-            "product_type_id": feed.product_type_id,
-            "sales_channel_view_id": feed.sales_channel_view_id,
-        }
-        feed.save(update_fields=["payload_data", "summary_data"])
+        feed.items_count = items_count
+        feed.rows_count = len(payload_data)
+        feed.save(update_fields=["payload_data", "items_count", "rows_count"])
 
     def _get_feed_items(self, *, feed: MiraklSalesChannelFeed):
         queryset = MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related(

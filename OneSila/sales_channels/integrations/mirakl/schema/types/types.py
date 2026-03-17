@@ -19,6 +19,8 @@ from sales_channels.integrations.mirakl.models import (
     MiraklRemoteCurrency,
     MiraklRemoteLanguage,
     MiraklSalesChannel,
+    MiraklSalesChannelFeed,
+    MiraklSalesChannelFeedItem,
     MiraklSalesChannelImport,
     MiraklSalesChannelView,
 )
@@ -38,6 +40,8 @@ from sales_channels.integrations.mirakl.schema.types.filters import (
     MiraklRemoteCurrencyFilter,
     MiraklRemoteLanguageFilter,
     MiraklSalesChannelFilter,
+    MiraklSalesChannelFeedFilter,
+    MiraklSalesChannelFeedItemFilter,
     MiraklSalesChannelImportFilter,
     MiraklSalesChannelViewFilter,
 )
@@ -57,6 +61,8 @@ from sales_channels.integrations.mirakl.schema.types.ordering import (
     MiraklRemoteCurrencyOrder,
     MiraklRemoteLanguageOrder,
     MiraklSalesChannelImportOrder,
+    MiraklSalesChannelFeedItemOrder,
+    MiraklSalesChannelFeedOrder,
     MiraklSalesChannelOrder,
     MiraklSalesChannelViewOrder,
 )
@@ -287,6 +293,67 @@ class MiraklRemoteProductType(relay.Node, GetQuerysetMultiTenantMixin):
 class MiraklProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
     remote_product: Annotated["MiraklRemoteProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
     views: List[Annotated["MiraklSalesChannelViewType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+
+
+@type(
+    MiraklSalesChannelFeed,
+    filters=MiraklSalesChannelFeedFilter,
+    order=MiraklSalesChannelFeedOrder,
+    pagination=True,
+    fields="__all__",
+)
+class MiraklSalesChannelFeedType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    product_type: Optional[Annotated["MiraklProductTypeType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+    sales_channel_view: Optional[Annotated["MiraklSalesChannelViewType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+    items: List[Annotated["MiraklSalesChannelFeedItemType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
+    products: List[Annotated["ProductType", lazy("products.schema.types.types")]]
+
+    @field()
+    def file_url(self, info) -> Optional[str]:
+        return MiraklSalesChannelFeed.file_url.fget(self)
+
+    @field()
+    def error_report_file_url(self, info) -> Optional[str]:
+        return MiraklSalesChannelFeed.error_report_file_url.fget(self)
+
+    @field()
+    def new_product_report_file_url(self, info) -> Optional[str]:
+        return MiraklSalesChannelFeed.new_product_report_file_url.fget(self)
+
+    @field()
+    def transformed_file_url(self, info) -> Optional[str]:
+        return MiraklSalesChannelFeed.transformed_file_url.fget(self)
+
+    @field()
+    def transformation_error_report_file_url(self, info) -> Optional[str]:
+        return MiraklSalesChannelFeed.transformation_error_report_file_url.fget(self)
+
+    @field()
+    def products(self, info) -> List[Annotated["ProductType", lazy("products.schema.types.types")]]:
+        from products.models import Product
+        ids = MiraklSalesChannelFeedItem.objects.filter(feed=self).values_list('remote_product__local_instance_id', flat=True)
+
+        return list(
+            Product.objects.filter(
+                id__in=ids,
+            )
+            .distinct()
+            .order_by("id")
+        )
+
+
+@type(
+    MiraklSalesChannelFeedItem,
+    filters=MiraklSalesChannelFeedItemFilter,
+    order=MiraklSalesChannelFeedItemOrder,
+    pagination=True,
+    fields="__all__",
+)
+class MiraklSalesChannelFeedItemType(relay.Node, GetQuerysetMultiTenantMixin):
+    feed: Annotated["MiraklSalesChannelFeedType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    remote_product: Annotated["MiraklRemoteProductType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    sales_channel_view: Optional[Annotated["MiraklSalesChannelViewType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
 
 
 @type(

@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from django.core.files.base import ContentFile
+from datetime import timedelta
+
+from django.db.models import Q
+from django.utils import timezone
 
 from sales_channels.integrations.mirakl.factories.feeds import (
+    MiraklFeedResyncFactory,
     MiraklImportStatusSyncFactory,
     MiraklProductFeedBuildFactory,
 )
-from sales_channels.integrations.mirakl.models import (
-    MiraklSalesChannel,
-    MiraklSalesChannelFeed,
-    MiraklSalesChannelFeedItem,
-)
-from sales_channels.models import SalesChannelFeed, SalesChannelFeedItem
+from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelFeed
+from sales_channels.models import SalesChannelFeed
 
 
 def process_mirakl_gathering_product_feeds(
@@ -58,76 +58,31 @@ def sync_mirakl_product_feeds(
     )
 
 
-def refresh_mirakl_feed_statuses(*, feed_id: int | None = None, sales_channel_id: int | None = None) -> list[MiraklSalesChannelFeed]:
-    queryset = MiraklSalesChannelFeed.objects.filter(
-        sales_channel__active=True,
-        remote_id__gt="",
-        status__in=[
-            SalesChannelFeed.STATUS_PENDING,
-            SalesChannelFeed.STATUS_SUBMITTED,
-            SalesChannelFeed.STATUS_PROCESSING,
-        ],
-    )
-    if feed_id is not None:
-        queryset = queryset.filter(id=feed_id)
+def sync_mirakl_product_import_statuses(*, sales_channel_id: int | None = None) -> list[MiraklSalesChannelFeed]:
+    queryset = MiraklSalesChannel.objects.filter(active=True)
     if sales_channel_id is not None:
-        queryset = queryset.filter(sales_channel_id=sales_channel_id)
+        queryset = queryset.filter(id=sales_channel_id)
+    else:
+        cutoff = timezone.now() - timedelta(minutes=15)
+        queryset = queryset.filter(
+            Q(last_product_imports_request_date__isnull=True)
+            | Q(last_product_imports_request_date__lt=cutoff)
+        )
 
     refreshed: list[MiraklSalesChannelFeed] = []
-    for feed in queryset.select_related("sales_channel").iterator():
-        refreshed.append(MiraklImportStatusSyncFactory(feed=feed).run())
+    for sales_channel in queryset.order_by("id").iterator():
+        refreshed.extend(
+            MiraklImportStatusSyncFactory(
+                sales_channel=sales_channel,
+            ).run()
+        )
     return refreshed
 
 
-def refresh_mirakl_imports(*, import_process_id: int | None = None, sales_channel_id: int | None = None):
-    from sales_channels.integrations.mirakl.models import MiraklSalesChannelImport
-
-    queryset = MiraklSalesChannelImport.objects.all()
-    if import_process_id is not None:
-        queryset = queryset.filter(id=import_process_id)
-    if sales_channel_id is not None:
-        queryset = queryset.filter(sales_channel_id=sales_channel_id)
-    return list(queryset)
-
-
-def retry_mirakl_feed(*, feed_id: int) -> SalesChannelFeed:
-    feed = MiraklSalesChannelFeed.objects.select_related("sales_channel", "product_type", "sales_channel_view").get(id=feed_id)
-    retry_feed = feed.__class__.objects.create(
-        sales_channel=feed.sales_channel,
-        multi_tenant_company=feed.multi_tenant_company,
-        type=feed.type,
-        status=SalesChannelFeed.STATUS_NEW,
-        summary_data=feed.summary_data,
-        error_message="",
-        stage=getattr(feed, "stage", feed.STAGE_PRODUCT),
-        raw_data={},
-        product_type=feed.product_type,
-        sales_channel_view=feed.sales_channel_view,
-    )
-    if feed.file:
-        with feed.file.open("rb") as file_handle:
-            content = file_handle.read()
-        retry_feed.file.save(feed.file.name.rsplit("/", 1)[-1], ContentFile(content), save=False)
-        retry_feed.save(update_fields=["file"])
-
-    items = []
-    for item in MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related("remote_product").iterator():
-        items.append(
-            MiraklSalesChannelFeedItem(
-                feed=retry_feed,
-                multi_tenant_company=retry_feed.multi_tenant_company,
-                remote_product=item.remote_product,
-                sales_channel_view=item.sales_channel_view,
-                action=item.action,
-                status=SalesChannelFeedItem.STATUS_PENDING,
-                identifier=item.identifier,
-                payload_data=item.payload_data,
-                result_data={},
-            )
-        )
-    MiraklSalesChannelFeedItem.objects.bulk_create(items)
-
-    from sales_channels.integrations.mirakl.factories.feeds import MiraklProductFeedSubmitFactory
-
-    MiraklProductFeedSubmitFactory(feed=retry_feed).run()
-    return retry_feed
+def resync_mirakl_feed(*, feed_id: int) -> MiraklSalesChannelFeed:
+    feed = MiraklSalesChannelFeed.objects.select_related(
+        "sales_channel",
+        "product_type",
+        "sales_channel_view",
+    ).get(id=feed_id)
+    return MiraklFeedResyncFactory(feed=feed).run()

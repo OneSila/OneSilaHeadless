@@ -77,6 +77,8 @@ class MiraklReverseProductMapper:
             for item in MiraklProperty.objects.filter(sales_channel=sales_channel).select_related("local_instance")
         }
         self._select_value_lookup = self._build_select_value_lookup()
+        self._brand_property = self._resolve_brand_property()
+        self._brand_value_lookup = self._build_brand_value_lookup()
 
     def build(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], object | None]:
         product_data = dict(payload.get("product") or {})
@@ -165,8 +167,17 @@ class MiraklReverseProductMapper:
         if documents:
             structured["documents"] = documents
 
-        properties = self._build_property_entries(merged_fields=merged_fields)
-        properties.extend(self._build_offer_metadata_properties(merged_fields=merged_fields))
+        brand_property_entry = self._build_brand_property_entry(merged_fields=merged_fields)
+        properties = []
+        if brand_property_entry is not None:
+            properties.append(brand_property_entry)
+        properties.extend(self._build_property_entries(merged_fields=merged_fields))
+        properties.extend(
+            self._build_offer_metadata_properties(
+                merged_fields=merged_fields,
+                skip_codes={"product_brand"} if brand_property_entry is not None else None,
+            )
+        )
         if properties:
             structured["properties"] = properties
 
@@ -263,6 +274,50 @@ class MiraklReverseProductMapper:
                 if normalized:
                     lookup[(item.remote_property_id, normalized)] = item
         return lookup
+
+    def _resolve_brand_property(self) -> Property | None:
+        return Property.objects.filter(
+            multi_tenant_company=self.company,
+            internal_name="brand",
+        ).first()
+
+    def _build_brand_value_lookup(self) -> dict[str, MiraklPropertySelectValue]:
+        if self._brand_property is None:
+            return {}
+
+        lookup: dict[str, MiraklPropertySelectValue] = {}
+        queryset = (
+            MiraklPropertySelectValue.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_property__local_instance=self._brand_property,
+                local_instance__isnull=False,
+            )
+            .select_related("local_instance")
+            .order_by("id")
+        )
+        for item in queryset:
+            normalized = str(item.value or "").strip().lower()
+            if normalized and normalized not in lookup:
+                lookup[normalized] = item
+        return lookup
+
+    def _build_brand_property_entry(self, *, merged_fields: dict[str, Any]) -> dict[str, Any] | None:
+        if self._brand_property is None:
+            return None
+
+        brand_value = str(merged_fields.get("product_brand") or "").strip()
+        if not brand_value:
+            return None
+
+        mapped_value = self._brand_value_lookup.get(brand_value.lower())
+        if mapped_value is None or not mapped_value.local_instance_id:
+            return None
+
+        return {
+            "property": self._brand_property,
+            "value": mapped_value.local_instance_id,
+            "value_is_id": True,
+        }
 
     def _map_select_value(
         self,
@@ -433,7 +488,12 @@ class MiraklReverseProductMapper:
 
         return origin, current
 
-    def _build_offer_metadata_properties(self, *, merged_fields: dict[str, Any]) -> list[dict[str, Any]]:
+    def _build_offer_metadata_properties(
+        self,
+        *,
+        merged_fields: dict[str, Any],
+        skip_codes: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
         property_codes = [
             "allow_quote_requests",
             "channels",
@@ -467,6 +527,8 @@ class MiraklReverseProductMapper:
         ]
         results: list[dict[str, Any]] = []
         for code in property_codes:
+            if skip_codes and code in skip_codes:
+                continue
             raw_value = merged_fields.get(code)
             if raw_value in (None, "", [], {}):
                 continue

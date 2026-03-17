@@ -94,9 +94,9 @@ class MiraklProductIssuesFetchFactory(GetMiraklAPIMixin):
     def _persist_boundary(self, *, boundary) -> None:
         update_fields: list[str] = []
         if self.mode == self.MODE_FULL:
-            self.sales_channel.last_full_fetch = boundary
+            self.sales_channel.last_full_issues_fetch = boundary
             self.sales_channel.last_differential_issues_fetch = boundary
-            update_fields.extend(["last_full_fetch", "last_differential_issues_fetch"])
+            update_fields.extend(["last_full_issues_fetch", "last_differential_issues_fetch"])
         else:
             self.sales_channel.last_differential_issues_fetch = boundary
             update_fields.append("last_differential_issues_fetch")
