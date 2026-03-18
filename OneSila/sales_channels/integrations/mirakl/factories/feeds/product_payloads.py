@@ -811,7 +811,7 @@ class MiraklProductPayloadBuilder:
                 raise MissingMappingError(
                     f"Map the OneSila select value for Mirakl field '{remote_property.code}' before pushing."
                 )
-            return self._stringify(getattr(mapped_value, "value", None) or getattr(mapped_value, "code", None))
+            return self._serialize_remote_select_value(select_value=mapped_value)
         if property_type == "MULTISELECT":
             values: list[str] = []
             for select_value in product_property.value_multi_select.all():
@@ -820,10 +820,20 @@ class MiraklProductPayloadBuilder:
                     raise MissingMappingError(
                         f"Map all OneSila multiselect values for Mirakl field '{remote_property.code}' before pushing."
                     )
-                values.append(self._stringify(getattr(mapped_value, "value", None) or getattr(mapped_value, "code", None)))
+                values.append(self._serialize_remote_select_value(select_value=mapped_value))
             separator = getattr(self.sales_channel, "list_of_multiple_values_separator", None) or ","
             return separator.join([value for value in values if value])
         return self._stringify(product_property.get_serialised_value(self.language))
+
+    def _serialize_remote_select_value(
+        self,
+        *,
+        select_value: MiraklPropertySelectValue | None,
+        fallback: Any = "",
+    ) -> str:
+        if select_value is None:
+            return self._stringify(fallback)
+        return select_value.code
 
     def _resolve_boolean_value(self, *, remote_property: MiraklProperty, value: bool) -> str:
         yes_text_value, no_text_value = self._get_effective_boolean_text_values(remote_property=remote_property)
@@ -841,7 +851,7 @@ class MiraklProductPayloadBuilder:
                 bool_value=value,
             ).order_by("id").first()
             if mapped_value is not None:
-                return self._stringify(mapped_value.value or mapped_value.code)
+                return self._serialize_remote_select_value(select_value=mapped_value)
 
         return "true" if value else "false"
 
@@ -1011,7 +1021,7 @@ class MiraklProductPayloadBuilder:
         )
         if select_value is None:
             return ""
-        return self._stringify(select_value.value or select_value.code or select_value.remote_id)
+        return self._serialize_remote_select_value(select_value=select_value)
 
     def _build_delete_product_reference_placeholder(self, *, remote_property: MiraklProperty) -> str:
         for entry in self._get_validation_entries(remote_property=remote_property):
@@ -1188,7 +1198,7 @@ class MiraklProductPayloadBuilder:
             ).order_by("id")[:2]
         )
         if len(select_values) == 1:
-            return self._stringify(select_values[0].value or select_values[0].code or normalized_default)
+            return self._serialize_remote_select_value(select_value=select_values[0], fallback=normalized_default)
 
         match = (
             MiraklPropertySelectValue.objects.filter(
@@ -1220,7 +1230,7 @@ class MiraklProductPayloadBuilder:
                 .first()
             )
         if match is not None:
-            return self._stringify(match.value or match.code or normalized_default)
+            return self._serialize_remote_select_value(select_value=match, fallback=normalized_default)
         return normalized_default
 
     def _format_date(self, value: Any, pattern: str = "") -> str:

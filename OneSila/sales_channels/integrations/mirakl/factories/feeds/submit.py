@@ -10,7 +10,7 @@ from sales_channels.models import SalesChannelFeed
 
 
 class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
-    """Submit a generated Mirakl product feed file."""
+    """Submit a generated Mirakl feed file through the combined offer import endpoint."""
 
     def __init__(self, *, feed) -> None:
         self.feed = feed
@@ -23,7 +23,7 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
         if settings.DEBUG:
             raw_data = dict(self.feed.raw_data or {})
             raw_data["product_submit_skipped"] = True
-            raw_data["product_submit_skip_reason"] = "Skipped P41 upload because settings.DEBUG is True."
+            raw_data["product_submit_skip_reason"] = "Skipped OF01 upload because settings.DEBUG is True."
             self.feed.status = self.feed.STATUS_READY_TO_RENDER
             self.feed.stage = self.feed.STAGE_PRODUCT
             self.feed.raw_data = raw_data
@@ -32,7 +32,12 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
 
         with self.feed.file.open("rb") as file_handle:
             response = self.mirakl_post_multipart(
-                path="/api/products/imports",
+                path="/api/offers/imports",
+                payload={
+                    "import_mode": "NORMAL",
+                    "operator_format": "true",
+                    "with_products": "true",
+                },
                 files={
                     "file": (
                         Path(self.feed.file.name).name,
@@ -43,13 +48,15 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
                 expected_statuses={200, 201, 202},
             )
 
-        remote_import_id = str(response.get("import_id") or response.get("id") or "")
+        offer_import_id = str(response.get("import_id") or response.get("id") or "")
+        product_import_id = str(response.get("product_import_id") or "")
         raw_data = dict(self.feed.raw_data or {})
         raw_data["product_submit_response"] = response
         self.feed.status = SalesChannelFeed.STATUS_SUBMITTED
         self.feed.stage = self.feed.STAGE_PRODUCT
-        self.feed.remote_id = remote_import_id
-        self.feed.product_remote_id = remote_import_id
+        self.feed.remote_id = product_import_id
+        self.feed.product_remote_id = product_import_id
+        self.feed.offer_import_remote_id = offer_import_id
         self.feed.last_submitted_at = timezone.now()
         self.feed.raw_data = raw_data
         self.feed.save(
@@ -58,6 +65,7 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
                 "stage",
                 "remote_id",
                 "product_remote_id",
+                "offer_import_remote_id",
                 "last_submitted_at",
                 "raw_data",
             ]

@@ -52,6 +52,7 @@ class MiraklFeedResyncFactory:
             reason_status="",
             product_remote_id="",
             offer_remote_id="",
+            offer_import_remote_id="",
             remote_id="",
         )
 

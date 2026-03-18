@@ -41,6 +41,7 @@ class MiraklSalesChannelFeed(SalesChannelFeed):
     stage = models.CharField(max_length=32, choices=STAGE_CHOICES, default=STAGE_PRODUCT)
     product_remote_id = models.CharField(max_length=255, blank=True, default="")
     offer_remote_id = models.CharField(max_length=255, blank=True, default="")
+    offer_import_remote_id = models.CharField(max_length=255, blank=True, default="")
     raw_data = models.JSONField(default=dict, blank=True)
     import_status = models.CharField(max_length=64, blank=True, default="")
     reason_status = models.CharField(max_length=128, blank=True, default="")

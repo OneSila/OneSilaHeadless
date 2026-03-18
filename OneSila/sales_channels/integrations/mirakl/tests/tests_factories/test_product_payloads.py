@@ -18,6 +18,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProductTypeItem,
     MiraklProperty,
     MiraklPropertyApplicability,
+    MiraklPropertySelectValue,
     MiraklSalesChannel,
     MiraklSalesChannelView,
 )
@@ -226,6 +227,96 @@ class MiraklProductPayloadBuilderTests(TestCase):
             "Missing Mirakl mappings:\n- Map the OneSila select value for Mirakl field 'colour' before pushing.",
         ):
             builder.build()
+
+    def test_select_field_uses_mapped_remote_code_in_payload(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="colour",
+            local_property=local_property,
+            required=True,
+            remote_type="SELECT",
+        )
+        local_select_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        baker.make(
+            ProductProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_property,
+            value_select=local_select_value,
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
+            local_instance=local_select_value,
+            code="PURPLE_CODE",
+            value="Purple Label",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["colour"], "PURPLE_CODE")
+
+    def test_multiselect_field_uses_mapped_remote_codes_in_payload(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.MULTISELECT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="materials",
+            local_property=local_property,
+            required=True,
+            remote_type="MULTISELECT",
+        )
+        first_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        second_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        product_property = baker.make(
+            ProductProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_property,
+        )
+        product_property.value_multi_select.add(first_local_value, second_local_value)
+        baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
+            local_instance=first_local_value,
+            code="COTTON_CODE",
+            value="Cotton",
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
+            local_instance=second_local_value,
+            code="LINEN_CODE",
+            value="Linen",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["materials"], "COTTON_CODE,LINEN_CODE")
 
     @patch("media.models.Media.image_url", return_value="https://cdn.example.com/color.jpg")
     def test_required_swatch_uses_color_image_media(self, _image_url_mock):
