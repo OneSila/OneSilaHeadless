@@ -19,6 +19,7 @@ from sales_channels.factories.products.products import (
     RemoteProductDeleteFactory,
     RemoteProductSyncFactory,
 )
+from sales_channels.factories.value_mixins import RemoteValueMixin
 from sales_channels.helpers import _content_is_empty, build_content_data
 from sales_channels.integrations.mirakl.factories.mixins import GetMiraklAPIMixin
 from sales_channels.integrations.mirakl.models import (
@@ -39,6 +40,68 @@ from sales_channels.integrations.mirakl.models import (
 from sales_channels.integrations.mirakl.utils.type_parameters import get_mirakl_type_parameter_value
 from sales_channels.models import SalesChannelFeedItem, SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPriceListItem
+
+
+class _MiraklRemoteValueRunner(RemoteValueMixin):
+    def __init__(
+        self,
+        *,
+        sales_channel,
+        language,
+        remote_select_lookup: dict[tuple[int, int], MiraklPropertySelectValue],
+    ) -> None:
+        self.sales_channel = sales_channel
+        self.language = language
+        self.remote_select_lookup = remote_select_lookup
+
+    def get_select_value(self, *, product_property=None, remote_property=None, language_code=None):
+        selected_value = self.get_select_value_local(
+            product_property=product_property,
+            multiple=False,
+            language_code=language_code,
+        )
+        self._coerce_select_value_for_original_type(
+            selected_value=selected_value,
+            product_property=product_property,
+            remote_property=remote_property,
+        )
+
+        if product_property is None or remote_property is None:
+            return selected_value
+
+        local_select_value = getattr(product_property, "value_select", None)
+        if local_select_value is None:
+            return None
+
+        mapped_value = self.remote_select_lookup.get((remote_property.id, local_select_value.id))
+        if mapped_value is None:
+            raise MissingMappingError(
+                f"Map the OneSila select value for Mirakl field '{remote_property.code}' before pushing."
+            )
+        return self._serialize_remote_select_value(select_value=mapped_value)
+
+    def get_select_value_multiple(self, *, product_property=None, remote_property=None, language_code=None):
+        if product_property is None or remote_property is None:
+            return super().get_select_value_multiple(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
+            )
+
+        mapped_values: list[str] = []
+        for local_select_value in product_property.value_multi_select.all():
+            mapped_value = self.remote_select_lookup.get((remote_property.id, local_select_value.id))
+            if mapped_value is None:
+                raise MissingMappingError(
+                    f"Map all OneSila multiselect values for Mirakl field '{remote_property.code}' before pushing."
+                )
+            mapped_values.append(self._serialize_remote_select_value(select_value=mapped_value))
+
+        separator = getattr(self.sales_channel, "list_of_multiple_values_separator", None) or ","
+        return separator.join([value for value in mapped_values if value])
+
+    def _serialize_remote_select_value(self, *, select_value: MiraklPropertySelectValue) -> str:
+        return str(select_value.code or select_value.remote_id or select_value.value or "")
 
 
 class MiraklProductPayloadBuilder:
@@ -555,6 +618,19 @@ class MiraklProductPayloadBuilder:
         )
         if (
             value in (None, "")
+            and product_context.get("parent_product") is None
+            and representation_type in {
+                MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
+                MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_ID,
+            }
+            and self._is_required_product_type_item(product_type_item=product_type_item, product_context=product_context)
+        ):
+            value = self._resolve_required_standalone_configurable_value(
+                representation_type=representation_type,
+                product_context=product_context,
+            )
+        if (
+            value in (None, "")
             and self.action == SalesChannelFeedItem.ACTION_DELETE
             and self._is_required_product_type_item(product_type_item=product_type_item, product_context=product_context)
         ):
@@ -735,6 +811,19 @@ class MiraklProductPayloadBuilder:
             return ""
         return str(parent_product.id)
 
+    def _resolve_required_standalone_configurable_value(
+        self,
+        *,
+        representation_type: str,
+        product_context: dict[str, Any],
+    ) -> str:
+        product = product_context["product"]
+        if representation_type == MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU:
+            return getattr(product, "sku", "") or ""
+        if representation_type == MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_ID:
+            return str(getattr(product, "id", "") or "")
+        return ""
+
     def _resolve_product_active(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
         return self._resolve_boolean_value(
             remote_property=remote_property,
@@ -804,26 +893,16 @@ class MiraklProductPayloadBuilder:
         remote_property: MiraklProperty,
         remote_value_lookup: dict[tuple[int, int], MiraklPropertySelectValue],
     ) -> str:
-        property_type = getattr(product_property.property, "type", "")
-        if property_type == "SELECT" and product_property.value_select_id:
-            mapped_value = remote_value_lookup.get((remote_property.id, product_property.value_select_id))
-            if mapped_value is None:
-                raise MissingMappingError(
-                    f"Map the OneSila select value for Mirakl field '{remote_property.code}' before pushing."
-                )
-            return self._serialize_remote_select_value(select_value=mapped_value)
-        if property_type == "MULTISELECT":
-            values: list[str] = []
-            for select_value in product_property.value_multi_select.all():
-                mapped_value = remote_value_lookup.get((remote_property.id, select_value.id))
-                if mapped_value is None:
-                    raise MissingMappingError(
-                        f"Map all OneSila multiselect values for Mirakl field '{remote_property.code}' before pushing."
-                    )
-                values.append(self._serialize_remote_select_value(select_value=mapped_value))
-            separator = getattr(self.sales_channel, "list_of_multiple_values_separator", None) or ","
-            return separator.join([value for value in values if value])
-        return self._stringify(product_property.get_serialised_value(self.language))
+        value_runner = _MiraklRemoteValueRunner(
+            sales_channel=self.sales_channel,
+            language=self.language,
+            remote_select_lookup=remote_value_lookup,
+        )
+        return value_runner.get_remote_value(
+            product_property=product_property,
+            remote_property=remote_property,
+            language_code=self.language,
+        )
 
     def _serialize_remote_select_value(
         self,
@@ -1141,12 +1220,6 @@ class MiraklProductPayloadBuilder:
         return int(match.group(1)) if match else 1
 
     def _is_required_product_type_item(self, *, product_type_item: MiraklProductTypeItem, product_context: dict[str, Any]) -> bool:
-        representation_type = self._get_effective_representation_type(remote_property=product_type_item.remote_property)
-        if representation_type in {
-            MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
-            MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_ID,
-        } and product_context.get("parent_product") is None:
-            return False
         return bool(product_type_item.required or str(product_type_item.requirement_level or "").upper() == "REQUIRED")
 
     def _get_effective_default_value(self, *, remote_property: MiraklProperty) -> str:

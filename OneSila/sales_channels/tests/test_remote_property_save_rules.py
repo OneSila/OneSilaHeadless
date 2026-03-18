@@ -10,6 +10,7 @@ from sales_channels.integrations.ebay.models import EbaySalesChannel, EbaySalesC
 from sales_channels.integrations.ebay.models.properties import EbayProperty
 from sales_channels.integrations.magento2.models import MagentoSalesChannel, MagentoProperty
 from sales_channels.integrations.magento2.models.properties import MagentoPropertySelectValue
+from sales_channels.integrations.mirakl.models import MiraklProperty, MiraklSalesChannel
 from sales_channels.integrations.shein.models import SheinSalesChannel
 from sales_channels.integrations.shein.models.properties import SheinProperty, SheinPropertySelectValue
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceGlobalAttribute
@@ -43,6 +44,11 @@ class RemotePropertySaveRulesTestCase(DisableMagentoAndWooConnectionsMixin, Test
             EbaySalesChannel,
             multi_tenant_company=self.multi_tenant_company,
             hostname="ebay.example.com",
+        )
+        self.mirakl_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="mirakl.example.com",
         )
         self.ebay_view = baker.make(
             EbaySalesChannelView,
@@ -220,6 +226,18 @@ class RemotePropertySaveRulesTestCase(DisableMagentoAndWooConnectionsMixin, Test
             sales_channel=self.ebay_channel,
             marketplace=self.ebay_view,
             localized_name="Brand",
+            allow_multiple=False,
+        )
+
+        remote_property.refresh_from_db()
+        self.assertTrue(remote_property.allow_multiple)
+
+    def test_mirakl_save_forces_allow_multiple_true(self):
+        remote_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            code="mirakl-color",
             allow_multiple=False,
         )
 

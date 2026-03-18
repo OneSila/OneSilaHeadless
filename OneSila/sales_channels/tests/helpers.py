@@ -3,6 +3,7 @@ from unittest.mock import patch
 from sales_channels import signals as sc_signals
 from sales_channels.integrations.magento2 import factories as magento_factories
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
+from sales_channels.integrations.mirakl.models import MiraklSalesChannel
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
 
 
@@ -43,6 +44,14 @@ class DisableMagentoAndWooConnectionsMixin:
         )
         self._woo_connect_patcher.start()
         self.addCleanup(self._woo_connect_patcher.stop)
+
+        self._mirakl_connect_patcher = patch.object(
+            MiraklSalesChannel,
+            "connect",
+            return_value=None,
+        )
+        self._mirakl_connect_patcher.start()
+        self.addCleanup(self._mirakl_connect_patcher.stop)
 
         self._magento_get_api_patcher = patch.object(
             magento_factories.mixins,

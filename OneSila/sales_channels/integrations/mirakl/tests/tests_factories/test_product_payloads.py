@@ -524,6 +524,63 @@ class MiraklProductPayloadBuilderTests(TestCase):
         self.assertEqual(rows[0]["title_field"], "Parent Name")
         self.assertEqual(rows[0]["main_image"], "https://cdn.example.com/parent.jpg")
 
+    def test_optional_configurable_sku_representation_stays_empty_for_standalone_product(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, _ = self._build_builder(
+            remote_code="parent_sku",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU
+        remote_property.save()
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["parent_sku"], "")
+
+    def test_required_configurable_sku_representation_uses_standalone_product_sku(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, _ = self._build_builder(
+            remote_code="parent_sku",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU
+        remote_property.save()
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["parent_sku"], "SKU-1")
+
+    def test_required_configurable_id_representation_uses_standalone_product_id(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="parent_product_id",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_CONFIGURABLE_ID
+        remote_property.save()
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["parent_product_id"], str(product.id))
+
     def test_delete_action_uses_placeholder_for_missing_required_text(self):
         local_property = baker.make(
             Property,
