@@ -9,6 +9,10 @@ from typing import Any
 from properties.models import Property
 
 from sales_channels.integrations.mirakl.factories.mixins import GetMiraklAPIMixin
+from sales_channels.integrations.mirakl.utils.type_parameters import (
+    get_mirakl_type_parameter_value,
+    normalize_mirakl_type_parameters,
+)
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklDocumentType,
@@ -315,7 +319,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             )
         if self._should_replace_property_definition(remote_property=remote_property, item=item):
             remote_property.code = code
-            remote_property.name = self._clean_string(item.get("label")) or code
+            remote_property.name = self._build_property_name(item=item, code=code)
             remote_property.description = self._clean_string(item.get("description"))
             remote_property.example = self._clean_string(item.get("example"))
             remote_property.is_common = not bool(self._clean_string(item.get("hierarchy_code")))
@@ -351,6 +355,19 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             self._inline_property_values[remote_property.code] = inline_values
 
         return remote_property
+
+    def _build_property_name(self, *, item: dict[str, Any], code: str) -> str:
+        base_name = self._clean_string(item.get("label")) or code
+        unit = self._resolve_type_parameter_value(
+            type_parameters=item.get("type_parameters"),
+            name="UNIT",
+        )
+        if not unit:
+            return base_name
+        suffix = f" ({unit})"
+        if base_name.endswith(suffix):
+            return base_name
+        return f"{base_name}{suffix}"
 
     def _upsert_product_type_item(self, *, product_type: MiraklProductType, remote_property: MiraklProperty, item: dict[str, Any]) -> None:
         product_type_item, _ = MiraklProductTypeItem.objects.get_or_create(
@@ -553,16 +570,10 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         if direct_value:
             return direct_value
 
-        for type_parameter in self._ensure_json_value(item.get("type_parameters"), default=[]):
-            if not isinstance(type_parameter, dict):
-                continue
-            if self._normalize_lookup_token(type_parameter.get("name")) != "list_code":
-                continue
-            resolved_value = self._clean_string(type_parameter.get("value"))
-            if resolved_value:
-                return resolved_value
-
-        return ""
+        return self._resolve_type_parameter_value(
+            type_parameters=item.get("type_parameters"),
+            name="LIST_CODE",
+        )
 
     def _detect_representation_type(
         self,
@@ -837,27 +848,20 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
 
     def _resolve_media_type(self, *, type_parameters: Any) -> str:
-        for item in self._ensure_json_value(type_parameters, default=[]):
-            if not isinstance(item, dict):
-                continue
-            if self._normalize_lookup_token(item.get("name")) != "type":
-                continue
-            resolved = self._normalize_lookup_token(item.get("value"))
-            if resolved:
-                return resolved
-        return ""
+        return self._normalize_lookup_token(
+            get_mirakl_type_parameter_value(
+                raw_value=type_parameters,
+                name="TYPE",
+            )
+        )
 
     def _resolve_type_parameter_value(self, *, type_parameters: Any, name: str) -> str:
-        normalized_name = self._normalize_lookup_token(name)
-        for item in self._ensure_json_value(type_parameters, default=[]):
-            if not isinstance(item, dict):
-                continue
-            if self._normalize_lookup_token(item.get("name")) != normalized_name:
-                continue
-            resolved = self._clean_string(item.get("value"))
-            if resolved:
-                return resolved
-        return ""
+        return self._clean_string(
+            get_mirakl_type_parameter_value(
+                raw_value=normalize_mirakl_type_parameters(raw_value=type_parameters),
+                name=name,
+            )
+        )
 
     def _apply_public_definition(self, *, remote_property: MiraklProperty) -> None:
         public_definition = (

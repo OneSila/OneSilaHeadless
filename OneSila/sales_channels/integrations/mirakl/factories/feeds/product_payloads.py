@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import re
 from collections import defaultdict
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
 from datetime import date, datetime
 from typing import Any
 
@@ -12,7 +13,7 @@ from eancodes.models import EanCode
 from media.models import Media, MediaProductThrough
 from products.models import Product, ProductTranslation
 from properties.models import ProductProperty
-from sales_channels.exceptions import MissingMappingError, PreFlightCheckError
+from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
 from sales_channels.factories.products.products import (
     RemoteProductCreateFactory,
     RemoteProductDeleteFactory,
@@ -35,6 +36,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelFeed,
     MiraklSalesChannelFeedItem,
 )
+from sales_channels.integrations.mirakl.utils.type_parameters import get_mirakl_type_parameter_value
 from sales_channels.models import SalesChannelFeedItem, SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPriceListItem
 
@@ -85,22 +87,25 @@ class MiraklProductPayloadBuilder:
                 f"Mirakl product {getattr(self.local_product, 'sku', self.local_product.id)} has no rows to push."
             )
 
-        translations = self._load_translations(products=products)
+        lookup_products = self._get_lookup_products(products=products)
+        translations = self._load_translations(products=lookup_products)
         product_properties_by_product = self._load_properties(products=products)
         prices_by_product = self._load_prices(products=products)
-        media_by_product = self._load_media(products=products)
+        media_by_product = self._load_media(products=lookup_products)
         eans_by_product = self._load_eans(products=products)
 
         resolved_product_type: MiraklProductType | None = None
         rows: list[dict[str, str]] = []
         for product in products:
+            content_product = self._get_content_source_product(product=product)
             product_context = self._build_product_context(
                 product=product,
-                translation=self._select_translation(translations=translations.get(product.id, [])),
+                translation=self._select_translation(translations=translations.get(content_product.id, [])),
                 product_properties=list(product_properties_by_product.get(product.id, [])),
                 prices=list(prices_by_product.get(product.id, [])),
-                images=list(media_by_product.get(product.id, [])),
+                images=list(media_by_product.get(content_product.id, [])),
                 ean=eans_by_product.get(product.id, ""),
+                content_product=content_product,
             )
             product_type = product_context["product_type"]
             if resolved_product_type is None:
@@ -126,6 +131,18 @@ class MiraklProductPayloadBuilder:
             return [self.local_product]
         return list(self.local_product.get_configurable_variations(active_only=False))
 
+    def _get_lookup_products(self, *, products: list[Product]) -> list[Product]:
+        if self.local_product is None or not self.local_product.is_configurable():
+            return products
+        by_id = {product.id: product for product in products}
+        by_id[self.local_product.id] = self.local_product
+        return list(by_id.values())
+
+    def _get_content_source_product(self, *, product: Product) -> Product:
+        if self.local_product is not None and self.local_product.is_configurable():
+            return self.local_product
+        return product
+
     def _build_product_context(
         self,
         *,
@@ -135,6 +152,7 @@ class MiraklProductPayloadBuilder:
         prices: list[dict[str, Any]],
         images: list[dict[str, Any]],
         ean: str,
+        content_product: Product,
     ) -> dict[str, Any]:
         product_type = self._resolve_product_type(product=product)
         if product_type is None:
@@ -156,12 +174,13 @@ class MiraklProductPayloadBuilder:
             product=product,
             prices=prices,
         )
-        content_payload = self._resolve_content_payload(product=product)
-        fallback_name = getattr(translation, "name", None) or getattr(product, "name", "") or ""
+        content_payload = self._resolve_content_payload(product=content_product)
+        fallback_name = getattr(translation, "name", None) or getattr(content_product, "name", None) or getattr(product, "name", "") or ""
 
         return {
             "product": product,
             "parent_product": self.local_product if self.local_product and self.local_product.is_configurable() else None,
+            "content_product": content_product,
             "translation": translation,
             "product_type": product_type,
             "category_remote_id": getattr(product_type, "remote_id", "") or "",
@@ -264,15 +283,28 @@ class MiraklProductPayloadBuilder:
 
     def _build_offer_fields(self, *, product_context: dict[str, Any]) -> dict[str, str]:
         price_data = product_context["price_data"]
+        description = product_context["description"]
+        short_description = product_context["short_description"]
+        price = self._stringify(price_data.get("full_price"))
+        quantity = self._resolve_create_quantity()
+        if self.action == SalesChannelFeedItem.ACTION_DELETE:
+            if not description:
+                description = self._default_delete_text()
+            if not short_description:
+                short_description = self._default_delete_text()
+            if not price:
+                price = "0"
+            if not quantity:
+                quantity = "0"
         return {
             "sku": product_context["sku"],
             "product-id": product_context["sku"],
             "product-id-type": "SHOP_SKU",
-            "description": product_context["description"],
-            "internal-description": product_context["short_description"],
-            "price": self._stringify(price_data.get("full_price")),
+            "description": description,
+            "internal-description": short_description,
+            "price": price,
             "price-additional-info": "",
-            "quantity": self._resolve_create_quantity(),
+            "quantity": quantity,
             "min-quantity-alert": "",
             "state": self._resolve_offer_state(product_context=product_context),
             "available-start-date": "",
@@ -521,6 +553,15 @@ class MiraklProductPayloadBuilder:
             bullet_index=bullet_index,
             image_index=image_index,
         )
+        if (
+            value in (None, "")
+            and self.action == SalesChannelFeedItem.ACTION_DELETE
+            and self._is_required_product_type_item(product_type_item=product_type_item, product_context=product_context)
+        ):
+            value = self._build_delete_placeholder(
+                remote_property=remote_property,
+                product_context=product_context,
+            )
         value = self._apply_remote_validations(remote_property=remote_property, value=value, product_context=product_context)
         if value in (None, "") and self._is_required_product_type_item(product_type_item=product_type_item, product_context=product_context):
             if self._is_missing_required_mapping(
@@ -805,37 +846,219 @@ class MiraklProductPayloadBuilder:
         return "true" if value else "false"
 
     def _apply_remote_validations(self, *, remote_property: MiraklProperty, value: Any, product_context: dict[str, Any]) -> Any:
+        if str(getattr(remote_property, "type", "") or "").upper() in {"SELECT", "MULTISELECT"}:
+            return value
+
+        value = self._apply_type_parameter_transforms(
+            remote_property=remote_property,
+            value=value,
+        )
         rendered = self._stringify(value)
         if rendered == "":
             return value
 
-        validations = remote_property.validations
-        validation_entries: list[str] = []
-        if isinstance(validations, str):
-            validation_entries = [validations]
-        elif isinstance(validations, list):
-            validation_entries = [str(entry) for entry in validations if entry not in (None, "")]
-
-        for entry in validation_entries:
+        for entry in self._get_validation_entries(remote_property=remote_property):
             parts = [part.strip() for part in str(entry).split("|") if part.strip()]
-            if len(parts) != 2:
+            if len(parts) < 2:
                 continue
-            rule, raw_limit = parts[0].upper(), parts[1]
-            try:
-                limit = int(raw_limit)
-            except (TypeError, ValueError):
+            rule = parts[0].upper()
+
+            if rule == "MAX_LENGTH":
+                try:
+                    limit = int(parts[1])
+                except (TypeError, ValueError):
+                    continue
+                if len(rendered) > limit:
+                    rendered = rendered[:limit]
                 continue
 
-            if rule == "MAX_LENGTH" and len(rendered) > limit:
-                raise PreFlightCheckError(
-                    f"Mirakl field '{remote_property.code}' exceeds max length {limit} for product {product_context['sku']}."
-                )
-            if rule == "MIN_LENGTH" and len(rendered) < limit:
-                raise PreFlightCheckError(
-                    f"Mirakl field '{remote_property.code}' is shorter than min length {limit} for product {product_context['sku']}."
-                )
+            if rule == "MIN_LENGTH":
+                try:
+                    limit = int(parts[1])
+                except (TypeError, ValueError):
+                    continue
+                if len(rendered) < limit:
+                    raise MiraklPayloadValidationError(
+                        f"Mirakl field '{remote_property.code}' is shorter than min length {limit} for product {product_context['sku']}."
+                    )
+                continue
 
-        return value
+            if rule == "FORBIDDEN_WORDS":
+                forbidden_words = [part.strip().lower() for part in parts[1].strip('"').split(",") if part.strip()]
+                for forbidden_word in forbidden_words:
+                    if not forbidden_word:
+                        continue
+                    matched_forbidden_word = self._find_matching_forbidden_word(
+                        value=rendered,
+                        forbidden_word=forbidden_word,
+                    )
+                    if matched_forbidden_word:
+                        raise MiraklPayloadValidationError(
+                            f"Mirakl field '{remote_property.code}' contains forbidden word '{matched_forbidden_word}' for product {product_context['sku']}."
+                        )
+                continue
+
+            if rule == "PRODUCT_REFERENCE":
+                allowed_reference_types = parts[1:]
+                if not self._is_valid_product_reference(value=rendered, allowed_reference_types=allowed_reference_types):
+                    raise MiraklPayloadValidationError(
+                        f"Mirakl field '{remote_property.code}' is not a valid product reference for product {product_context['sku']}."
+                    )
+
+        return rendered
+
+    def _apply_type_parameter_transforms(self, *, remote_property: MiraklProperty, value: Any) -> Any:
+        transformed_value = self._apply_precision_type_parameter(
+            remote_property=remote_property,
+            value=value,
+        )
+        return self._apply_pattern_type_parameter(
+            remote_property=remote_property,
+            value=transformed_value,
+        )
+
+    def _apply_precision_type_parameter(self, *, remote_property: MiraklProperty, value: Any) -> Any:
+        raw_precision = self._get_type_parameter_value(
+            remote_property=remote_property,
+            name="PRECISION",
+        )
+        if raw_precision == "" or value in (None, ""):
+            return value
+        try:
+            precision = int(raw_precision)
+        except (TypeError, ValueError):
+            return value
+        if precision < 0:
+            return value
+
+        numeric_value = self._truncate_decimal_value(value=value, precision=precision)
+        if numeric_value is None:
+            return value
+        return numeric_value
+
+    def _truncate_decimal_value(self, *, value: Any, precision: int) -> str | None:
+        normalized_value = self._stringify(value).strip()
+        if normalized_value == "":
+            return ""
+        try:
+            decimal_value = Decimal(normalized_value)
+        except (InvalidOperation, ValueError):
+            return None
+
+        exponent = Decimal("1").scaleb(-precision)
+        quantized_value = decimal_value.quantize(exponent, rounding=ROUND_DOWN)
+        rendered = format(quantized_value, "f")
+        if precision == 0:
+            return rendered.split(".", 1)[0]
+        rendered = rendered.rstrip("0").rstrip(".")
+        return rendered or "0"
+
+    def _apply_pattern_type_parameter(self, *, remote_property: MiraklProperty, value: Any) -> Any:
+        pattern = self._get_type_parameter_value(
+            remote_property=remote_property,
+            name="PATTERN",
+        )
+        if not pattern or value in (None, ""):
+            return value
+        return self._format_date(value=value, pattern=pattern)
+
+    def _get_validation_entries(self, *, remote_property: MiraklProperty) -> list[str]:
+        validations = remote_property.validations
+        if isinstance(validations, str):
+            return [validations]
+        if isinstance(validations, list):
+            return [str(entry) for entry in validations if entry not in (None, "")]
+        if isinstance(validations, dict):
+            entries: list[str] = []
+            for key, value in validations.items():
+                if key not in (None, ""):
+                    entries.append(str(key))
+                if isinstance(value, str) and value:
+                    entries.append(value)
+                if isinstance(value, list):
+                    entries.extend(str(item) for item in value if item not in (None, ""))
+            return entries
+        return []
+
+    def _build_delete_placeholder(self, *, remote_property: MiraklProperty, product_context: dict[str, Any]) -> str:
+        select_placeholder = self._get_first_select_value(remote_property=remote_property)
+        if select_placeholder:
+            return select_placeholder
+
+        reference_placeholder = self._build_delete_product_reference_placeholder(remote_property=remote_property)
+        if reference_placeholder:
+            return reference_placeholder
+
+        remote_type = str(getattr(remote_property, "type", "") or "").upper()
+        if remote_type in {"BOOLEAN"}:
+            return self._resolve_boolean_value(remote_property=remote_property, value=False)
+        if remote_type in {"NUMERIC"}:
+            return "0"
+        if remote_type == "DATE":
+            return date.today().isoformat()
+        return self._default_delete_text()
+
+    def _get_first_select_value(self, *, remote_property: MiraklProperty) -> str:
+        if str(getattr(remote_property, "type", "") or "").upper() not in {"SELECT", "MULTISELECT"}:
+            return ""
+        select_value = (
+            MiraklPropertySelectValue.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_property=remote_property,
+            )
+            .order_by("id")
+            .first()
+        )
+        if select_value is None:
+            return ""
+        return self._stringify(select_value.value or select_value.code or select_value.remote_id)
+
+    def _build_delete_product_reference_placeholder(self, *, remote_property: MiraklProperty) -> str:
+        for entry in self._get_validation_entries(remote_property=remote_property):
+            parts = [part.strip() for part in str(entry).split("|") if part.strip()]
+            if not parts or parts[0].upper() != "PRODUCT_REFERENCE":
+                continue
+            for reference_type in parts[1:]:
+                normalized_type = str(reference_type or "").upper()
+                if normalized_type == "EAN-8":
+                    return "00000000"
+                if normalized_type == "UPC":
+                    return "000000000000"
+                if normalized_type == "EAN-13":
+                    return "0000000000000"
+        return ""
+
+    def _is_valid_product_reference(self, *, value: str, allowed_reference_types: list[str]) -> bool:
+        normalized_value = re.sub(r"\s+", "", str(value or ""))
+        if not normalized_value.isdigit():
+            return False
+        length_map = {
+            "EAN-8": 8,
+            "UPC": 12,
+            "EAN-13": 13,
+        }
+        for reference_type in allowed_reference_types:
+            expected_length = length_map.get(str(reference_type or "").upper())
+            if expected_length is not None and len(normalized_value) == expected_length:
+                return True
+        return False
+
+    def _find_matching_forbidden_word(self, *, value: str, forbidden_word: str) -> str:
+        value_tokens = self._tokenize_forbidden_words_value(value=value)
+        forbidden_tokens = self._tokenize_forbidden_words_value(value=forbidden_word)
+        if not value_tokens or not forbidden_tokens:
+            return ""
+        max_start = len(value_tokens) - len(forbidden_tokens)
+        for start_index in range(max_start + 1):
+            if value_tokens[start_index:start_index + len(forbidden_tokens)] == forbidden_tokens:
+                return " ".join(forbidden_tokens)
+        return ""
+
+    def _tokenize_forbidden_words_value(self, *, value: str) -> list[str]:
+        return [token for token in re.findall(r"[a-z0-9]+", str(value or "").lower()) if token]
+
+    def _default_delete_text(self) -> str:
+        return "TO_BE_DELETED"
 
     def _build_representation_indexes(self, *, header_items: list[MiraklProductTypeItem], representation_type: str) -> dict[int, int]:
         matches = [
@@ -1000,14 +1223,57 @@ class MiraklProductPayloadBuilder:
             return self._stringify(match.value or match.code or normalized_default)
         return normalized_default
 
-    def _format_date(self, value: Any) -> str:
+    def _format_date(self, value: Any, pattern: str = "") -> str:
         if value in (None, ""):
             return ""
+        parsed_value = self._coerce_temporal_value(value=value)
+        if parsed_value is None:
+            return self._stringify(value)
+        if pattern:
+            strftime_pattern = self._mirakl_pattern_to_strftime(pattern=pattern)
+            if strftime_pattern:
+                return parsed_value.strftime(strftime_pattern)
+        if isinstance(parsed_value, datetime):
+            return parsed_value.date().isoformat()
+        return parsed_value.isoformat()
+
+    def _coerce_temporal_value(self, *, value: Any) -> date | datetime | None:
         if isinstance(value, datetime):
-            return value.date().isoformat()
-        if hasattr(value, "isoformat"):
-            return value.isoformat()
-        return self._stringify(value)
+            return value
+        if isinstance(value, date):
+            return value
+        normalized_value = self._stringify(value).strip()
+        if not normalized_value:
+            return None
+        normalized_value = normalized_value.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized_value)
+        except ValueError:
+            pass
+        try:
+            return date.fromisoformat(normalized_value)
+        except ValueError:
+            return None
+
+    def _mirakl_pattern_to_strftime(self, *, pattern: str) -> str:
+        rendered_pattern = str(pattern or "")
+        replacements = [
+            ("yyyy", "%Y"),
+            ("MM", "%m"),
+            ("dd", "%d"),
+            ("HH", "%H"),
+            ("mm", "%M"),
+            ("ss", "%S"),
+        ]
+        for source, target in replacements:
+            rendered_pattern = rendered_pattern.replace(source, target)
+        return rendered_pattern if "%" in rendered_pattern else ""
+
+    def _get_type_parameter_value(self, *, remote_property: MiraklProperty, name: str) -> str:
+        return get_mirakl_type_parameter_value(
+            raw_value=getattr(remote_property, "type_parameters", None),
+            name=name,
+        )
 
     def _resolve_content_payload(self, *, product: Product) -> dict[str, Any]:
         content_data = build_content_data(
@@ -1247,11 +1513,6 @@ class MiraklProductBaseFactory(GetMiraklAPIMixin, _MiraklFeedPersistenceMixin):
             "sales_channel_view_id": self.view.id,
         }
         self._persist_feed_rows(product_type=product_type, rows=rows)
-
-        remote_sku = getattr(self.local_instance, "sku", "") or getattr(self.remote_instance, "remote_sku", "") or ""
-        if self.remote_instance.remote_sku != remote_sku:
-            self.remote_instance.remote_sku = remote_sku
-            self.remote_instance.save(update_fields=["remote_sku"])
 
         self.remote_product = self.remote_instance
         return self.payload

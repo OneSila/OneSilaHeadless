@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from django.db.models import Q
@@ -12,6 +13,8 @@ from sales_channels.integrations.mirakl.factories.feeds import (
 )
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelFeed
 from sales_channels.models import SalesChannelFeed
+
+logger = logging.getLogger(__name__)
 
 
 def process_mirakl_gathering_product_feeds(
@@ -71,11 +74,23 @@ def sync_mirakl_product_import_statuses(*, sales_channel_id: int | None = None) 
 
     refreshed: list[MiraklSalesChannelFeed] = []
     for sales_channel in queryset.order_by("id").iterator():
-        refreshed.extend(
-            MiraklImportStatusSyncFactory(
-                sales_channel=sales_channel,
-            ).run()
-        )
+        if not sales_channel.connected:
+            logger.info(
+                "Skipping Mirakl import status sync for channel %s because it is not connected.",
+                sales_channel.id,
+            )
+            continue
+        try:
+            refreshed.extend(
+                MiraklImportStatusSyncFactory(
+                    sales_channel=sales_channel,
+                ).run()
+            )
+        except Exception:
+            logger.exception(
+                "Mirakl import status sync failed for sales_channel_id=%s",
+                sales_channel.id,
+            )
     return refreshed
 
 

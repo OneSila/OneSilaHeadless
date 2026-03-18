@@ -149,12 +149,19 @@ def _queue_delete_rows_for_mirakl_remote_products(
                 .values_list("sales_channel_view_id", flat=True)
                 .distinct()
             )
-            views = list(
-                MiraklSalesChannelView.objects.filter(
-                    sales_channel_id=sales_channel_id,
-                    id__in=assigned_view_ids,
-                ).order_by("id")
-            )
+            if assigned_view_ids:
+                views = list(
+                    MiraklSalesChannelView.objects.filter(
+                        sales_channel_id=sales_channel_id,
+                        id__in=assigned_view_ids,
+                    ).order_by("id")
+                )
+            else:
+                views = list(
+                    MiraklSalesChannelView.objects.filter(
+                        sales_channel_id=sales_channel_id,
+                    ).order_by("id")
+                )
         for view in views:
             MiraklProductDeleteFactory(
                 sales_channel=remote_product.sales_channel,

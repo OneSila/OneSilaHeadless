@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import Any
 
 from django.utils.text import slugify
@@ -16,55 +15,56 @@ from sales_channels.integrations.mirakl.models import (
 
 class MiraklReverseProductMapper:
     RESERVED_FIELD_CODES = {
-        "offer-id",
-        "offer_id",
-        "product-sku",
-        "product_sku",
-        "shop-id",
-        "shop_id",
-        "shop-sku",
-        "shop_sku",
         "active",
-        "deleted",
-        "channels",
-        "price",
-        "prices",
-        "discount-price",
-        "discount_price",
-        "origin-price",
-        "origin_price",
-        "currency-iso-code",
-        "currency_iso_code",
-        "quantity",
-        "product_title",
-        "product_description",
+        "all_prices",
         "allow_quote_requests",
+        "applicable_pricing",
         "available_end_date",
         "available_start_date",
+        "category_code",
+        "category_label",
+        "channels",
+        "currency_iso_code",
         "date_created",
+        "deleted",
+        "description",
+        "discount",
         "favorite_rank",
         "fulfillment",
+        "inactivity_reasons",
+        "internal_description",
         "is_professional",
         "last_updated",
         "leadtime_to_ship",
         "logistic_class",
         "max_order_quantity",
-        "measurement",
         "min_order_quantity",
         "min_shipping_price",
         "min_shipping_price_additional",
         "min_shipping_type",
         "min_shipping_zone",
-        "model",
         "msrp",
         "offer_additional_fields",
+        "offer_id",
         "package_quantity",
+        "price",
         "price_additional_info",
+        "product_brand",
+        "product_description",
+        "product_id",
+        "product_id_type",
+        "product_references",
+        "product_sku",
         "product_tax_code",
+        "product_title",
+        "quantity",
         "retail_prices",
-        "shipping_types",
+        "shipping_deadline",
+        "shop_id",
         "shop_name",
+        "shop_sku",
         "state_code",
+        "total_price",
         "warehouses",
     }
 
@@ -81,66 +81,59 @@ class MiraklReverseProductMapper:
         self._brand_value_lookup = self._build_brand_value_lookup()
 
     def build(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], object | None]:
-        product_data = dict(payload.get("product") or {})
-        export_rows = [row for row in payload.get("export_rows") or [] if isinstance(row, dict)]
-        matched_offers = [row for row in payload.get("matched_offers") or [] if isinstance(row, dict)]
-        merged_fields = self._merge_fields(
-            product_data=product_data,
-            export_rows=export_rows,
-            matched_offers=matched_offers,
-        )
+        offer = dict(payload.get("offer") or {})
+        p31_product = dict(payload.get("p31_product") or {})
+        merged_fields = self._merge_fields(offer=offer, p31_product=p31_product)
 
         sku = self._first_non_empty(
-            product_data.get("product_sku"),
-            merged_fields.get("product_sku"),
-            merged_fields.get("product-sku"),
+            offer.get("shop_sku"),
             merged_fields.get("shop_sku"),
-            merged_fields.get("shop-sku"),
         )
         if not sku:
-            raise ValueError("Mirakl payload is missing product SKU.")
+            raise ValueError("Mirakl OF21 payload is missing shop_sku.")
 
+        remote_sku = self._first_non_empty(
+            offer.get("product_sku"),
+            merged_fields.get("product_sku"),
+        )
+        remote_id = self._first_non_empty(
+            p31_product.get("product_id"),
+            merged_fields.get("product_id"),
+        )
         title = self._first_non_empty(
-            product_data.get("product_title"),
+            offer.get("product_title"),
             merged_fields.get("product_title"),
-            merged_fields.get("description"),
             sku,
         )
         description = self._first_non_empty(
-            product_data.get("product_description"),
-            merged_fields.get("description"),
-            "",
-        )
-        subtitle = self._first_non_empty(
-            product_data.get("product_subtitle"),
-            merged_fields.get("product_subtitle"),
+            offer.get("product_description"),
+            merged_fields.get("product_description"),
             "",
         )
         short_description = self._first_non_empty(
-            product_data.get("product_short_description"),
-            merged_fields.get("product_short_description"),
-            description,
+            offer.get("internal_description"),
+            merged_fields.get("internal_description"),
+            "",
+        )
+        subtitle = self._first_non_empty(
+            merged_fields.get("product_subtitle"),
+            "",
         )
         bullet_points = self._collect_bullet_points(merged_fields=merged_fields)
-        references = [item for item in product_data.get("product_references") or [] if isinstance(item, dict)]
+        references = self._extract_references(offer=offer, p31_product=p31_product)
         ean_code = self._extract_ean_code(references=references)
-        configurable_parent_sku = self._resolve_configurable_parent_sku(
-            merged_fields=merged_fields,
-            sku=sku,
-        )
-        price_entries, sales_pricelist_items = self._build_price_entries(
-            export_rows=export_rows,
-            matched_offers=matched_offers,
-        )
-        images, documents = self._build_media_entries(product_data=product_data)
-        active = self._resolve_active(export_rows=export_rows)
+        price_entries, sales_pricelist_items = self._build_price_entries(offer=offer)
+        images, documents = self._build_media_entries(product_data=p31_product)
+        active = self._resolve_active(offer=offer)
 
         structured: dict[str, Any] = {
             "sku": sku,
             "name": title,
             "type": Product.SIMPLE,
             "active": active,
-            "__mirakl_export_rows": export_rows,
+            "__mirakl_offer_id": self._first_non_empty(offer.get("offer_id")),
+            "__mirakl_remote_id": remote_id,
+            "__mirakl_remote_sku": remote_sku,
             "translations": [
                 {
                     "language": self.default_language,
@@ -156,8 +149,6 @@ class MiraklReverseProductMapper:
         }
         if ean_code:
             structured["ean_code"] = ean_code
-        if configurable_parent_sku:
-            structured["configurable_parent_sku"] = configurable_parent_sku
         if price_entries:
             structured["prices"] = price_entries
         if sales_pricelist_items:
@@ -181,37 +172,35 @@ class MiraklReverseProductMapper:
         if properties:
             structured["properties"] = properties
 
-        product_rule = self._resolve_product_rule(product_data=product_data)
+        product_rule = self._resolve_product_rule(merged_fields=merged_fields)
         structured_log = {
             "remote_payload": {
-                "product": product_data,
-                "export_rows": export_rows,
-                "matched_offers": matched_offers,
+                "offer": offer,
+                "p31_product": p31_product,
                 "merged_fields": merged_fields,
             },
-            "resolved_payload": structured,
+            "resolved_payload": {
+                **structured,
+                "__mirakl_remote_id": remote_id,
+                "__mirakl_remote_sku": remote_sku,
+            },
         }
         return structured, structured_log, product_rule
 
-    def _merge_fields(
-        self,
-        *,
-        product_data: dict[str, Any],
-        export_rows: list[dict[str, Any]],
-        matched_offers: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        merged: dict[str, Any] = {}
-        if product_data:
-            merged.update(product_data)
-        for row in export_rows:
-            for key, value in row.items():
-                if key not in merged or merged.get(key) in (None, "", [], {}):
-                    merged[key] = value
-        for offer in matched_offers:
-            for key, value in offer.items():
-                if key not in merged or merged.get(key) in (None, "", [], {}):
-                    merged[key] = value
+    def _merge_fields(self, *, offer: dict[str, Any], p31_product: dict[str, Any]) -> dict[str, Any]:
+        merged = dict(offer)
+        for key, value in p31_product.items():
+            if key not in merged or merged.get(key) in (None, "", [], {}):
+                merged[key] = value
         return merged
+
+    def _extract_references(self, *, offer: dict[str, Any], p31_product: dict[str, Any]) -> list[dict[str, Any]]:
+        references = offer.get("product_references") or []
+        if not isinstance(references, list) or not references:
+            references = p31_product.get("product_references") or []
+        if not isinstance(references, list):
+            return []
+        return [reference for reference in references if isinstance(reference, dict)]
 
     def _build_property_entries(self, *, merged_fields: dict[str, Any]) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
@@ -238,7 +227,11 @@ class MiraklReverseProductMapper:
                 )
                 continue
 
-            property_type = remote_property.local_instance.type if remote_property.local_instance_id else remote_property.type or self._infer_property_type(raw_value=raw_value)
+            property_type = (
+                remote_property.local_instance.type
+                if remote_property.local_instance_id
+                else remote_property.type or self._infer_property_type(raw_value=raw_value)
+            )
             normalized_value = self._normalize_property_value(raw_value=raw_value, property_type=property_type)
             entry: dict[str, Any] = {"value": normalized_value}
             if remote_property.local_instance_id:
@@ -265,9 +258,7 @@ class MiraklReverseProductMapper:
 
     def _build_select_value_lookup(self) -> dict[tuple[int, str], MiraklPropertySelectValue]:
         lookup: dict[tuple[int, str], MiraklPropertySelectValue] = {}
-        queryset = MiraklPropertySelectValue.objects.filter(
-            sales_channel=self.sales_channel,
-        ).select_related("local_instance", "remote_property")
+        queryset = MiraklPropertySelectValue.objects.filter(sales_channel=self.sales_channel).select_related("local_instance", "remote_property")
         for item in queryset:
             for candidate in {item.code, item.value}:
                 normalized = str(candidate or "").strip().lower()
@@ -377,116 +368,70 @@ class MiraklReverseProductMapper:
                 continue
             remote_property = self._property_by_code.get(code)
             if remote_property and remote_property.representation_type == MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT:
-                index = self._extract_suffix(value=code)
-                buckets[index] = str(value).strip()
+                buckets[self._extract_suffix(value=code)] = str(value).strip()
                 continue
             normalized = str(code).lower()
             if "bullet" in normalized:
-                index = self._extract_suffix(value=code)
-                buckets[index] = str(value).strip()
+                buckets[self._extract_suffix(value=code)] = str(value).strip()
         return [value for _index, value in sorted(buckets.items()) if value]
 
     def _extract_ean_code(self, *, references: list[dict[str, Any]]) -> str:
         for item in references:
-            if str(item.get("reference_type") or "").upper() == "EAN":
+            reference_type = str(item.get("reference_type") or "").upper()
+            if reference_type == "EAN" or reference_type.startswith("EAN-"):
                 value = str(item.get("reference") or "").strip()
                 if value:
                     return value
         return ""
 
-    def _build_price_entries(
-        self,
-        *,
-        export_rows: list[dict[str, Any]],
-        matched_offers: list[dict[str, Any]],
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        prices: list[dict[str, Any]] = []
-        sales_pricelist_items: list[dict[str, Any]] = []
-        seen_currencies: set[str] = set()
-        pricing_rows = matched_offers or export_rows
-        if not pricing_rows:
-            pricing_rows = export_rows
-        for row in pricing_rows:
-            currency = str(row.get("currency-iso-code") or row.get("currency_iso_code") or "").strip()
-            if not currency:
-                prices_payload = row.get("prices") or row.get("retail_prices") or []
-                if isinstance(prices_payload, list):
-                    for price_row in prices_payload:
-                        if not isinstance(price_row, dict):
-                            continue
-                        nested_currency = str(price_row.get("currency_iso_code") or price_row.get("currency") or "").strip()
-                        if nested_currency:
-                            currency = nested_currency
-                            break
-            if not currency or currency in seen_currencies:
-                continue
-            seen_currencies.add(currency)
-            origin, current = self._extract_prices_from_row(row=row)
-            if origin in (None, "") and current in (None, ""):
-                continue
-            if current in (None, ""):
-                current = origin
-            if origin in (None, ""):
-                origin = current
-            prices.append(
-                {
-                    "currency": currency,
-                    "rrp": origin,
-                    "price": current,
-                }
-            )
-            sales_pricelist_items.append(
-                {
-                    "salespricelist_data": {
-                        "name": f"Mirakl {self.sales_channel.hostname} {currency}",
-                        "currency": currency,
-                    },
-                    "price_auto": origin if origin not in (None, "") else current,
-                    "discount_auto": current if origin not in (None, "") and current not in (None, "") else None,
-                    "disable_auto_update": True,
-                }
-            )
-        return prices, sales_pricelist_items
+    def _build_price_entries(self, *, offer: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        currency = str(offer.get("currency_iso_code") or "").strip()
+        if not currency:
+            return [], []
 
-    def _extract_prices_from_row(self, *, row: dict[str, Any]) -> tuple[Any, Any]:
-        origin = row.get("origin-price")
-        if origin in (None, ""):
-            origin = row.get("origin_price")
-        current = row.get("discount-price")
-        if current in (None, ""):
-            current = row.get("discount_price")
-        if current in (None, ""):
-            current = row.get("price")
+        price = self._extract_offer_price(offer=offer)
+        rrp = offer.get("msrp")
+        if price in (None, "") and rrp in (None, ""):
+            return [], []
 
-        applicable_pricing = row.get("applicable_pricing") or {}
+        entry = {
+            "currency": currency,
+            "price": price,
+        }
+        if rrp not in (None, ""):
+            entry["rrp"] = rrp
+
+        sales_pricelist_item = {
+            "salespricelist_data": {
+                "name": f"Mirakl {self.sales_channel.hostname} {currency}",
+                "currency": currency,
+            },
+            "price_auto": rrp if rrp not in (None, "") else price,
+            "discount_auto": price if rrp not in (None, "") and price not in (None, "") else None,
+            "disable_auto_update": True,
+        }
+        return [entry], [sales_pricelist_item]
+
+    def _extract_offer_price(self, *, offer: dict[str, Any]) -> Any:
+        direct_price = offer.get("price")
+        if direct_price not in (None, ""):
+            return direct_price
+
+        applicable_pricing = offer.get("applicable_pricing") or {}
         if isinstance(applicable_pricing, dict):
-            if origin in (None, ""):
-                origin = applicable_pricing.get("unit_origin_price")
-            if current in (None, ""):
-                current = applicable_pricing.get("unit_discount_price")
-            if current in (None, ""):
-                current = applicable_pricing.get("price")
+            applicable_price = applicable_pricing.get("price")
+            if applicable_price not in (None, ""):
+                return applicable_price
 
-        if origin in (None, "") and current in (None, ""):
-            price_entry = self._extract_price_entry(row=row)
-            if price_entry is not None:
-                origin = (
-                    price_entry.get("origin_price")
-                    or price_entry.get("unit_origin_price")
-                )
-                current = price_entry.get("unit_discount_price")
-                if current in (None, ""):
-                    current = price_entry.get("discount_price")
-                if current in (None, ""):
-                    current = price_entry.get("price")
-                if current in (None, ""):
-                    volume_prices = price_entry.get("volume_prices") or []
-                    if volume_prices and isinstance(volume_prices[0], dict):
-                        current = volume_prices[0].get("price")
-                        if origin in (None, ""):
-                            origin = volume_prices[0].get("unit_origin_price")
-
-        return origin, current
+        all_prices = offer.get("all_prices") or []
+        if isinstance(all_prices, list):
+            for price_row in all_prices:
+                if not isinstance(price_row, dict):
+                    continue
+                price = price_row.get("price")
+                if price not in (None, ""):
+                    return price
+        return None
 
     def _build_offer_metadata_properties(
         self,
@@ -496,24 +441,21 @@ class MiraklReverseProductMapper:
     ) -> list[dict[str, Any]]:
         property_codes = [
             "allow_quote_requests",
+            "category_code",
+            "category_label",
             "channels",
             "currency_iso_code",
             "date_created",
-            "deleted",
+            "internal_description",
             "is_professional",
             "last_updated",
             "leadtime_to_ship",
-            "max_order_quantity",
-            "min_order_quantity",
             "min_shipping_price",
             "min_shipping_price_additional",
             "min_shipping_type",
             "min_shipping_zone",
-            "model",
             "msrp",
             "offer_id",
-            "package_quantity",
-            "premium",
             "price_additional_info",
             "product_brand",
             "product_tax_code",
@@ -542,10 +484,7 @@ class MiraklReverseProductMapper:
                         "is_public_information": True,
                         "add_to_filters": False,
                     },
-                    "value": self._normalize_property_value(
-                        raw_value=raw_value,
-                        property_type=property_type,
-                    ),
+                    "value": self._normalize_property_value(raw_value=raw_value, property_type=property_type),
                 }
             )
 
@@ -612,20 +551,15 @@ class MiraklReverseProductMapper:
                 documents.append({"document_url": url})
         return images, documents
 
-    def _resolve_active(self, *, export_rows: list[dict[str, Any]]) -> bool:
-        if not export_rows:
-            return True
-        for row in export_rows:
-            deleted = row.get("deleted")
-            active = row.get("active")
-            if deleted in (True, "true", "TRUE", 1, "1"):
-                continue
-            if active in (True, "true", "TRUE", 1, "1", None, ""):
-                return True
-        return False
+    def _resolve_active(self, *, offer: dict[str, Any]) -> bool:
+        deleted = offer.get("deleted")
+        if deleted in (True, "true", "TRUE", 1, "1"):
+            return False
+        active = offer.get("active")
+        return active in (True, "true", "TRUE", 1, "1", None, "")
 
-    def _resolve_product_rule(self, *, product_data: dict[str, Any]):
-        category_code = str(product_data.get("category_code") or "").strip()
+    def _resolve_product_rule(self, *, merged_fields: dict[str, Any]):
+        category_code = str(merged_fields.get("category_code") or "").strip()
         if not category_code:
             return None
         product_type = (
@@ -638,35 +572,6 @@ class MiraklReverseProductMapper:
             .first()
         )
         return getattr(product_type, "local_instance", None)
-
-    def _resolve_configurable_parent_sku(self, *, merged_fields: dict[str, Any], sku: str) -> str:
-        for code, value in merged_fields.items():
-            if value in (None, ""):
-                continue
-            remote_property = self._property_by_code.get(code)
-            if remote_property is not None and remote_property.representation_type == MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU:
-                candidate = str(value).strip()
-                if candidate and candidate != sku:
-                    return candidate
-
-        for code in ("configurable_sku", "parent_sku", "parent-product-sku", "parent_product_sku"):
-            candidate = str(merged_fields.get(code) or "").strip()
-            if candidate and candidate != sku:
-                return candidate
-        return ""
-
-    def _extract_price_entry(self, *, row: dict[str, Any]) -> dict[str, Any] | None:
-        for key in ("prices", "retail_prices"):
-            price_rows = row.get(key) or []
-            if not isinstance(price_rows, list):
-                continue
-            for price_row in price_rows:
-                if not isinstance(price_row, dict):
-                    continue
-                if price_row.get("price") in (None, "") and price_row.get("unit_origin_price") in (None, ""):
-                    continue
-                return price_row
-        return None
 
     def _extract_suffix(self, *, value: str) -> int:
         digits = "".join(character for character in str(value or "") if character.isdigit())

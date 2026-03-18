@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import time
-from collections import defaultdict
 from typing import Any, Iterator
 
 from django.db import IntegrityError
+from django.utils.text import slugify
 
-from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
+from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
 from sales_channels.factories.imports.imports import SalesChannelImportMixin
 from sales_channels.integrations.mirakl.factories.imports.products.client import MiraklProductsImportClient
@@ -35,21 +36,21 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
     remote_product_content_class = MiraklProductContent
     remote_price_class = MiraklPrice
 
-    initial_poll_delay_seconds = 30
-    poll_interval_seconds = 60
-    max_poll_attempts = 10
+    page_interval_seconds = 5
 
     def __init__(self, *, import_process, sales_channel, language=None):
         super().__init__(import_process=import_process, sales_channel=sales_channel, language=language)
         self.client = MiraklProductsImportClient(sales_channel=sales_channel)
         self.mapper = MiraklReverseProductMapper(sales_channel=sales_channel)
-        self._prepared_products: list[dict[str, Any]] | None = None
+        self._prepared_groups: list[dict[str, Any]] | None = None
+        self._offers_total_count = 0
+        self._p31_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
 
     def prepare_import_process(self):
         super().prepare_import_process()
         self.import_process.status = self.import_process.STATUS_PROCESSING
-        self.import_process.save(update_fields=["status"])
-        self._initialize_total_records_from_account()
+        self.import_process.name = f"Mirakl products import - {self.sales_channel.hostname} [OF21]"
+        self.import_process.save(update_fields=["status", "name"])
 
     def get_properties_data(self):
         return []
@@ -61,43 +62,78 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
         return []
 
     def get_total_instances(self):
-        products = self._load_products()
-        self.import_process.total_records = len(products)
+        self._load_groups()
+        self.import_process.total_records = self._offers_total_count
         self.import_process.processed_records = 0
         self.import_process.save(update_fields=["total_records", "processed_records"])
-        return len(products)
+        return self._offers_total_count
 
     def get_products_data(self) -> Iterator[dict[str, Any]]:
-        yield from self._load_products()
+        yield from self._load_groups()
 
     def import_products_process(self):
         for payload in self.get_products_data():
-            self._process_single_payload(payload=payload)
+            offer_count = len(payload.get("offers") or [])
+            self._process_group_payload(payload=payload)
+            self.import_process.processed_records = (self.import_process.processed_records or 0) + offer_count
+            self.import_process.save(update_fields=["processed_records"])
+            self.update_percentage(to_add=offer_count)
 
-    def _process_single_payload(self, *, payload: dict[str, Any]):
-        structured, structured_log, product_rule = self.mapper.build(payload=payload)
-        self._ensure_configurable_parent(payload=payload, structured=structured)
-        remote_product = (
-            MiraklProduct.objects.filter(
-                sales_channel=self.sales_channel,
-                remote_sku=structured["sku"],
+    def _process_group_payload(self, *, payload: dict[str, Any]) -> None:
+        offer_entries = payload.get("offers") or []
+        if not offer_entries:
+            return
+
+        parent_local_product = None
+        parent_remote_product = None
+        if len(offer_entries) > 1:
+            parent_local_product, parent_remote_product = self._ensure_synthetic_parent(payload=payload)
+
+        for offer_entry in offer_entries:
+            self._process_offer_entry(
+                payload=payload,
+                offer_entry=offer_entry,
+                parent_local_product=parent_local_product,
+                parent_remote_product=parent_remote_product,
             )
-            .select_related("local_instance")
-            .first()
+
+        if parent_local_product is not None and parent_remote_product is not None:
+            self._update_view_assigns_for_channels(
+                product=parent_local_product,
+                remote_product=parent_remote_product,
+                channel_codes=self._collect_group_channel_codes(payload=payload),
+            )
+
+    def _process_offer_entry(
+        self,
+        *,
+        payload: dict[str, Any],
+        offer_entry: dict[str, Any],
+        parent_local_product: Product | None,
+        parent_remote_product: MiraklProduct | None,
+    ) -> None:
+        mapper_payload = {
+            "offer": offer_entry.get("offer") or {},
+            "p31_product": self._get_p31_product(offer=offer_entry.get("offer") or {}),
+        }
+        structured, structured_log, product_rule = self.mapper.build(payload=mapper_payload)
+        if parent_local_product is not None:
+            structured["configurable_parent_sku"] = parent_local_product.sku
+
+        remote_sku = self._normalize_remote_value(structured.get("__mirakl_remote_sku"))
+        remote_id = self._normalize_remote_value(structured.get("__mirakl_remote_id"))
+        local_product = self._find_local_product(sku=structured.get("sku") or "")
+        existing_remote_product = self._find_existing_remote_product(
+            local_product=local_product,
+            remote_sku=remote_sku,
+            remote_parent_product=parent_remote_product,
         )
-        local_product = getattr(remote_product, "local_instance", None)
         import_instance = ImportProductInstance(
             structured,
             import_process=self.import_process,
             rule=product_rule,
             sales_channel=self.sales_channel,
-            instance=local_product,
-        )
-        import_instance.prepare_mirror_model_class(
-            mirror_model_class=MiraklProduct,
-            sales_channel=self.sales_channel,
-            mirror_model_map={"local_instance": "*"},
-            mirror_model_defaults={"remote_sku": structured["sku"]},
+            instance=getattr(existing_remote_product, "local_instance", None) or local_product,
         )
 
         try:
@@ -106,7 +142,7 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             self._handle_product_error(
                 code="UPDATE_ONLY_NOT_FOUND",
                 message="Mirakl product skipped because update_only is enabled and no local product exists.",
-                payload=payload,
+                payload=mapper_payload,
                 sku=structured["sku"],
                 exc=exc,
             )
@@ -115,7 +151,7 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             self._handle_product_error(
                 code="BROKEN_IMPORT_PROCESS",
                 message="Mirakl product import failed during local import processing.",
-                payload=payload,
+                payload=mapper_payload,
                 sku=structured["sku"],
                 exc=exc,
             )
@@ -124,141 +160,198 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             self._handle_product_error(
                 code="BROKEN_IMPORT_PROCESS",
                 message="Mirakl product import failed.",
-                payload=payload,
+                payload=mapper_payload,
                 sku=structured["sku"],
                 exc=exc,
             )
             return
 
-        if import_instance.remote_instance is None:
-            self._handle_product_error(
-                code="REMOTE_INSTANCE_MISSING",
-                message="Mirakl product mirror was not created.",
-                payload=payload,
-                sku=structured["sku"],
-            )
-            return
+        remote_product = self._upsert_remote_product(
+            existing_remote_product=existing_remote_product,
+            local_product=import_instance.instance,
+            remote_sku=remote_sku,
+            remote_id=remote_id,
+            parent_remote_product=parent_remote_product,
+            structured=structured,
+            mapper_payload=mapper_payload,
+            group_hash=payload["group_hash"],
+        )
+        import_instance.set_remote_instance(remote_product)
 
-        self._update_remote_product(remote_product=import_instance.remote_instance, payload=payload, structured=structured)
-        self._update_product_category(import_instance=import_instance, payload=payload)
+        self._update_product_category(import_instance=import_instance, offer=mapper_payload["offer"])
         self._update_content_mirror(import_instance=import_instance)
         self._update_price_mirror(import_instance=import_instance)
-        self._update_ean_mirrors(import_instance=import_instance, payload=payload)
-        self._update_view_assigns(import_instance=import_instance, payload=payload)
+        self._update_ean_mirrors(import_instance=import_instance, mapper_payload=mapper_payload)
+        if parent_local_product is None:
+            self._update_view_assigns_for_channels(
+                product=import_instance.instance,
+                remote_product=remote_product,
+                channel_codes=self._collect_offer_channel_codes(offer=mapper_payload["offer"]),
+            )
+        else:
+            self._clear_view_assigns(product=import_instance.instance)
         self.create_log_instance(import_instance=import_instance, structured_data=structured_log)
 
-        self.import_process.processed_records = (self.import_process.processed_records or 0) + 1
-        self.import_process.save(update_fields=["processed_records"])
-        self.update_percentage()
-
-    def _handle_product_error(
-        self,
-        *,
-        code: str,
-        message: str,
-        payload: dict[str, Any],
-        sku: str,
-        exc: Exception | None = None,
-    ) -> None:
-        self._add_broken_record(
-            code=code,
-            message=message,
-            data=payload,
-            context={"sku": sku},
-            exc=exc,
+    def _ensure_synthetic_parent(self, *, payload: dict[str, Any]) -> tuple[Product, MiraklProduct]:
+        existing_parent_remote = (
+            MiraklProduct.objects.filter(
+                sales_channel=self.sales_channel,
+                raw_data__configurable_group_hash=payload["group_hash"],
+                raw_data__synthetic_configurable=True,
+            )
+            .select_related("local_instance")
+            .order_by("id")
+            .first()
         )
-        if not self.import_process.skip_broken_records:
-            if exc is not None:
-                raise exc
-            raise ValueError(message)
-        return
+        existing_parent_local = getattr(existing_parent_remote, "local_instance", None)
+        parent_payload = self._build_synthetic_parent_payload(payload=payload)
+        import_instance = ImportProductInstance(
+            parent_payload,
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+            instance=existing_parent_local,
+        )
+        import_instance.process()
+        remote_product = self._upsert_remote_product(
+            existing_remote_product=existing_parent_remote,
+            local_product=import_instance.instance,
+            remote_sku=None,
+            remote_id=None,
+            parent_remote_product=None,
+            structured=parent_payload,
+            mapper_payload={
+                "offer": {},
+                "p31_product": {},
+                "synthetic": True,
+                "group_values": payload["group_values"],
+            },
+            group_hash=payload["group_hash"],
+            is_variation=False,
+            title=parent_payload.get("name") or "",
+            brand=str(payload["group_values"].get("product_brand") or "").strip(),
+        )
+        import_instance.set_remote_instance(remote_product)
+        self._update_content_mirror(import_instance=import_instance)
+        return import_instance.instance, remote_product
 
-    def _ensure_configurable_parent(self, *, payload: dict[str, Any], structured: dict[str, Any]) -> None:
-        parent_sku = str(structured.get("configurable_parent_sku") or "").strip()
-        child_sku = str(structured.get("sku") or "").strip()
-        if not parent_sku or parent_sku == child_sku:
-            return
-
-        existing_parent = Product.objects.filter(
-            sku=parent_sku,
-            multi_tenant_company=self.import_process.multi_tenant_company,
-        ).first()
-        if existing_parent is not None:
-            return
-
-        parent_payload = {
-            "sku": parent_sku,
-            "name": parent_sku,
+    def _build_synthetic_parent_payload(self, *, payload: dict[str, Any]) -> dict[str, Any]:
+        group_values = payload["group_values"]
+        title = str(group_values.get("product_title") or "").strip() or f"Mirakl Group {payload['group_hash'][:10]}"
+        description = str(group_values.get("product_description") or "").strip()
+        short_description = str(group_values.get("internal_description") or "").strip()
+        return {
+            "name": title,
             "type": Product.CONFIGURABLE,
-            "active": True,
-            "__mirakl_export_rows": payload.get("export_rows") or [],
+            "active": any(self._is_offer_active(offer=entry.get("offer") or {}) for entry in payload.get("offers") or []),
             "translations": [
                 {
                     "language": self.language or self.sales_channel.multi_tenant_company.language,
                     "sales_channel": self.sales_channel,
-                    "name": parent_sku,
-                    "short_description": "",
-                    "description": "",
-                    "url_key": parent_sku.lower(),
+                    "name": title,
+                    "subtitle": "",
+                    "description": description,
+                    "short_description": short_description,
+                    "url_key": slugify(title) or payload["group_hash"][:16],
                     "bullet_points": [],
                 }
             ],
         }
-        parent_import = ImportProductInstance(
-            parent_payload,
-            import_process=self.import_process,
-            sales_channel=self.sales_channel,
-        )
-        parent_import.prepare_mirror_model_class(
-            mirror_model_class=MiraklProduct,
-            sales_channel=self.sales_channel,
-            mirror_model_map={"local_instance": "*"},
-            mirror_model_defaults={"remote_sku": parent_sku},
-        )
-        parent_import.process()
-        if parent_import.remote_instance is not None:
-            parent_import.remote_instance.title = parent_sku
-            parent_import.remote_instance.raw_data = {
-                "placeholder_configurable": True,
-                "source_child_sku": child_sku,
-            }
-            parent_import.remote_instance.syncing_current_percentage = 100
-            parent_import.remote_instance.save(
-                update_fields=["title", "raw_data", "syncing_current_percentage"]
-            )
-            self._update_content_mirror(import_instance=parent_import)
-            self._update_view_assigns(import_instance=parent_import, payload=payload)
 
-    def _update_remote_product(self, *, remote_product: MiraklProduct, payload: dict[str, Any], structured: dict[str, Any]):
-        product_data = payload.get("product") or {}
-        references = [item for item in product_data.get("product_references") or [] if isinstance(item, dict)]
+    def _upsert_remote_product(
+        self,
+        *,
+        existing_remote_product: MiraklProduct | None,
+        local_product: Product,
+        remote_sku: str | None,
+        remote_id: str | None,
+        parent_remote_product: MiraklProduct | None,
+        structured: dict[str, Any],
+        mapper_payload: dict[str, Any],
+        group_hash: str,
+        is_variation: bool | None = None,
+        title: str | None = None,
+        brand: str | None = None,
+    ) -> MiraklProduct:
+        remote_product = existing_remote_product
+        if remote_product is None:
+            remote_product = MiraklProduct.objects.create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                local_instance=local_product,
+                remote_sku=remote_sku,
+                remote_id=remote_id,
+                is_variation=bool(parent_remote_product) if is_variation is None else is_variation,
+                remote_parent_product=parent_remote_product,
+            )
+        update_fields: list[str] = []
+        for field_name, value in (
+            ("local_instance", local_product),
+            ("remote_sku", remote_sku),
+            ("remote_id", remote_id),
+            ("remote_parent_product", parent_remote_product),
+            ("is_variation", bool(parent_remote_product) if is_variation is None else is_variation),
+            ("product_id_type", self._resolve_product_id_type(mapper_payload=mapper_payload)),
+            ("product_reference", self._resolve_product_reference(mapper_payload=mapper_payload)),
+            ("title", title if title is not None else str(structured.get("name") or "")),
+            (
+                "brand",
+                brand
+                if brand is not None
+                else str(
+                    (mapper_payload.get("offer") or {}).get("product_brand")
+                    or (mapper_payload.get("p31_product") or {}).get("product_brand")
+                    or ""
+                ),
+            ),
+            (
+                "raw_data",
+                {
+                    "configurable_group_hash": group_hash,
+                    "synthetic_configurable": bool(mapper_payload.get("synthetic")),
+                    "offer": mapper_payload.get("offer") or {},
+                    "p31_product": mapper_payload.get("p31_product") or {},
+                    "group_values": mapper_payload.get("group_values") or {},
+                },
+            ),
+            ("syncing_current_percentage", 100),
+        ):
+            if getattr(remote_product, field_name) != value:
+                setattr(remote_product, field_name, value)
+                update_fields.append(field_name)
+        if update_fields:
+            remote_product.save(update_fields=update_fields)
+        return remote_product
+
+    def _resolve_product_id_type(self, *, mapper_payload: dict[str, Any]) -> str:
+        p31_product = mapper_payload.get("p31_product") or {}
+        offer = mapper_payload.get("offer") or {}
+        references = self._extract_references(mapper_payload=mapper_payload)
         primary_reference = references[0] if references else {}
-        remote_product.product_id_type = str(
-            product_data.get("product_id_type")
+        return str(
+            p31_product.get("product_id_type")
+            or p31_product.get("reference_type")
             or primary_reference.get("reference_type")
+            or offer.get("product_id_type")
             or ""
         )
-        remote_product.product_reference = str(
-            product_data.get("product_id")
+
+    def _resolve_product_reference(self, *, mapper_payload: dict[str, Any]) -> str:
+        p31_product = mapper_payload.get("p31_product") or {}
+        references = self._extract_references(mapper_payload=mapper_payload)
+        primary_reference = references[0] if references else {}
+        return str(
+            p31_product.get("product_reference")
+            or p31_product.get("product_id")
             or primary_reference.get("reference")
             or ""
         )
-        remote_product.title = structured.get("name") or ""
-        remote_product.raw_data = {
-            "product": product_data,
-            "export_rows": payload.get("export_rows") or [],
-            "matched_offers": payload.get("matched_offers") or [],
-        }
-        remote_product.syncing_current_percentage = 100
-        remote_product.save(
-            update_fields=[
-                "product_id_type",
-                "product_reference",
-                "title",
-                "raw_data",
-                "syncing_current_percentage",
-            ]
-        )
+
+    def _extract_references(self, *, mapper_payload: dict[str, Any]) -> list[dict[str, Any]]:
+        for key in ("offer", "p31_product"):
+            references = (mapper_payload.get(key) or {}).get("product_references") or []
+            if isinstance(references, list) and references:
+                return [reference for reference in references if isinstance(reference, dict)]
+        return []
 
     def _update_content_mirror(self, *, import_instance: ImportProductInstance):
         translations = getattr(import_instance, "translations", []) or []
@@ -283,17 +376,11 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
         mirror.content_data = content_data
         mirror.save()
 
-    def _update_product_category(self, *, import_instance: ImportProductInstance, payload: dict[str, Any]) -> None:
-        product_data = payload.get("product") or {}
-        category_code = str(product_data.get("category_code") or "").strip()
-        if not category_code:
+    def _update_product_category(self, *, import_instance: ImportProductInstance, offer: dict[str, Any]) -> None:
+        category_code = str(offer.get("category_code") or "").strip()
+        if not category_code or import_instance.instance is None:
             return
-        if import_instance.instance is None:
-            return
-        if not MiraklCategory.objects.filter(
-            sales_channel=self.sales_channel,
-            remote_id=category_code,
-        ).exists():
+        if not MiraklCategory.objects.filter(sales_channel=self.sales_channel, remote_id=category_code).exists():
             return
 
         MiraklProductCategory.objects.update_or_create(
@@ -309,50 +396,44 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
 
     def _update_price_mirror(self, *, import_instance: ImportProductInstance):
         prices = getattr(import_instance, "prices", []) or []
-        export_rows = import_instance.data.get("__mirakl_export_rows") or []
-        offer_id = ""
-        for row in export_rows:
-            offer_id = str(row.get("offer_id") or row.get("offer-id") or "").strip()
-            if offer_id:
-                break
-
+        offer_id = str(import_instance.data.get("__mirakl_offer_id") or "").strip()
         if not prices and not offer_id:
             return
+
         mirror, _ = MiraklPrice.objects.get_or_create(
             multi_tenant_company=self.import_process.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_product=import_instance.remote_instance,
         )
-        if offer_id:
+        update_fields: list[str] = []
+        if offer_id and mirror.remote_id != offer_id:
             mirror.remote_id = offer_id
+            update_fields.append("remote_id")
+
         price_data: dict[str, Any] = {}
         for entry in prices:
             currency = str(entry.get("currency") or "").strip()
             if not currency:
                 continue
-            current_price = entry.get("price")
-            original_price = entry.get("rrp")
             payload: dict[str, Any] = {}
-            if original_price not in (None, ""):
-                payload["price"] = float(original_price)
-            if current_price not in (None, ""):
-                payload["discount_price"] = float(current_price)
+            if entry.get("rrp") not in (None, ""):
+                payload["price"] = float(entry["rrp"])
+            if entry.get("price") not in (None, ""):
+                payload["discount_price"] = float(entry["price"])
                 if "price" not in payload:
-                    payload["price"] = float(current_price)
+                    payload["price"] = float(entry["price"])
             if payload:
                 price_data[currency] = payload
-        if price_data:
+        if price_data and mirror.price_data != price_data:
             mirror.price_data = price_data
-        update_fields = ["remote_id"] if offer_id else []
-        if price_data:
             update_fields.append("price_data")
-        mirror.save(update_fields=update_fields or None)
+        if update_fields:
+            mirror.save(update_fields=update_fields)
 
-    def _update_ean_mirrors(self, *, import_instance: ImportProductInstance, payload: dict[str, Any]):
-        product_data = payload.get("product") or {}
-        references = [item for item in product_data.get("product_references") or [] if isinstance(item, dict)]
-        for reference in references:
-            if str(reference.get("reference_type") or "").upper() != "EAN":
+    def _update_ean_mirrors(self, *, import_instance: ImportProductInstance, mapper_payload: dict[str, Any]):
+        for reference in self._extract_references(mapper_payload=mapper_payload):
+            reference_type = str(reference.get("reference_type") or "").upper()
+            if reference_type != "EAN" and not reference_type.startswith("EAN-"):
                 continue
             ean_code = str(reference.get("reference") or "").strip()
             if not ean_code:
@@ -364,198 +445,205 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
                 ean_code=ean_code[:14],
             )
 
-    def _update_view_assigns(self, *, import_instance: ImportProductInstance, payload: dict[str, Any]):
-        channel_codes: set[str] = set()
-        for row in payload.get("export_rows") or []:
-            channels = row.get("channels") or []
-            if isinstance(channels, str):
-                channels = [part.strip() for part in channels.split(",") if part.strip()]
-            channel_codes.update(str(code).strip() for code in channels if str(code).strip())
-
+    def _update_view_assigns_for_channels(
+        self,
+        *,
+        product: Product,
+        remote_product: MiraklProduct,
+        channel_codes: set[str],
+    ) -> None:
         views_queryset = MiraklSalesChannelView.objects.filter(sales_channel=self.sales_channel)
         if channel_codes:
             views_queryset = views_queryset.filter(remote_id__in=channel_codes)
-        views = list(views_queryset)
-        for view in views:
-            SalesChannelViewAssign.objects.get_or_create(
+        for view in views_queryset:
+            SalesChannelViewAssign.objects.update_or_create(
                 multi_tenant_company=self.import_process.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 sales_channel_view=view,
-                product=import_instance.instance,
-                remote_product=import_instance.remote_instance,
+                product=product,
+                defaults={"remote_product": remote_product},
             )
 
-    def _load_products(self) -> list[dict[str, Any]]:
-        if self._prepared_products is None:
-            export_payload = self._run_offer_export()
-            product_payloads = self._hydrate_products(export_payload=export_payload)
-            self._prepared_products = product_payloads
-        return self._prepared_products
+    def _clear_view_assigns(self, *, product: Product) -> None:
+        SalesChannelViewAssign.objects.filter(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=product,
+        ).delete()
 
-    def _initialize_total_records_from_account(self) -> None:
-        account_info = self.client.get_account_info()
-        offers_count = account_info.get("offers_count")
-        if not isinstance(offers_count, int):
-            return
-        if offers_count < 0:
-            return
-        self.import_process.total_records = offers_count
-        self.import_process.processed_records = 0
-        self.import_process.save(update_fields=["total_records", "processed_records"])
+    def _load_groups(self) -> list[dict[str, Any]]:
+        if self._prepared_groups is not None:
+            return self._prepared_groups
 
-    def _run_offer_export(self) -> dict[str, Any]:
-        tracking_id = str(getattr(self.import_process, "tracking_id", "") or "").strip()
-        if not tracking_id:
-            export_response = self.client.start_full_offer_export()
-            tracking_id = str(export_response.get("tracking_id") or "").strip()
-            self.import_process.tracking_id = tracking_id
-        else:
-            export_response = {"tracking_id": tracking_id, "reused": True}
-        if not tracking_id:
-            raise ValueError("Mirakl OF52 response did not include a tracking_id.")
+        page_size = min(100, self.client.default_page_size)
+        offset = 0
+        total_count: int | None = None
+        grouped_payloads: dict[str, dict[str, Any]] = {}
 
-        self.import_process.name = f"Mirakl products import - {self.sales_channel.hostname} [{tracking_id}]"
-        update_fields = ["name"]
-        if "tracking_id" not in update_fields and getattr(self.import_process, "tracking_id", None) == tracking_id:
-            update_fields.append("tracking_id")
-        self.import_process.save(update_fields=update_fields)
-        time.sleep(self.initial_poll_delay_seconds)
-        last_status_payload: dict[str, Any] = {}
-        for attempt in range(self.max_poll_attempts):
-            last_status_payload = self.client.get_offer_export_status(tracking_id=tracking_id)
-            status = str(last_status_payload.get("status") or "").upper()
-            if status == "COMPLETED":
-                urls = [url for url in last_status_payload.get("urls") or [] if isinstance(url, str) and url]
-                rows: list[dict[str, Any]] = []
-                for url in urls:
-                    rows.extend(self.client.download_json_chunk(url=url))
-                return {
-                    "tracking_id": tracking_id,
-                    "status_payload": last_status_payload,
-                    "rows": rows,
-                }
-            if status == "FAILED":
-                error_payload = last_status_payload.get("error") or last_status_payload
-                raise ValueError(f"Mirakl OF53 failed: {error_payload}")
-            if attempt < self.max_poll_attempts - 1:
-                time.sleep(self.poll_interval_seconds)
-        raise ValueError(f"Mirakl OF53 polling timed out for tracking_id={tracking_id}")
+        while True:
+            page_payload = self.client.get_offers_page(offset=offset, max_items=page_size)
+            offers = page_payload.get("offers") or []
+            if total_count is None and isinstance(page_payload.get("total_count"), int):
+                total_count = max(page_payload["total_count"], 0)
+            for offer in offers:
+                self._append_offer_to_group(groups=grouped_payloads, offer=offer)
 
-    def _hydrate_products(self, *, export_payload: dict[str, Any]) -> list[dict[str, Any]]:
-        rows = [row for row in export_payload.get("rows") or [] if isinstance(row, dict)]
-        rows_by_sku: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for row in rows:
-            sku = str(row.get("product_sku") or row.get("product-sku") or "").strip()
-            if sku:
-                rows_by_sku[sku].append(row)
+            offset += len(offers)
+            reached_total = isinstance(total_count, int) and offset >= total_count
+            if not offers or len(offers) < page_size or reached_total:
+                break
+            time.sleep(self.page_interval_seconds)
 
-        products_by_sku: dict[str, dict[str, Any]] = {}
-        sku_list = list(rows_by_sku.keys())
-        for start in range(0, len(sku_list), 100):
-            batch = sku_list[start:start + 100]
-            for product in self.client.get_products_offers(product_ids=batch):
-                sku = str(product.get("product_sku") or "").strip()
-                if sku:
-                    products_by_sku[sku] = product
+        self._offers_total_count = total_count if isinstance(total_count, int) else offset
+        self._prepared_groups = list(grouped_payloads.values())
+        return self._prepared_groups
 
-        products_by_reference = self._load_p31_products(products_by_sku=products_by_sku)
+    def _append_offer_to_group(self, *, groups: dict[str, dict[str, Any]], offer: dict[str, Any]) -> None:
+        group_values = self._build_group_values(offer=offer)
+        group_hash = hashlib.sha256(
+            "||".join(
+                [
+                    group_values["product_title"],
+                    group_values["product_brand"],
+                    group_values["product_description"],
+                    group_values["internal_description"],
+                    group_values["category_code"],
+                ]
+            ).encode("utf-8")
+        ).hexdigest()
+        group = groups.setdefault(
+            group_hash,
+            {
+                "group_hash": group_hash,
+                "group_values": group_values,
+                "offers": [],
+            },
+        )
+        group["offers"].append({"offer": offer})
 
-        hydrated: list[dict[str, Any]] = []
-        for sku, export_rows in rows_by_sku.items():
-            product_payload = products_by_sku.get(sku)
-            if product_payload is None:
-                self._add_broken_record(
-                    code="P11_PRODUCT_MISSING",
-                    message="Mirakl P11 did not return a product for an exported SKU.",
-                    data={"sku": sku, "export_rows": export_rows},
-                )
-                continue
-            product_payload = self._merge_p31_product_data(
-                product_payload=product_payload,
-                products_by_reference=products_by_reference,
-            )
-            matched_offers = self._match_p11_offers(product_payload=product_payload, export_rows=export_rows)
-            hydrated.append(
-                {
-                    "product": product_payload,
-                    "export_rows": export_rows,
-                    "matched_offers": matched_offers,
-                }
-            )
-        return hydrated
-
-    def _match_p11_offers(self, *, product_payload: dict[str, Any], export_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        offer_ids = {
-            str(row.get("offer_id") or row.get("offer-id") or "").strip()
-            for row in export_rows
-            if (row.get("offer_id") or row.get("offer-id")) not in (None, "")
+    def _build_group_values(self, *, offer: dict[str, Any]) -> dict[str, str]:
+        return {
+            "product_title": self._normalize_group_value(offer.get("product_title")),
+            "product_brand": self._normalize_group_value(offer.get("product_brand")),
+            "product_description": self._normalize_group_value(offer.get("product_description")),
+            "internal_description": self._normalize_group_value(offer.get("internal_description")),
+            "category_code": self._normalize_group_value(offer.get("category_code")),
         }
-        shop_skus = {
-            str(row.get("shop_sku") or row.get("shop-sku") or "").strip()
-            for row in export_rows
-            if (row.get("shop_sku") or row.get("shop-sku")) not in (None, "")
-        }
-        matched: list[dict[str, Any]] = []
-        for offer in product_payload.get("offers") or []:
-            if not isinstance(offer, dict):
-                continue
-            offer_id = str(offer.get("offer_id") or "").strip()
-            shop_sku = str(offer.get("shop_sku") or "").strip()
-            if offer_id and offer_id in offer_ids:
-                matched.append(offer)
-                continue
-            if shop_sku and shop_sku in shop_skus:
-                matched.append(offer)
-        return matched
 
-    def _load_p31_products(self, *, products_by_sku: dict[str, dict[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
-        references: list[tuple[str, str]] = []
-        seen_references: set[tuple[str, str]] = set()
-        for product_payload in products_by_sku.values():
-            for reference in product_payload.get("product_references") or []:
-                if not isinstance(reference, dict):
-                    continue
-                reference_type = str(reference.get("reference_type") or "").strip().upper()
-                reference_value = str(reference.get("reference") or "").strip()
-                reference_key = (reference_type, reference_value)
-                if not reference_type or not reference_value or reference_key in seen_references:
-                    continue
-                seen_references.add(reference_key)
-                references.append(reference_key)
+    def _normalize_group_value(self, value: Any) -> str:
+        return str(value or "").strip()
 
-        products_by_reference: dict[tuple[str, str], dict[str, Any]] = {}
-        for start in range(0, len(references), 100):
-            batch = references[start:start + 100]
-            for product in self.client.get_products_by_references(product_references=batch):
-                for reference in product.get("product_references") or []:
-                    if not isinstance(reference, dict):
-                        continue
-                    reference_type = str(reference.get("reference_type") or "").strip().upper()
-                    reference_value = str(reference.get("reference") or "").strip()
-                    if reference_type and reference_value:
-                        products_by_reference[(reference_type, reference_value)] = product
-        return products_by_reference
+    def _get_p31_product(self, *, offer: dict[str, Any]) -> dict[str, Any] | None:
+        reference_type, reference = self._extract_ean_reference(offer=offer)
+        if not reference_type or not reference:
+            return None
+        cache_key = (reference_type, reference)
+        if cache_key not in self._p31_cache:
+            self._p31_cache[cache_key] = self.client.get_product_by_reference(
+                reference_type=reference_type,
+                reference=reference,
+            )
+        return self._p31_cache[cache_key]
 
-    def _merge_p31_product_data(
-        self,
-        *,
-        product_payload: dict[str, Any],
-        products_by_reference: dict[tuple[str, str], dict[str, Any]],
-    ) -> dict[str, Any]:
-        for reference in product_payload.get("product_references") or []:
+    def _extract_ean_reference(self, *, offer: dict[str, Any]) -> tuple[str, str]:
+        references = offer.get("product_references") or []
+        if not isinstance(references, list):
+            return "", ""
+        for reference in references:
             if not isinstance(reference, dict):
                 continue
-            reference_type = str(reference.get("reference_type") or "").strip().upper()
-            reference_value = str(reference.get("reference") or "").strip()
-            if not reference_type or not reference_value:
-                continue
-            p31_product = products_by_reference.get((reference_type, reference_value))
-            if p31_product is None:
-                continue
+            reference_type = str(reference.get("reference_type") or "").upper()
+            if reference_type == "EAN" or reference_type.startswith("EAN-"):
+                return reference_type, str(reference.get("reference") or "").strip()
+        return "", ""
 
-            merged_payload = dict(product_payload)
-            for key, value in p31_product.items():
-                if merged_payload.get(key) in (None, "", [], {}) and value not in (None, "", [], {}):
-                    merged_payload[key] = value
-            return merged_payload
-        return product_payload
+    def _find_local_product(self, *, sku: str) -> Product | None:
+        normalized_sku = str(sku or "").strip()
+        if not normalized_sku:
+            return None
+        return Product.objects.filter(
+            sku=normalized_sku,
+            multi_tenant_company=self.import_process.multi_tenant_company,
+        ).first()
+
+    def _find_existing_remote_product(
+        self,
+        *,
+        local_product: Product | None,
+        remote_sku: str | None,
+        remote_parent_product: MiraklProduct | None,
+    ) -> MiraklProduct | None:
+        if remote_sku:
+            remote_by_sku = (
+                MiraklProduct.objects.filter(
+                    sales_channel=self.sales_channel,
+                    remote_sku=remote_sku,
+                )
+                .select_related("local_instance", "remote_parent_product")
+                .order_by("id")
+                .first()
+            )
+            if remote_by_sku is not None:
+                return remote_by_sku
+
+        if local_product is None:
+            return None
+
+        queryset = MiraklProduct.objects.filter(
+            sales_channel=self.sales_channel,
+            local_instance=local_product,
+        ).select_related("local_instance", "remote_parent_product")
+        if remote_parent_product is not None:
+            exact_match = queryset.filter(remote_parent_product=remote_parent_product).order_by("id").first()
+            if exact_match is not None:
+                return exact_match
+        return queryset.order_by("id").first()
+
+    def _collect_offer_channel_codes(self, *, offer: dict[str, Any]) -> set[str]:
+        channel_codes: set[str] = set()
+        channels = offer.get("channels") or []
+        if isinstance(channels, str):
+            channels = [part.strip() for part in channels.split(",") if part.strip()]
+        for channel_code in channels:
+            normalized = str(channel_code or "").strip()
+            if normalized:
+                channel_codes.add(normalized)
+        return channel_codes
+
+    def _collect_group_channel_codes(self, *, payload: dict[str, Any]) -> set[str]:
+        channel_codes: set[str] = set()
+        for offer_entry in payload.get("offers") or []:
+            channel_codes.update(self._collect_offer_channel_codes(offer=offer_entry.get("offer") or {}))
+        return channel_codes
+
+    def _normalize_remote_value(self, value: Any) -> str | None:
+        normalized = str(value or "").strip()
+        return normalized or None
+
+    def _is_offer_active(self, *, offer: dict[str, Any]) -> bool:
+        deleted = offer.get("deleted")
+        if deleted in (True, "true", "TRUE", 1, "1"):
+            return False
+        active = offer.get("active")
+        return active in (True, "true", "TRUE", 1, "1", None, "")
+
+    def _handle_product_error(
+        self,
+        *,
+        code: str,
+        message: str,
+        payload: dict[str, Any],
+        sku: str,
+        exc: Exception | None = None,
+    ) -> None:
+        self._add_broken_record(
+            code=code,
+            message=message,
+            data=payload,
+            context={"sku": sku},
+            exc=exc,
+        )
+        if not self.import_process.skip_broken_records:
+            if exc is not None:
+                raise exc
+            raise ValueError(message)

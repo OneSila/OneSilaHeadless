@@ -1,5 +1,6 @@
 from core.receivers import receiver
-from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+from core.signals import post_create, post_update
+from sales_channels.integrations.mirakl.models import MiraklPropertySelectValue, MiraklSalesChannel
 from sales_channels.signals import (
     add_remote_product_variation,
     create_remote_document_association,
@@ -34,6 +35,26 @@ def _get_remote_request_count(*, product) -> int:
         except Exception:  # pragma: no cover - defensive
             return 1
     return 1
+
+
+@receiver(post_create, sender="mirakl.MiraklPropertySelectValue")
+@receiver(post_update, sender="mirakl.MiraklPropertySelectValue")
+def mirakl__property_select_value__propagate_local_mapping(sender, instance: MiraklPropertySelectValue, **kwargs):
+    signal = kwargs.get("signal")
+    if signal == post_update and not instance.is_dirty_field("local_instance", check_relationship=True):
+        return
+    if not instance.local_instance_id:
+        return
+    if not getattr(instance.remote_property, "local_instance_id", None):
+        return
+
+    from sales_channels.integrations.mirakl.factories.sync import (
+        MiraklPropertySelectValueSiblingMappingFactory,
+    )
+
+    MiraklPropertySelectValueSiblingMappingFactory(
+        remote_select_value=instance,
+    ).run()
 
 
 @receiver(refresh_website_pull_models, sender="sales_channels.SalesChannel")

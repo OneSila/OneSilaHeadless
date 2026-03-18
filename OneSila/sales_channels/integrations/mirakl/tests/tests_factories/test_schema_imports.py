@@ -175,6 +175,19 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
                         "channels": [{"code": "WEB"}],
                     },
                     {
+                        "code": "package_length",
+                        "label": "Package Length",
+                        "hierarchy_code": "CHILD",
+                        "required": False,
+                        "variant": False,
+                        "type": "NUMERIC",
+                        "type_parameters": [
+                            {"name": "PRECISION", "value": "2"},
+                            {"name": "UNIT", "value": "cm"},
+                        ],
+                        "channels": [{"code": "WEB"}],
+                    },
+                    {
                         "code": "product_title",
                         "label": "Product Title",
                         "hierarchy_code": "",
@@ -305,6 +318,8 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
         category2_child_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="category2_child")
         self.assertEqual(category2_child_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
         self.assertEqual(category2_child_property.default_value, "child_default")
+        package_length_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="package_length")
+        self.assertEqual(package_length_property.name, "Package Length (cm)")
         title_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="product_title")
         self.assertEqual(title_property.representation_type, MiraklProperty.REPRESENTATION_PRODUCT_TITLE)
         self.assertTrue(title_property.is_common)
