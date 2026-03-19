@@ -11,9 +11,10 @@ from sales_channels.integrations.mirakl.models import (
 )
 from sales_channels.integrations.shopify.models import ShopifySalesChannel
 from sales_channels.signals import refresh_website_pull_models
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklMetadataReceiverTests(TestCase):
+class MiraklMetadataReceiverTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(
@@ -71,7 +72,7 @@ class MiraklMetadataReceiverTests(TestCase):
         currency_factory_cls.assert_not_called()
 
 
-class MiraklPropertySelectValueReceiverTests(TestCase):
+class MiraklPropertySelectValueReceiverTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

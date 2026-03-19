@@ -7,9 +7,10 @@ from core.tests import TestCase
 from sales_channels.integrations.mirakl.factories.feeds import MiraklProductFeedSubmitFactory
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelFeed
 from sales_channels.models import SalesChannelFeed
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklProductFeedSubmitFactoryTests(TestCase):
+class MiraklProductFeedSubmitFactoryTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

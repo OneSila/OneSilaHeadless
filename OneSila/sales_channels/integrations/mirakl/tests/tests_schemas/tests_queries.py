@@ -19,6 +19,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelFeedItem,
     MiraklSalesChannelView,
 )
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
 MIRAKL_CHANNELS_QUERY = """
@@ -198,7 +199,11 @@ query ($status: String!, $importStatus: String!) {
 """
 
 
-class MiraklQueryTests(TransactionTestCaseMixin, TransactionTestCase):
+class MiraklQueryTests(
+    DisableMiraklConnectionMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

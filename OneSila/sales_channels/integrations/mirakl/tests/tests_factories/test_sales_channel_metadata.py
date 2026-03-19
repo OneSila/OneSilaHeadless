@@ -17,9 +17,10 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannel,
     MiraklSalesChannelView,
 )
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklSalesChannelMetadataFactoriesTests(TestCase):
+class MiraklSalesChannelMetadataFactoriesTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

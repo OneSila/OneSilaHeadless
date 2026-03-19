@@ -7,9 +7,10 @@ from model_bakery import baker
 from core.tests import TestCase
 from sales_channels.integrations.mirakl.factories.feeds import MiraklImportStatusSyncFactory
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelFeed
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklImportStatusSyncFactoryTests(TestCase):
+class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

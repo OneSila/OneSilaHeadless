@@ -10,9 +10,10 @@ from sales_channels.integrations.mirakl.models import (
     MiraklPropertySelectValue,
     MiraklSalesChannel,
 )
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklPropertySelectValueSiblingMappingFactoryTests(TestCase):
+class MiraklPropertySelectValueSiblingMappingFactoryTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

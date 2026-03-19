@@ -21,9 +21,10 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelImport,
     MiraklSalesChannelView,
 )
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklFullSchemaSyncFactoryTests(TestCase):
+class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(
@@ -379,7 +380,7 @@ class MiraklFullSchemaSyncFactoryTests(TestCase):
         self.assertGreaterEqual(summary["properties"], 4)
 
 
-class MiraklSchemaImportProcessorTests(TestCase):
+class MiraklSchemaImportProcessorTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

@@ -7,9 +7,10 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProductCategory,
     MiraklSalesChannel,
 )
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklCategoryModelTests(TestCase):
+class MiraklCategoryModelTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(
@@ -75,4 +76,3 @@ class MiraklCategoryModelTests(TestCase):
 
         self.assertFalse(mapping.require_view)
         self.assertIsNone(mapping.view)
-

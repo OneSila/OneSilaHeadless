@@ -17,9 +17,10 @@ from sales_channels.integrations.mirakl.models import (
     MiraklRemoteLanguage,
     MiraklSalesChannel,
 )
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklPerfectMatchFactoriesTest(TestCase):
+class MiraklPerfectMatchFactoriesTest(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.multi_tenant_company.language = "en"

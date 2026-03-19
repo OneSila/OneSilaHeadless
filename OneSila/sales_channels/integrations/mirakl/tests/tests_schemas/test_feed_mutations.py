@@ -5,6 +5,7 @@ from model_bakery import baker
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelFeed
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
 RESYNC_MIRAKL_FEED_MUTATION = """
@@ -26,7 +27,11 @@ mutation ($instance: MiraklSalesChannelPartialInput!) {
 """
 
 
-class MiraklFeedMutationTests(TransactionTestCaseMixin, TransactionTestCase):
+class MiraklFeedMutationTests(
+    DisableMiraklConnectionMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

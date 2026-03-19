@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from core.tests import TestCase
 from model_bakery import baker
@@ -23,9 +23,10 @@ from sales_channels.integrations.mirakl.tasks import (
     sales_channels__tasks__refresh_mirakl_product_issues_full,
     sales_channels__tasks__refresh_mirakl_product_issues_full__cronjob,
 )
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklImportTaskTests(TestCase):
+class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

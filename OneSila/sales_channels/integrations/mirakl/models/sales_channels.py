@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from core import models

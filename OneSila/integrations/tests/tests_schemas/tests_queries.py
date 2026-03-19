@@ -9,6 +9,7 @@ from integrations.tests.helpers import PublicIntegrationTypeSchemaMixin
 from media.tests.helpers import CreateImageMixin
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
 from sales_channels.integrations.mirakl.schema.types.types import MiraklSalesChannelType
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
 INTEGRATIONS_QUERY = """
@@ -77,6 +78,7 @@ query PublicIntegrationTypes($search: String!) {
 class MiraklIntegrationQueryTests(
     CreateImageMixin,
     PublicIntegrationTypeSchemaMixin,
+    DisableMiraklConnectionMixin,
     TransactionTestCaseMixin,
     TransactionTestCase,
 ):

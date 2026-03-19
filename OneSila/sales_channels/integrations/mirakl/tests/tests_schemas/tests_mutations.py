@@ -6,6 +6,7 @@ from model_bakery import baker
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from properties.models import Property, PropertySelectValue, PropertySelectValueTranslation
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
 VALIDATE_MIRAKL_CREDENTIALS_MUTATION = """
@@ -50,7 +51,11 @@ mutation ($data: MiraklSalesChannelImportInput!) {
 }
 """
 
-class MiraklMutationTests(TransactionTestCaseMixin, TransactionTestCase):
+class MiraklMutationTests(
+    DisableMiraklConnectionMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(

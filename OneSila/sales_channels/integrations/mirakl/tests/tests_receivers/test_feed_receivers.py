@@ -17,9 +17,10 @@ from sales_channels.integrations.mirakl.tasks import (
 )
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.signals import create_remote_product, delete_remote_product, manual_sync_remote_product
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklLiveReceiversTests(TestCase):
+class MiraklLiveReceiversTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = MiraklSalesChannel.objects.create(

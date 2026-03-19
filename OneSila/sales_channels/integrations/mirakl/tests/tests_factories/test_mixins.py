@@ -5,6 +5,7 @@ from model_bakery import baker
 from core.tests import TestCase
 from sales_channels.integrations.mirakl.factories.mixins import GetMiraklAPIMixin
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
 class DummyMiraklAPI(GetMiraklAPIMixin):
@@ -12,7 +13,7 @@ class DummyMiraklAPI(GetMiraklAPIMixin):
         self.sales_channel = sales_channel
 
 
-class GetMiraklAPIMixinTests(TestCase):
+class GetMiraklAPIMixinTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(
@@ -65,4 +66,3 @@ class GetMiraklAPIMixinTests(TestCase):
         self.assertIs(response, success)
         self.assertEqual(request_mock.call_count, 2)
         sleep_mock.assert_called_once_with(0)
-

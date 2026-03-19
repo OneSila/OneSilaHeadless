@@ -21,6 +21,7 @@ from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.integrations.amazon.models import AmazonProduct, AmazonSalesChannelView
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel
 from sales_channels.models import SalesChannelViewAssign
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
 RESYNC_SALES_CHANNEL_VIEW_ASSIGNS_MUTATION = """
@@ -287,7 +288,11 @@ class ResyncSalesChannelAssignsMutationTestCase(TransactionTestCaseMixin, Transa
         self.assertEqual(kwargs["view"].id, self.view.id)
 
 
-class PerfectMatchMappingMutationTestCase(TransactionTestCaseMixin, TransactionTestCase):
+class PerfectMatchMappingMutationTestCase(
+    DisableMiraklConnectionMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
     def setUp(self):
         super().setUp()
         self.sales_channel = MiraklSalesChannel.objects.create(

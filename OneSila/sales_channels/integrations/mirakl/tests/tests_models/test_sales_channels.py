@@ -6,9 +6,10 @@ from sales_channels.integrations.mirakl.models import MiraklSalesChannel
 from sales_channels.integrations.mirakl.sub_type_constants import DEFAULT_MIRAKL_SUB_TYPE
 from sales_channels.integrations.mirakl.utils.url_helpers import get_mirakl_remote_url
 from sales_channels.models import SalesChannelViewAssign
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklSalesChannelModelTests(TestCase):
+class MiraklSalesChannelModelTests(DisableMiraklConnectionMixin, TestCase):
     def test_save_infers_sub_type_from_hostname_when_default(self):
         sales_channel = baker.make(
             MiraklSalesChannel,

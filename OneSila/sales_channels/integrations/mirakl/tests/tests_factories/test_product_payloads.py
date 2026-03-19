@@ -23,9 +23,10 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelView,
 )
 from sales_channels.models import SalesChannelFeedItem
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
-class MiraklProductPayloadBuilderTests(TestCase):
+class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(
