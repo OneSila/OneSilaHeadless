@@ -77,6 +77,9 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
 
     def _payloads_by_path(self):
         return {
+            "/api/documents": {
+                "document_types": [],
+            },
             "/api/offers/states": {
                 "offer_states": [
                     {

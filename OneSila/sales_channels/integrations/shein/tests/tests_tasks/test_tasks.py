@@ -26,6 +26,7 @@ class SheinImportTasksTest(TestCase):
         super().setUp()
         self.sales_channel: SheinSalesChannel = baker.make(
             SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
             hostname="https://tasks.shein.example.com",
             secret_key="secret",
             open_key_id="open",

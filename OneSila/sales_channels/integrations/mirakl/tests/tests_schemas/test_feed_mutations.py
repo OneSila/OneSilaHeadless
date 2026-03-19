@@ -11,9 +11,12 @@ from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 RESYNC_MIRAKL_FEED_MUTATION = """
 mutation ($instance: SalesChannelFeedPartialInput!) {
   resyncMiraklFeed(instance: $instance) {
-    id
-    status
-    type
+    __typename
+    ... on MiraklSalesChannelFeedType {
+      id
+      status
+      type
+    }
   }
 }
 """

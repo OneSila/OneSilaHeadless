@@ -12,9 +12,12 @@ from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 VALIDATE_MIRAKL_CREDENTIALS_MUTATION = """
 mutation ($instance: MiraklSalesChannelPartialInput!) {
   validateMiraklCredentials(instance: $instance) {
-    id
-    hostname
-    rawData
+    __typename
+    ... on MiraklSalesChannelType {
+      id
+      hostname
+      rawData
+    }
   }
 }
 """
@@ -22,8 +25,11 @@ mutation ($instance: MiraklSalesChannelPartialInput!) {
 REFRESH_MIRAKL_METADATA_MUTATION = """
 mutation ($instance: MiraklSalesChannelPartialInput!) {
   refreshMiraklMetadata(instance: $instance) {
-    id
-    hostname
+    __typename
+    ... on MiraklSalesChannelType {
+      id
+      hostname
+    }
   }
 }
 """
@@ -31,11 +37,13 @@ mutation ($instance: MiraklSalesChannelPartialInput!) {
 CREATE_SALES_IMPORT_PROCESS_MUTATION = """
 mutation ($data: SalesChannelImportInput!) {
   createSalesImportProcess(data: $data) {
-    id
-    importId
-    status
-    percentage
     __typename
+    ... on SalesChannelImportType {
+      id
+      importId
+      status
+      percentage
+    }
   }
 }
 """
@@ -43,10 +51,12 @@ mutation ($data: SalesChannelImportInput!) {
 CREATE_MIRAKL_IMPORT_PROCESS_MUTATION = """
 mutation ($data: MiraklSalesChannelImportInput!) {
   createMiraklImportProcess(data: $data) {
-    id
-    status
-    type
     __typename
+    ... on MiraklSalesChannelImportType {
+      id
+      status
+      type
+    }
   }
 }
 """
@@ -66,10 +76,8 @@ class MiraklMutationTests(
             shop_id=123,
             api_key="secret-token",
         )
-        self.product_type_property = baker.make(
-            Property,
+        self.product_type_property = Property.objects.get(
             multi_tenant_company=self.multi_tenant_company,
-            type=Property.TYPES.SELECT,
             is_product_type=True,
         )
         self.product_type = baker.make(

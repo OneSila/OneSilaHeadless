@@ -12,6 +12,7 @@ from products.models import ProductTranslation, ProductTranslationBulletPoint
 from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
 from sales_channels.integrations.mirakl.factories.feeds.product_payloads import MiraklProductPayloadBuilder
 from sales_channels.integrations.mirakl.models import (
+    MiraklCategory,
     MiraklProduct,
     MiraklProductCategory,
     MiraklProductType,
@@ -64,10 +65,19 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=self.sales_channel,
             local_instance=product,
         )
-        product_type = baker.make(
-            MiraklProductType,
+        category = baker.make(
+            MiraklCategory,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
+            remote_id="cat-1",
+            name="Category 1",
+            is_leaf=True,
+        )
+        product_type = baker.make(
+            MiraklProductType,
+            category=category,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=None,
             remote_id="cat-1",
         )
         baker.make(
@@ -439,10 +449,19 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=self.sales_channel,
             local_instance=parent_product,
         )
-        product_type = baker.make(
-            MiraklProductType,
+        category = baker.make(
+            MiraklCategory,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
+            remote_id="cat-1",
+            name="Category 1",
+            is_leaf=True,
+        )
+        product_type = baker.make(
+            MiraklProductType,
+            category=category,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=None,
             remote_id="cat-1",
         )
         baker.make(

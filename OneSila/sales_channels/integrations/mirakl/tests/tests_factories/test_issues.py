@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime
 from unittest.mock import Mock, patch
 
 from django.utils import timezone
@@ -77,7 +77,7 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
     @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.timezone.now")
     @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.MiraklProductIssuesFetchFactory._request")
     def test_full_sync_creates_expected_issue_rows_and_attaches_views(self, request_mock, now_mock):
-        now_mock.return_value = timezone.now()
+        now_mock.return_value = timezone.make_aware(datetime(2026, 3, 19, 10, 0, 0))
         request_mock.return_value = self._response(
             status_code=200,
             payload=[
@@ -183,7 +183,9 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
     @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.timezone.now")
     @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.MiraklProductIssuesFetchFactory._request")
     def test_differential_sync_keeps_existing_issues_on_204(self, request_mock, now_mock):
-        self.sales_channel.last_differential_issues_fetch = timezone.now() - timedelta(hours=1)
+        self.sales_channel.last_differential_issues_fetch = timezone.make_aware(
+            datetime(2026, 3, 19, 9, 0, 0)
+        )
         self.sales_channel.save(update_fields=["last_differential_issues_fetch"])
         existing_issue = baker.make(
             MiraklProductIssue,
@@ -193,7 +195,7 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
             code="OLD",
             severity="ERROR",
         )
-        boundary = timezone.now()
+        boundary = timezone.make_aware(datetime(2026, 3, 19, 10, 0, 0))
         now_mock.return_value = boundary
         request_mock.return_value = self._response(status_code=204, payload=None)
 
@@ -217,7 +219,7 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
             code="OLD",
             severity="ERROR",
         )
-        boundary = timezone.now()
+        boundary = timezone.make_aware(datetime(2026, 3, 19, 11, 0, 0))
         now_mock.return_value = boundary
         request_mock.return_value = self._response(status_code=204, payload=None)
 

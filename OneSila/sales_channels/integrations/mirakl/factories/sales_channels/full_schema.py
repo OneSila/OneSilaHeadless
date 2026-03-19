@@ -588,13 +588,12 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         type_parameters = self._ensure_json_value(item.get("type_parameters"), default=[])
         media_type = self._resolve_media_type(type_parameters=type_parameters)
 
+        if code.endswith("_uom") or label.endswith(" unit"):
+            return MiraklProperty.REPRESENTATION_UNIT
         if field_type in {"list", "list_multiple_values"}:
             value_count = len(inline_values) or (1 if values_list_code in self._value_list_single_defaults else 0)
             if value_count == 1:
                 return MiraklProperty.REPRESENTATION_DEFAULT_VALUE
-
-        if code.endswith("_uom") or label.endswith(" unit"):
-            return MiraklProperty.REPRESENTATION_UNIT
         if any(token in code for token in {"product_title", "product_name"}) or code == "name":
             return MiraklProperty.REPRESENTATION_PRODUCT_TITLE
         if "subtitle" in code:

@@ -7,7 +7,12 @@ from currencies.models import PublicCurrency
 from core.tests import TestCase
 from model_bakery import baker
 from products.models import ConfigurableVariation, Product
-from properties.models import Property, PropertySelectValue
+from properties.models import (
+    Property,
+    PropertySelectValue,
+    PropertySelectValueTranslation,
+    PropertyTranslation,
+)
 from sales_prices.models import SalesPrice
 from sales_channels.integrations.mirakl.factories.imports.products import MiraklProductsImportProcessor
 from sales_channels.integrations.mirakl.models import (
@@ -61,10 +66,21 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
                 internal_name="brand",
                 type=Property.TYPES.SELECT,
             )
+            PropertyTranslation.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                property=self.brand_property,
+                language=self.multi_tenant_company.language,
+                name="Brand",
+            )
         self.brand_option = baker.make(
             PropertySelectValue,
             multi_tenant_company=self.multi_tenant_company,
             property=self.brand_property,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.brand_option,
+            language=self.multi_tenant_company.language,
             value="I Love Fancy Dress",
         )
         self.remote_brand = baker.make(

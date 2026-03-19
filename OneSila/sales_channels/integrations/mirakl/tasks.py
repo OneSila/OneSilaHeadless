@@ -132,6 +132,10 @@ def _queue_delete_rows_for_mirakl_remote_products(
     remote_products = MiraklProduct.objects.filter(id__in=remote_product_ids).select_related("sales_channel", "local_instance")
     for remote_product in remote_products.iterator():
         processed_remote_product_ids.append(remote_product.id)
+        sales_channel = remote_product.sales_channel
+        get_real_instance = getattr(sales_channel, "get_real_instance", None)
+        if callable(get_real_instance):
+            sales_channel = get_real_instance()
         if view_id is not None:
             views = list(
                 MiraklSalesChannelView.objects.filter(
@@ -164,7 +168,7 @@ def _queue_delete_rows_for_mirakl_remote_products(
                 )
         for view in views:
             MiraklProductDeleteFactory(
-                sales_channel=remote_product.sales_channel,
+                sales_channel=sales_channel,
                 local_instance=remote_product.local_instance,
                 remote_instance=remote_product,
                 view=view,

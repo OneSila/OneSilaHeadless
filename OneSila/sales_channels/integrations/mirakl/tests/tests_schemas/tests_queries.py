@@ -5,8 +5,14 @@ from model_bakery import baker
 
 from currencies.models import Currency
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
-from products.models import Product
-from properties.models import Property, PropertySelectValue, ProductPropertiesRule
+from products.models import Product, ProductTranslation
+from properties.models import (
+    Property,
+    PropertySelectValue,
+    PropertySelectValueTranslation,
+    PropertyTranslation,
+    ProductPropertiesRule,
+)
 from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
     MiraklPropertySelectValue,
@@ -204,6 +210,50 @@ class MiraklQueryTests(
     TransactionTestCaseMixin,
     TransactionTestCase,
 ):
+    def _create_local_property(self, *, name: str, internal_name: str, property_type: str) -> Property:
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name=internal_name,
+            type=property_type,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+            language=self.multi_tenant_company.language,
+            name=name,
+        )
+        return local_property
+
+    def _create_local_select_value(self, *, property_instance: Property, value: str) -> PropertySelectValue:
+        local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=property_instance,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=local_value,
+            language=self.multi_tenant_company.language,
+            value=value,
+        )
+        return local_value
+
+    def _create_local_product(self, *, sku: str, name: str) -> Product:
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            sku=sku,
+            type=Product.SIMPLE,
+        )
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language=self.multi_tenant_company.language,
+            name=name,
+        )
+        return product
+
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(
@@ -213,17 +263,13 @@ class MiraklQueryTests(
             shop_id=123,
             api_key="secret-token",
         )
-        self.local_property = baker.make(
-            Property,
-            multi_tenant_company=self.multi_tenant_company,
+        self.local_property = self._create_local_property(
             name="Material",
             internal_name="material",
-            type=Property.TYPES.SELECT,
+            property_type=Property.TYPES.SELECT,
         )
-        self.local_value = baker.make(
-            PropertySelectValue,
-            multi_tenant_company=self.multi_tenant_company,
-            property=self.local_property,
+        self.local_value = self._create_local_select_value(
+            property_instance=self.local_property,
             value="Cotton",
         )
         self.currency = baker.make(
@@ -233,9 +279,19 @@ class MiraklQueryTests(
             symbol="EUR",
             iso_code="EUR",
         )
-        self.product_rule = baker.make(
-            ProductPropertiesRule,
+        product_type_property = Property.objects.get(
             multi_tenant_company=self.multi_tenant_company,
+            is_product_type=True,
+        )
+        product_type_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=product_type_property,
+        )
+        self.product_rule = ProductPropertiesRule.objects.get(
+            product_type=product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel__isnull=True,
         )
 
     def test_mirakl_sales_channel_query_exposes_api_key_and_connected(self):
@@ -544,9 +600,7 @@ class MiraklQueryTests(
                 MiraklProduct,
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.multi_tenant_company,
-                local_instance=baker.make(
-                    Product,
-                    multi_tenant_company=self.multi_tenant_company,
+                local_instance=self._create_local_product(
                     sku="LOCAL-SKU-1",
                     name="Local Product 1",
                 ),

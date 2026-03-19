@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 from core.tests import TestCase
+from django.utils import timezone
 from model_bakery import baker
 
 from sales_channels.integrations.mirakl.models import (
@@ -60,7 +61,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
 
     @patch("sales_channels.integrations.mirakl.flows.sync_mirakl_product_import_statuses")
     def test_manual_product_import_status_sync_task_calls_flow(self, flow_mock):
-        sales_channels__tasks__sync_mirakl_product_import_statuses(
+        sales_channels__tasks__sync_mirakl_product_import_statuses.call_local(
             sales_channel_id=self.sales_channel.id,
         )
 
@@ -74,7 +75,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
 
     @patch("sales_channels.integrations.mirakl.flows.refresh_mirakl_product_issues_differential")
     def test_manual_differential_issue_refresh_task_calls_flow(self, flow_mock):
-        sales_channels__tasks__refresh_mirakl_product_issues_differential(
+        sales_channels__tasks__refresh_mirakl_product_issues_differential.call_local(
             sales_channel_id=self.sales_channel.id,
         )
 
@@ -82,7 +83,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
 
     @patch("sales_channels.integrations.mirakl.flows.refresh_mirakl_product_issues_full")
     def test_manual_full_issue_refresh_task_calls_flow(self, flow_mock):
-        sales_channels__tasks__refresh_mirakl_product_issues_full(
+        sales_channels__tasks__refresh_mirakl_product_issues_full.call_local(
             sales_channel_id=self.sales_channel.id,
         )
 
@@ -118,7 +119,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
         )
         mock_processor.return_value.run.assert_called_once_with()
 
-    @patch("sales_channels.integrations.mirakl.tasks.MiraklProductDeleteFactory")
+    @patch("sales_channels.integrations.mirakl.factories.feeds.MiraklProductDeleteFactory")
     def test_delete_helper_falls_back_to_all_views_when_assign_is_missing(self, delete_factory_mock):
         product = baker.make(
             "products.Product",
@@ -157,7 +158,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             MiraklSalesChannel,
             multi_tenant_company=self.multi_tenant_company,
             active=True,
-            hostname="https://mirakl.example.com",
+            hostname="https://disconnected.example.com",
             shop_id=None,
             api_key="",
         )
@@ -169,6 +170,8 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
 
     @patch("sales_channels.integrations.mirakl.flows.feeds.MiraklImportStatusSyncFactory")
     def test_import_status_flow_continues_when_one_channel_fails(self, sync_factory_mock):
+        self.sales_channel.last_product_imports_request_date = timezone.now()
+        self.sales_channel.save(update_fields=["last_product_imports_request_date"])
         good_channel = baker.make(
             MiraklSalesChannel,
             multi_tenant_company=self.multi_tenant_company,
@@ -202,6 +205,8 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
 
     @patch("sales_channels.integrations.mirakl.flows.issues.MiraklProductIssuesFetchFactory")
     def test_full_issues_flow_continues_when_one_channel_fails(self, issues_factory_mock):
+        self.sales_channel.last_full_issues_fetch = timezone.now()
+        self.sales_channel.save(update_fields=["last_full_issues_fetch"])
         good_channel = baker.make(
             MiraklSalesChannel,
             multi_tenant_company=self.multi_tenant_company,
@@ -218,6 +223,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             shop_id=22,
             api_key="token-22",
         )
+        issues_factory_mock.MODE_FULL = "full"
 
         def build_factory(*, sales_channel, mode):
             fac = Mock()

@@ -2,7 +2,7 @@ from model_bakery import baker
 
 from core.tests import TestCase
 from products.models import ConfigurableVariation
-from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelView
 from sales_channels.integrations.mirakl.sub_type_constants import DEFAULT_MIRAKL_SUB_TYPE
 from sales_channels.integrations.mirakl.utils.url_helpers import get_mirakl_remote_url
 from sales_channels.models import SalesChannelViewAssign
@@ -59,10 +59,18 @@ class MiraklSalesChannelModelTests(DisableMiraklConnectionMixin, TestCase):
             local_instance=product,
             remote_sku="REMOTE-SKU-1",
         )
+        view = baker.make(
+            MiraklSalesChannelView,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            remote_id="DEFAULT",
+            name="Default",
+        )
         assign = baker.make(
             SalesChannelViewAssign,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=sales_channel,
+            sales_channel_view=view,
             product=product,
             remote_product=remote_product,
         )
@@ -88,11 +96,13 @@ class MiraklSalesChannelModelTests(DisableMiraklConnectionMixin, TestCase):
         first_child = baker.make(
             "products.Product",
             multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
             sku="A-CHILD",
         )
         second_child = baker.make(
             "products.Product",
             multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
             sku="B-CHILD",
         )
         baker.make(
@@ -132,10 +142,18 @@ class MiraklSalesChannelModelTests(DisableMiraklConnectionMixin, TestCase):
             is_variation=True,
             remote_parent_product=parent_remote,
         )
+        view = baker.make(
+            MiraklSalesChannelView,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            remote_id="DEFAULT",
+            name="Default",
+        )
         assign = baker.make(
             SalesChannelViewAssign,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=sales_channel,
+            sales_channel_view=view,
             product=parent_product,
             remote_product=parent_remote,
         )
