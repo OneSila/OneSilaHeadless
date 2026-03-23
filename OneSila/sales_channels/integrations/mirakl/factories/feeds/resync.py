@@ -4,8 +4,6 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from sales_channels.integrations.mirakl.factories.feeds.product_payloads import MiraklProductPayloadBuilder
-from sales_channels.integrations.mirakl.factories.feeds.renderer import MiraklProductFeedFileFactory
-from sales_channels.integrations.mirakl.factories.feeds.submit import MiraklProductFeedSubmitFactory
 from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeed, MiraklSalesChannelFeedItem
 from sales_channels.models import SalesChannelFeed, SalesChannelFeedItem
 
@@ -22,9 +20,6 @@ class MiraklFeedResyncFactory:
         resynced_feed = self._create_feed()
         try:
             self._populate_feed(feed=resynced_feed)
-            MiraklProductFeedFileFactory(feed=resynced_feed).run()
-            if self.sales_channel.connected:
-                MiraklProductFeedSubmitFactory(feed=resynced_feed).run()
         except Exception:
             resynced_feed.delete()
             raise
@@ -102,4 +97,4 @@ class MiraklFeedResyncFactory:
             feed.items_count = len(resynced_items)
             feed.rows_count = len(payload_data)
             feed.status = MiraklSalesChannelFeed.STATUS_READY_TO_RENDER
-            feed.save(update_fields=["payload_data", "items_count", "rows_count", "status"])
+            feed.save(update_fields=["payload_data", "items_count", "rows_count", "status", "updated_at"])

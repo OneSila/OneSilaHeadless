@@ -1,6 +1,6 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
-from sales_channels.integrations.mirakl.models import MiraklPropertySelectValue, MiraklSalesChannel
+from sales_channels.integrations.mirakl.models import MiraklPropertySelectValue, MiraklSalesChannel, MiraklSalesChannelFeed
 from sales_channels.signals import (
     add_remote_product_variation,
     create_remote_document_association,
@@ -78,6 +78,27 @@ def sales_channels__mirakl__handle_pull(sender, instance, **kwargs):
     MiraklSalesChannelViewPullFactory(sales_channel=real_instance).run()
     MiraklRemoteLanguagePullFactory(sales_channel=real_instance).run()
     MiraklRemoteCurrencyPullFactory(sales_channel=real_instance).run()
+
+
+@receiver(post_update, sender="mirakl.MiraklSalesChannelFeed")
+def mirakl__feed__queue_processing_on_ready_to_render(sender, instance: MiraklSalesChannelFeed, **kwargs):
+    if not instance.is_dirty_field("status"):
+        return
+    if instance.status != MiraklSalesChannelFeed.STATUS_READY_TO_RENDER:
+        return
+    if not getattr(instance.sales_channel, "active", False):
+        return
+
+    from sales_channels.integrations.mirakl.factories.task_queue import MiraklSingleChannelAddTask
+    from sales_channels.integrations.mirakl.tasks import process_mirakl_feed_db_task
+
+    task_runner = MiraklSingleChannelAddTask(
+        task_func=process_mirakl_feed_db_task,
+        sales_channel=instance.sales_channel,
+        number_of_remote_requests=1,
+    )
+    task_runner.set_extra_task_kwargs(feed_id=instance.id)
+    task_runner.run()
 
 
 @receiver(manual_sync_remote_product, sender="sales_channels.RemoteProduct")

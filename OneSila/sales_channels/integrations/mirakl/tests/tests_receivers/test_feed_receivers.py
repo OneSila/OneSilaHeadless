@@ -4,20 +4,27 @@ from django.db import transaction
 
 from core.tests import TestCase
 from integrations.helpers import get_import_path
+from integrations.models import IntegrationTaskQueue
 from products.models import Product
 from sales_channels.integrations.mirakl.models import (
     MiraklProduct,
     MiraklSalesChannel,
+    MiraklSalesChannelFeed,
     MiraklSalesChannelView,
 )
 from sales_channels.integrations.mirakl.tasks import (
     create_mirakl_product_db_task,
     delete_mirakl_product_db_task,
+    process_mirakl_feed_db_task,
     resync_mirakl_product_db_task,
 )
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.signals import create_remote_product, delete_remote_product, manual_sync_remote_product
 from sales_channels.tests.helpers import DisableMiraklConnectionMixin
+
+
+def _noop_dispatch_task(self, *, _unused=None):
+    return None
 
 
 class MiraklLiveReceiversTests(DisableMiraklConnectionMixin, TestCase):
@@ -132,3 +139,28 @@ class MiraklLiveReceiversTests(DisableMiraklConnectionMixin, TestCase):
             },
             number_of_remote_requests=1,
         )
+
+    @patch(
+        "integrations.factories.task_queue.TaskQueueFactory.dispatch_task",
+        new=_noop_dispatch_task,
+    )
+    def test_feed_status_change_to_ready_to_render_queues_processing_task(self, *, _unused=None):
+        feed = MiraklSalesChannelFeed.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
+        )
+
+        with patch.object(
+            transaction,
+            "on_commit",
+            side_effect=lambda func, using=None: func(),
+        ):
+            feed.status = MiraklSalesChannelFeed.STATUS_READY_TO_RENDER
+            feed.save(update_fields=["status", "updated_at"])
+
+        task = IntegrationTaskQueue.objects.get(task_name=get_import_path(process_mirakl_feed_db_task))
+        self.assertEqual(task.integration_id, self.sales_channel.id)
+        self.assertEqual(task.task_kwargs, {"feed_id": feed.id})

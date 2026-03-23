@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import timedelta
-
 from django.db import transaction
 from django.utils import timezone
 
@@ -11,72 +9,44 @@ from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeed, Mi
 
 
 class MiraklProductFeedFactory:
-    """Close gathering Mirakl feeds, render their CSV, and submit them."""
+    """Process one Mirakl feed already marked ready_to_render."""
 
-    gather_window = timedelta(minutes=20)
-
-    def __init__(
-        self,
-        *,
-        sales_channel,
-        force_full: bool = False,
-    ) -> None:
-        self.sales_channel = sales_channel
-        self.force_full = force_full
+    def __init__(self, *, feed: MiraklSalesChannelFeed) -> None:
+        self.feed = feed
+        self.sales_channel = feed.sales_channel
 
     def run(self) -> MiraklSalesChannelFeed | None:
-        processed_feeds = self.run_all()
-        return processed_feeds[-1] if processed_feeds else None
-
-    def run_all(self) -> list[MiraklSalesChannelFeed]:
-        processed_feeds: list[MiraklSalesChannelFeed] = []
-        for feed in self._get_candidate_feeds():
-            processed_feed = self._process_feed(feed=feed)
-            if processed_feed is not None:
-                processed_feeds.append(processed_feed)
-        return processed_feeds
-
-    def _get_candidate_feeds(self):
-        queryset = (
-            MiraklSalesChannelFeed.objects.filter(
-                sales_channel=self.sales_channel,
-                type=MiraklSalesChannelFeed.TYPE_PRODUCT,
-                stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
-                status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
-            )
-            .select_related("product_type", "sales_channel_view")
-            .order_by("created_at")
-        )
-        if not self.force_full:
-            cutoff = timezone.now() - self.gather_window
-            queryset = queryset.filter(updated_at__lte=cutoff)
-        return queryset
-
-    def _process_feed(self, *, feed: MiraklSalesChannelFeed) -> MiraklSalesChannelFeed | None:
-        feed = self._lock_feed_for_processing(feed=feed)
+        feed = self._claim_feed_for_processing(feed=self.feed)
         if feed is None:
             return None
 
-        self._persist_feed_payload(feed=feed)
-        if not self._feed_has_rows(feed=feed):
-            self._delete_empty_feed(feed=feed)
-            return None
+        try:
+            self._persist_feed_payload(feed=feed)
+            if not self._feed_has_rows(feed=feed):
+                self._delete_empty_feed(feed=feed)
+                return None
 
-        self._render_feed_file(feed=feed)
-        self._submit_feed_if_possible(feed=feed)
-        return feed
+            self._render_feed_file(feed=feed)
+            self._submit_feed_if_possible(feed=feed)
+            return feed
+        except Exception:
+            self._reset_feed_to_ready(feed=feed)
+            raise
 
-    def _lock_feed_for_processing(self, *, feed: MiraklSalesChannelFeed) -> MiraklSalesChannelFeed | None:
+    def _claim_feed_for_processing(self, *, feed: MiraklSalesChannelFeed) -> MiraklSalesChannelFeed | None:
         with transaction.atomic():
             locked_feed = (
                 MiraklSalesChannelFeed.objects.select_for_update()
+                .select_related("sales_channel", "product_type", "sales_channel_view")
                 .get(id=feed.id)
             )
-            if locked_feed.status != MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS:
+            if locked_feed.status != MiraklSalesChannelFeed.STATUS_READY_TO_RENDER:
                 return None
             if self._has_pending_feed_for_group(feed=locked_feed):
+                locked_feed.status = MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS
+                locked_feed.save(update_fields=["status", "updated_at"])
                 return None
-            locked_feed.status = MiraklSalesChannelFeed.STATUS_READY_TO_RENDER
+            locked_feed.status = MiraklSalesChannelFeed.STATUS_PROCESSING
             locked_feed.save(update_fields=["status", "updated_at"])
             return locked_feed
 
@@ -124,8 +94,19 @@ class MiraklProductFeedFactory:
 
     def _submit_feed_if_possible(self, *, feed: MiraklSalesChannelFeed) -> None:
         if not self.sales_channel.connected:
+            self._reset_feed_to_ready(feed=feed)
             return
         MiraklProductFeedSubmitFactory(feed=feed).run()
+
+    def _reset_feed_to_ready(self, *, feed: MiraklSalesChannelFeed) -> None:
+        MiraklSalesChannelFeed.objects.filter(
+            id=feed.id,
+            status=MiraklSalesChannelFeed.STATUS_PROCESSING,
+        ).update(
+            status=MiraklSalesChannelFeed.STATUS_READY_TO_RENDER,
+            updated_at=timezone.now(),
+        )
+        feed.status = MiraklSalesChannelFeed.STATUS_READY_TO_RENDER
 
 
 MiraklProductFeedBuildFactory = MiraklProductFeedFactory

@@ -42,14 +42,10 @@ class MiraklFeedResyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         with self.assertRaises(ValidationError):
             MiraklFeedResyncFactory(feed=feed).run()
 
-    @patch("sales_channels.integrations.mirakl.factories.feeds.resync.MiraklProductFeedSubmitFactory.run")
-    @patch("sales_channels.integrations.mirakl.factories.feeds.resync.MiraklProductFeedFileFactory.run")
     @patch("sales_channels.integrations.mirakl.factories.feeds.resync.MiraklProductPayloadBuilder.build")
     def test_run_creates_new_feed_and_regenerates_payloads(
         self,
         build_mock,
-        render_mock,
-        submit_mock,
     ):
         source_feed = baker.make(
             MiraklSalesChannelFeed,
@@ -89,5 +85,3 @@ class MiraklFeedResyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(resynced_feed.rows_count, 1)
         self.assertEqual(new_item.payload_data, [{"sku": "SKU-1", "title": "Fresh"}])
         self.assertEqual(source_feed.items.first().payload_data, [{"old": "payload"}])
-        render_mock.assert_called_once_with()
-        submit_mock.assert_not_called()

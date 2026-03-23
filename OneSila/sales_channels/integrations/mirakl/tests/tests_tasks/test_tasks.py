@@ -2,21 +2,25 @@ from unittest.mock import Mock, patch
 
 from core.tests import TestCase
 from django.utils import timezone
+from integrations.helpers import get_import_path
+from integrations.models import IntegrationTaskQueue
 from model_bakery import baker
 
 from sales_channels.integrations.mirakl.models import (
     MiraklProduct,
     MiraklSalesChannel,
     MiraklSalesChannelImport,
+    MiraklSalesChannelFeed,
     MiraklSalesChannelView,
 )
-from sales_channels.integrations.mirakl.flows import (
-    refresh_mirakl_product_issues_full,
-    sync_mirakl_product_import_statuses,
-)
+from sales_channels.integrations.mirakl.flows import refresh_mirakl_product_issues_full
 from sales_channels.integrations.mirakl.tasks import (
     _queue_delete_rows_for_mirakl_remote_products,
     mirakl_import_db_task,
+    process_mirakl_feed_db_task,
+    sales_channels__tasks__sync_mirakl_product_feeds,
+    sales_channels__tasks__sync_mirakl_product_feeds__cronjob,
+    sync_mirakl_product_import_statuses_db_task,
     sales_channels__tasks__sync_mirakl_product_import_statuses,
     sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob,
     sales_channels__tasks__refresh_mirakl_product_issues_differential,
@@ -25,6 +29,10 @@ from sales_channels.integrations.mirakl.tasks import (
     sales_channels__tasks__refresh_mirakl_product_issues_full__cronjob,
 )
 from sales_channels.tests.helpers import DisableMiraklConnectionMixin
+
+
+def _noop_dispatch_task(self, *, _unused=None):
+    return None
 
 
 class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
@@ -59,19 +67,171 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
         )
         mock_processor.return_value.run.assert_called_once_with()
 
-    @patch("sales_channels.integrations.mirakl.flows.sync_mirakl_product_import_statuses")
-    def test_manual_product_import_status_sync_task_calls_flow(self, flow_mock):
-        sales_channels__tasks__sync_mirakl_product_import_statuses.call_local(
+    @patch(
+        "integrations.factories.task_queue.TaskQueueFactory.dispatch_task",
+        new=_noop_dispatch_task,
+    )
+    def test_sync_mirakl_product_feeds_task_marks_gathering_feeds_ready_and_queues_remote_task(self, *, _unused=None):
+        gathering_feed = baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
+        )
+        baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+        )
+
+        processed_feeds = sales_channels__tasks__sync_mirakl_product_feeds.call_local(
             sales_channel_id=self.sales_channel.id,
         )
 
-        flow_mock.assert_called_once_with(sales_channel_id=self.sales_channel.id)
+        gathering_feed.refresh_from_db()
+        self.assertEqual(len(processed_feeds), 1)
+        self.assertEqual(processed_feeds[0].id, gathering_feed.id)
+        self.assertEqual(gathering_feed.status, MiraklSalesChannelFeed.STATUS_READY_TO_RENDER)
+        task = IntegrationTaskQueue.objects.get(task_name=get_import_path(process_mirakl_feed_db_task))
+        self.assertEqual(task.integration_id, self.sales_channel.id)
+        self.assertEqual(task.task_kwargs, {"feed_id": gathering_feed.id})
 
-    @patch("sales_channels.integrations.mirakl.flows.sync_mirakl_product_import_statuses")
-    def test_product_import_status_sync_cronjob_calls_flow(self, flow_mock):
-        sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob()
+    @patch(
+        "integrations.factories.task_queue.TaskQueueFactory.dispatch_task",
+        new=_noop_dispatch_task,
+    )
+    def test_sync_mirakl_product_feeds_cronjob_marks_gathering_feeds_ready_and_queues_remote_task(self, *, _unused=None):
+        gathering_feed = baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
+        )
 
-        flow_mock.assert_called_once_with()
+        processed_feeds = sales_channels__tasks__sync_mirakl_product_feeds__cronjob()
+
+        gathering_feed.refresh_from_db()
+        self.assertEqual([feed.id for feed in processed_feeds], [gathering_feed.id])
+        self.assertEqual(gathering_feed.status, MiraklSalesChannelFeed.STATUS_READY_TO_RENDER)
+        task = IntegrationTaskQueue.objects.get(task_name=get_import_path(process_mirakl_feed_db_task))
+        self.assertEqual(task.task_kwargs, {"feed_id": gathering_feed.id})
+
+    @patch(
+        "sales_channels.integrations.mirakl.tasks.BaseRemoteTask",
+    )
+    @patch(
+        "sales_channels.integrations.mirakl.factories.feeds.MiraklProductFeedBuildFactory",
+    )
+    def test_process_mirakl_feed_remote_task_runs_single_feed_factory(
+        self,
+        build_factory_mock,
+        base_remote_task_mock,
+    ):
+        feed = baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_READY_TO_RENDER,
+        )
+        task_instance = base_remote_task_mock.return_value
+
+        def execute_side_effect(callable_obj):
+            callable_obj()
+
+        task_instance.execute.side_effect = execute_side_effect
+
+        process_mirakl_feed_db_task.call_local(
+            1,
+            feed_id=feed.id,
+        )
+
+        base_remote_task_mock.assert_called_once_with(1)
+        build_factory_mock.assert_called_once()
+        self.assertEqual(build_factory_mock.call_args.kwargs["feed"].id, feed.id)
+        build_factory_mock.return_value.run.assert_called_once_with()
+
+    @patch(
+        "integrations.factories.task_queue.TaskQueueFactory.dispatch_task",
+        new=_noop_dispatch_task,
+    )
+    def test_manual_product_import_status_sync_task_queues_remote_task(self, *, _unused=None):
+        queued_sales_channel_ids = sales_channels__tasks__sync_mirakl_product_import_statuses.call_local(
+            sales_channel_id=self.sales_channel.id,
+        )
+
+        self.assertEqual(queued_sales_channel_ids, [self.sales_channel.id])
+        tasks = IntegrationTaskQueue.objects.filter(task_name=get_import_path(sync_mirakl_product_import_statuses_db_task))
+        self.assertEqual(tasks.count(), 1)
+        task = tasks.get()
+        self.assertEqual(task.integration_id, self.sales_channel.id)
+        self.assertEqual(task.task_kwargs, {"sales_channel_id": self.sales_channel.id})
+
+    @patch(
+        "integrations.factories.task_queue.TaskQueueFactory.dispatch_task",
+        new=_noop_dispatch_task,
+    )
+    def test_product_import_status_sync_cronjob_queues_remote_task(self, *, _unused=None):
+        disconnected_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+            hostname="https://disconnected.example.com",
+            shop_id=None,
+            api_key="",
+        )
+        not_due_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+            hostname="https://fresh.example.com",
+            shop_id=456,
+            api_key="fresh-token",
+            last_product_imports_request_date=timezone.now(),
+        )
+
+        queued_sales_channel_ids = sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob()
+
+        self.assertEqual(queued_sales_channel_ids, [self.sales_channel.id])
+        tasks = IntegrationTaskQueue.objects.filter(task_name=get_import_path(sync_mirakl_product_import_statuses_db_task))
+        self.assertEqual(tasks.count(), 1)
+        task = tasks.get()
+        self.assertEqual(task.integration_id, self.sales_channel.id)
+        self.assertEqual(task.task_kwargs, {"sales_channel_id": self.sales_channel.id})
+        self.assertEqual(task.number_of_remote_requests, 1)
+        self.assertNotEqual(task.integration_id, disconnected_channel.id)
+        self.assertNotEqual(task.integration_id, not_due_channel.id)
+
+    @patch("sales_channels.integrations.mirakl.tasks.BaseRemoteTask")
+    @patch("sales_channels.integrations.mirakl.factories.feeds.MiraklImportStatusSyncFactory")
+    def test_product_import_status_sync_remote_task_runs_factory(
+        self,
+        sync_factory_mock,
+        base_remote_task_mock,
+    ):
+        task_instance = base_remote_task_mock.return_value
+
+        def execute_side_effect(callable_obj):
+            callable_obj()
+
+        task_instance.execute.side_effect = execute_side_effect
+
+        sync_mirakl_product_import_statuses_db_task.call_local(
+            1,
+            sales_channel_id=self.sales_channel.id,
+        )
+
+        base_remote_task_mock.assert_called_once_with(1)
+        sync_factory_mock.assert_called_once_with(sales_channel=self.sales_channel)
+        sync_factory_mock.return_value.run.assert_called_once_with()
 
     @patch("sales_channels.integrations.mirakl.flows.refresh_mirakl_product_issues_differential")
     def test_manual_differential_issue_refresh_task_calls_flow(self, flow_mock):
@@ -152,57 +312,6 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             view=view,
         )
         delete_factory_mock.return_value.run.assert_called_once_with()
-
-    @patch("sales_channels.integrations.mirakl.flows.feeds.MiraklImportStatusSyncFactory")
-    def test_import_status_flow_skips_active_but_disconnected_channels(self, sync_factory_mock):
-        disconnected_channel = baker.make(
-            MiraklSalesChannel,
-            multi_tenant_company=self.multi_tenant_company,
-            active=True,
-            hostname="https://disconnected.example.com",
-            shop_id=None,
-            api_key="",
-        )
-
-        result = sync_mirakl_product_import_statuses(sales_channel_id=disconnected_channel.id)
-
-        self.assertEqual(result, [])
-        sync_factory_mock.assert_not_called()
-
-    @patch("sales_channels.integrations.mirakl.flows.feeds.MiraklImportStatusSyncFactory")
-    def test_import_status_flow_continues_when_one_channel_fails(self, sync_factory_mock):
-        self.sales_channel.last_product_imports_request_date = timezone.now()
-        self.sales_channel.save(update_fields=["last_product_imports_request_date"])
-        good_channel = baker.make(
-            MiraklSalesChannel,
-            multi_tenant_company=self.multi_tenant_company,
-            active=True,
-            hostname="https://good.example.com",
-            shop_id=1,
-            api_key="token-1",
-        )
-        bad_channel = baker.make(
-            MiraklSalesChannel,
-            multi_tenant_company=self.multi_tenant_company,
-            active=True,
-            hostname="https://bad.example.com",
-            shop_id=2,
-            api_key="token-2",
-        )
-
-        def build_factory(*, sales_channel):
-            fac = Mock()
-            if sales_channel.id == bad_channel.id:
-                fac.run.side_effect = ValueError("boom")
-            else:
-                fac.run.return_value = [{"sales_channel_id": sales_channel.id}]
-            return fac
-
-        sync_factory_mock.side_effect = build_factory
-
-        result = sync_mirakl_product_import_statuses()
-
-        self.assertEqual(result, [{"sales_channel_id": good_channel.id}])
 
     @patch("sales_channels.integrations.mirakl.flows.issues.MiraklProductIssuesFetchFactory")
     def test_full_issues_flow_continues_when_one_channel_fails(self, issues_factory_mock):

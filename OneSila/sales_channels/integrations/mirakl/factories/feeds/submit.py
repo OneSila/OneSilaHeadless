@@ -24,10 +24,15 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
             raw_data = dict(self.feed.raw_data or {})
             raw_data["product_submit_skipped"] = True
             raw_data["product_submit_skip_reason"] = "Skipped OF01 upload because settings.DEBUG is True."
+            self.feed.__class__.objects.filter(id=self.feed.id).update(
+                status=self.feed.STATUS_READY_TO_RENDER,
+                stage=self.feed.STAGE_PRODUCT,
+                raw_data=raw_data,
+                updated_at=timezone.now(),
+            )
             self.feed.status = self.feed.STATUS_READY_TO_RENDER
             self.feed.stage = self.feed.STAGE_PRODUCT
             self.feed.raw_data = raw_data
-            self.feed.save(update_fields=["status", "stage", "raw_data"])
             return self.feed
 
         with self.feed.file.open("rb") as file_handle:
