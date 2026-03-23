@@ -96,7 +96,8 @@ class MiraklFeedResyncFactory:
             raise ValidationError("Mirakl feed resync did not generate any rows.")
 
         with transaction.atomic():
-            MiraklSalesChannelFeedItem.objects.bulk_create(resynced_items)
+            for item in resynced_items:
+                item.save()
             feed.payload_data = payload_data
             feed.items_count = len(resynced_items)
             feed.rows_count = len(payload_data)

@@ -180,9 +180,8 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
         self.assertEqual(warning_issue.attribute_code, "mainImageLarge")
         self.assertFalse(warning_issue.views.exists())
 
-    @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.timezone.now")
     @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.MiraklProductIssuesFetchFactory._request")
-    def test_differential_sync_keeps_existing_issues_on_204(self, request_mock, now_mock):
+    def test_differential_sync_keeps_existing_issues_on_204(self, request_mock):
         self.sales_channel.last_differential_issues_fetch = timezone.make_aware(
             datetime(2026, 3, 19, 9, 0, 0)
         )
@@ -196,21 +195,23 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
             severity="ERROR",
         )
         boundary = timezone.make_aware(datetime(2026, 3, 19, 10, 0, 0))
-        now_mock.return_value = boundary
         request_mock.return_value = self._response(status_code=204, payload=None)
 
-        MiraklProductIssuesFetchFactory(
-            sales_channel=self.sales_channel,
-            mode=MiraklProductIssuesFetchFactory.MODE_DIFFERENTIAL,
-        ).run()
+        with patch(
+            "sales_channels.integrations.mirakl.factories.sales_channels.issues.timezone.now",
+            return_value=boundary,
+        ):
+            MiraklProductIssuesFetchFactory(
+                sales_channel=self.sales_channel,
+                mode=MiraklProductIssuesFetchFactory.MODE_DIFFERENTIAL,
+            ).run()
 
         self.assertTrue(MiraklProductIssue.objects.filter(id=existing_issue.id).exists())
         self.sales_channel.refresh_from_db()
         self.assertEqual(self.sales_channel.last_differential_issues_fetch, boundary)
 
-    @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.timezone.now")
     @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.MiraklProductIssuesFetchFactory._request")
-    def test_full_sync_clears_existing_issues_on_204(self, request_mock, now_mock):
+    def test_full_sync_clears_existing_issues_on_204(self, request_mock):
         baker.make(
             MiraklProductIssue,
             multi_tenant_company=self.multi_tenant_company,
@@ -220,13 +221,16 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
             severity="ERROR",
         )
         boundary = timezone.make_aware(datetime(2026, 3, 19, 11, 0, 0))
-        now_mock.return_value = boundary
         request_mock.return_value = self._response(status_code=204, payload=None)
 
-        MiraklProductIssuesFetchFactory(
-            sales_channel=self.sales_channel,
-            mode=MiraklProductIssuesFetchFactory.MODE_FULL,
-        ).run()
+        with patch(
+            "sales_channels.integrations.mirakl.factories.sales_channels.issues.timezone.now",
+            return_value=boundary,
+        ):
+            MiraklProductIssuesFetchFactory(
+                sales_channel=self.sales_channel,
+                mode=MiraklProductIssuesFetchFactory.MODE_FULL,
+            ).run()
 
         self.assertFalse(MiraklProductIssue.objects.filter(remote_product=self.remote_product).exists())
         self.sales_channel.refresh_from_db()

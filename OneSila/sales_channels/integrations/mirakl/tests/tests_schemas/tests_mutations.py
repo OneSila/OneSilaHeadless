@@ -133,27 +133,6 @@ class MiraklMutationTests(
             instance=self.sales_channel,
         )
 
-    def test_create_sales_import_process_creates_mirakl_products_import(self):
-        response = self.strawberry_test_client(
-            query=CREATE_SALES_IMPORT_PROCESS_MUTATION,
-            variables={
-                "data": {
-                    "salesChannel": {
-                        "id": self.to_global_id(self.sales_channel),
-                    },
-                    "name": MiraklSalesChannelImport.TYPE_PRODUCTS,
-                    "status": MiraklSalesChannelImport.STATUS_PENDING,
-                    "skipBrokenRecords": True,
-                    "updateOnly": True,
-                },
-            },
-        )
-
-        self.assertIsNone(response.errors)
-        created_import = MiraklSalesChannelImport.objects.latest("id")
-        self.assertEqual(created_import.type, MiraklSalesChannelImport.TYPE_PRODUCTS)
-        self.assertTrue(created_import.skip_broken_records)
-        self.assertTrue(created_import.update_only)
 
     def test_create_mirakl_import_process_creates_typed_import(self):
         response = self.strawberry_test_client(

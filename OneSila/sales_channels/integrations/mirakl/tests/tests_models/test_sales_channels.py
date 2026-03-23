@@ -50,6 +50,7 @@ class MiraklSalesChannelModelTests(DisableMiraklConnectionMixin, TestCase):
         product = baker.make(
             "products.Product",
             multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
             sku="LOCAL-SKU-1",
         )
         remote_product = baker.make(

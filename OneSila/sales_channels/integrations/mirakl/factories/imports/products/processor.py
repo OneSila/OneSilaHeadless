@@ -490,7 +490,8 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
 
             offset += len(offers)
             reached_total = isinstance(total_count, int) and offset >= total_count
-            if not offers or len(offers) < page_size or reached_total:
+            has_more_pages = isinstance(total_count, int) and offset < total_count
+            if not offers or reached_total or not has_more_pages:
                 break
             time.sleep(self.page_interval_seconds)
 

@@ -146,7 +146,15 @@ class MiraklProductIssuesFetchFactory(GetMiraklAPIMixin):
             .order_by("id")
             .first()
         )
-        return ean_match.remote_product if ean_match is not None else None
+        if ean_match is None or ean_match.remote_product is None:
+            return None
+
+        remote_product = ean_match.remote_product
+        get_real_instance = getattr(remote_product, "get_real_instance", None)
+        if callable(get_real_instance):
+            remote_product = get_real_instance()
+
+        return remote_product if isinstance(remote_product, MiraklProduct) else None
 
     def _sync_remote_product_issues(self, *, remote_product: MiraklProduct, record: dict[str, Any]) -> int:
         issue_payloads = self._build_issue_payloads(record=record)

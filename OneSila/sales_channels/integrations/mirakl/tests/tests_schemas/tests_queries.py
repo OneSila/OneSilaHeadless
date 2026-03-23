@@ -2,6 +2,7 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.test import TransactionTestCase
 from model_bakery import baker
+from strawberry.relay import to_base64
 
 from currencies.models import Currency
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
@@ -140,7 +141,7 @@ query ($mappedLocally: Boolean!) {
 """
 
 MIRAKL_PRODUCT_ISSUES_FILTER_QUERY = """
-query ($view: ID!, $isRejected: Boolean!) {
+query ($view: GlobalID, $isRejected: Boolean!) {
   miraklProductIssues(filters: {views: {id: {exact: $view}}, isRejected: {exact: $isRejected}}) {
     edges {
       node {
@@ -159,7 +160,7 @@ query ($view: ID!, $isRejected: Boolean!) {
 """
 
 MIRAKL_PRODUCT_ISSUE_NODE_QUERY = """
-query ($id: ID!) {
+query ($id: GlobalID!) {
   miraklProductIssue(id: $id) {
     id
     mainCode
@@ -562,7 +563,10 @@ class MiraklQueryTests(
         self.assertIsNone(response.errors)
         node = response.data["miraklProductIssue"]
         self.assertEqual(node["id"], self.to_global_id(issue))
-        self.assertEqual(node["remoteProduct"]["id"], self.to_global_id(remote_product))
+        self.assertEqual(
+            node["remoteProduct"]["id"],
+            to_base64("MiraklRemoteProductType", remote_product.id),
+        )
         self.assertEqual(node["views"][0]["remoteId"], "BE")
 
     def test_mirakl_feeds_query_exposes_mirakl_specific_fields(self):

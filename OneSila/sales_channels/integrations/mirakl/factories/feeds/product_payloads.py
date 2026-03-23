@@ -780,6 +780,14 @@ class MiraklProductPayloadBuilder:
     def _resolve_product_bullet_point(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
         bullet_points = list(product_context.get("bullet_points") or [])
         if not bullet_points:
+            translation = product_context.get("translation")
+            if translation is not None:
+                bullet_points = [
+                    self._stringify(point.text)
+                    for point in translation.bullet_points.all()
+                    if self._stringify(point.text)
+                ]
+        if not bullet_points:
             bullet_points = self._split_bullet_points(
                 product_context["short_description"],
                 product_context["description"],

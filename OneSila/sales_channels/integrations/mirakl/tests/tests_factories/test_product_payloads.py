@@ -77,6 +77,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             MiraklProductType,
             category=category,
             multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
             local_instance=None,
             remote_id="cat-1",
         )
@@ -461,6 +462,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             MiraklProductType,
             category=category,
             multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
             local_instance=None,
             remote_id="cat-1",
         )
@@ -738,7 +740,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             remote_code="package_length",
             local_property=local_property,
             required=True,
-            remote_type="NUMERIC",
+            remote_type=Property.TYPES.FLOAT,
         )
         remote_property.type_parameters = [{"name": "PRECISION", "value": "2"}]
         remote_property.save(update_fields=["type_parameters"])
