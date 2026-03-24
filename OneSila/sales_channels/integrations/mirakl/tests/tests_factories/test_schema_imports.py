@@ -10,6 +10,9 @@ from sales_channels.integrations.mirakl.factories.imports.schema_imports import 
 from sales_channels.integrations.mirakl.factories.sales_channels.full_schema import (
     MiraklFullSchemaSyncFactory,
 )
+from sales_channels.integrations.mirakl.factories.sync.public_definitions import (
+    MiraklPublicDefinitionSyncFactory,
+)
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklProductType,
@@ -17,6 +20,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
     MiraklPropertyApplicability,
     MiraklPropertySelectValue,
+    MiraklPublicDefinition,
     MiraklSalesChannel,
     MiraklSalesChannelImport,
     MiraklSalesChannelView,
@@ -74,6 +78,74 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
                     factory._map_remote_type(remote_type=remote_type),
                     expected_property_type,
                 )
+
+    def test_detect_representation_type_prefers_configurable_sku_for_configurable_id_codes(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        for code in ["parent_product_id", "variant_group_code", "configurable_id"]:
+            with self.subTest(code=code):
+                self.assertEqual(
+                    factory._detect_representation_type(
+                        item={
+                            "code": code,
+                            "label": code,
+                            "type": "TEXT",
+                            "type_parameters": [],
+                        },
+                        values_list_code="",
+                        inline_values=[],
+                    ),
+                    MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
+                )
+
+    def test_apply_public_definition_sets_language(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        MiraklPublicDefinition.objects.create(
+            hostname=self.sales_channel.hostname,
+            property_code="product_title_fr",
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+            language="fr",
+        )
+        remote_property = MiraklProperty(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="product_title_fr",
+            representation_type=MiraklProperty.REPRESENTATION_PROPERTY,
+        )
+
+        factory._apply_public_definition(remote_property=remote_property)
+
+        self.assertEqual(remote_property.representation_type, MiraklProperty.REPRESENTATION_PRODUCT_TITLE)
+        self.assertEqual(remote_property.language, "fr")
+        self.assertTrue(remote_property.representation_type_decided)
+
+    def test_public_definition_sync_persists_language(self):
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="product_title_fr",
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+            representation_type_decided=False,
+            language="fr",
+        )
+
+        synced = MiraklPublicDefinitionSyncFactory(sales_channel=self.sales_channel).run()
+
+        self.assertEqual(synced, 1)
+        remote_property.refresh_from_db()
+        self.assertTrue(remote_property.representation_type_decided)
+        public_definition = MiraklPublicDefinition.objects.get(
+            hostname=self.sales_channel.hostname,
+            property_code="product_title_fr",
+        )
+        self.assertEqual(public_definition.language, "fr")
 
     def _payloads_by_path(self):
         return {
@@ -323,6 +395,7 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(category2_child_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
         self.assertEqual(category2_child_property.default_value, "child_default")
         package_length_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="package_length")
+        self.assertEqual(package_length_property.representation_type, MiraklProperty.REPRESENTATION_UNIT)
         self.assertEqual(package_length_property.name, "Package Length (cm)")
         title_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="product_title")
         self.assertEqual(title_property.representation_type, MiraklProperty.REPRESENTATION_PRODUCT_TITLE)

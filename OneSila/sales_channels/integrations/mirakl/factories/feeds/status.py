@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import mimetypes
 import re
 from datetime import timezone as datetime_timezone
@@ -11,6 +12,8 @@ from django.utils.dateparse import parse_datetime
 from sales_channels.integrations.mirakl.factories.mixins import GetMiraklAPIMixin
 from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeed, MiraklSalesChannelFeedItem
 from sales_channels.models import SalesChannelFeed, SalesChannelFeedItem
+
+logger = logging.getLogger(__name__)
 
 
 class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
@@ -180,6 +183,22 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 path=f"/api/products/imports/{feed.remote_id}/transformation_error_report",
                 field_name="transformation_error_report_file",
                 filename_base=f"mirakl-product-transform-errors-{feed.remote_id}",
+            )
+        if feed.has_transformation_error_report and feed.transformation_error_report_file:
+            self._sync_transformation_report_issues(feed=feed)
+
+    def _sync_transformation_report_issues(self, *, feed: MiraklSalesChannelFeed) -> None:
+        from sales_channels.integrations.mirakl.factories.feeds.issues_report import (
+            MiraklTransformationErrorReportIssueSyncFactory,
+        )
+
+        try:
+            MiraklTransformationErrorReportIssueSyncFactory(feed=feed).run()
+        except Exception:
+            logger.exception(
+                "Failed to sync Mirakl transformation report issues for feed_id=%s remote_id=%s",
+                feed.id,
+                feed.remote_id,
             )
 
     def _download_report(

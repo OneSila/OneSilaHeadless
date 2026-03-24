@@ -50,3 +50,30 @@ class MiraklSalesChannelFeedAdminTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertIn('href="https://example.com/feed.csv"', file_link)
         self.assertIn("Open feed file", file_link)
+
+    def test_set_ready_to_render_action_updates_selected_feeds(self):
+        ready_feed = baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            status=MiraklSalesChannelFeed.STATUS_READY_TO_RENDER,
+        )
+        pending_feed = baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            status=MiraklSalesChannelFeed.STATUS_PENDING,
+        )
+        queryset = MiraklSalesChannelFeed.objects.filter(id__in=[ready_feed.id, pending_feed.id]).order_by("id")
+
+        with patch.object(self.model_admin, "message_user") as message_user_mock:
+            self.model_admin.set_ready_to_render(request=None, queryset=queryset)
+
+        ready_feed.refresh_from_db()
+        pending_feed.refresh_from_db()
+        self.assertEqual(ready_feed.status, MiraklSalesChannelFeed.STATUS_READY_TO_RENDER)
+        self.assertEqual(pending_feed.status, MiraklSalesChannelFeed.STATUS_READY_TO_RENDER)
+        message_user_mock.assert_called_once_with(
+            None,
+            "Marked 1 Mirakl feeds as ready to render.",
+        )

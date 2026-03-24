@@ -17,7 +17,7 @@ def refresh_mirakl_product_issues_differential(*, sales_channel_id: int | None =
     if sales_channel_id is not None:
         queryset = queryset.filter(id=sales_channel_id)
     else:
-        cutoff = timezone.now() - timedelta(minutes=30)
+        cutoff = timezone.now() - timedelta(hours=6)
         queryset = queryset.filter(
             last_full_issues_fetch__isnull=False,
         ).filter(
@@ -53,7 +53,7 @@ def refresh_mirakl_product_issues_full(*, sales_channel_id: int | None = None) -
     if sales_channel_id is not None:
         queryset = queryset.filter(id=sales_channel_id)
     else:
-        cutoff = timezone.now() - timedelta(hours=12)
+        cutoff = timezone.now() - timedelta(hours=24)
         queryset = queryset.filter(Q(last_full_issues_fetch__isnull=True) | Q(last_full_issues_fetch__lt=cutoff))
 
     results: list[dict] = []

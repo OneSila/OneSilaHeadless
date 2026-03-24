@@ -236,3 +236,75 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
         self.sales_channel.refresh_from_db()
         self.assertEqual(self.sales_channel.last_full_issues_fetch, boundary)
         self.assertEqual(self.sales_channel.last_differential_issues_fetch, boundary)
+
+    @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.MiraklProductIssuesFetchFactory._request")
+    def test_full_sync_204_keeps_transformation_report_issues(self, request_mock):
+        api_issue = baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=self.remote_product,
+            main_code="OLD",
+            code="OLD",
+            severity="ERROR",
+            raw_data={"source": "error"},
+        )
+        report_issue = baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=self.remote_product,
+            main_code="1000",
+            code="1000",
+            severity="ERROR",
+            raw_data={"source": "transformation_error_report_error"},
+        )
+        request_mock.return_value = self._response(status_code=204, payload=None)
+
+        MiraklProductIssuesFetchFactory(
+            sales_channel=self.sales_channel,
+            mode=MiraklProductIssuesFetchFactory.MODE_FULL,
+        ).run()
+
+        self.assertFalse(MiraklProductIssue.objects.filter(id=api_issue.id).exists())
+        self.assertTrue(MiraklProductIssue.objects.filter(id=report_issue.id).exists())
+
+    @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.MiraklProductIssuesFetchFactory._request")
+    def test_api_sync_for_product_keeps_existing_transformation_report_issues(self, request_mock):
+        report_issue = baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=self.remote_product,
+            main_code="1000",
+            code="1000",
+            severity="ERROR",
+            raw_data={"source": "transformation_error_report_error"},
+        )
+        request_mock.return_value = self._response(
+            status_code=200,
+            payload=[
+                {
+                    "warnings": [
+                        {
+                            "code": "MCM-05000",
+                            "message": "The 'mainImageLarge' attribute is required.",
+                        }
+                    ],
+                    "unique_identifiers": [
+                        {"code": "SKU", "value": "shopSku1"},
+                    ],
+                }
+            ],
+        )
+
+        MiraklProductIssuesFetchFactory(
+            sales_channel=self.sales_channel,
+            mode=MiraklProductIssuesFetchFactory.MODE_FULL,
+        ).run()
+
+        self.assertTrue(MiraklProductIssue.objects.filter(id=report_issue.id).exists())
+        self.assertTrue(
+            MiraklProductIssue.objects.filter(
+                remote_product=self.remote_product,
+                code="MCM-05000",
+                raw_data__source="warning",
+            ).exists()
+        )

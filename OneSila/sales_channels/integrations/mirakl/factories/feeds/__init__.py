@@ -11,6 +11,7 @@ from .product_payloads import (
 )
 from .resync import MiraklFeedResyncFactory
 from .renderer import MiraklProductFeedFileFactory
+from .issues_report import MiraklTransformationErrorReportIssueSyncFactory
 from .status import MiraklImportStatusSyncFactory
 from .submit import MiraklProductFeedSubmitFactory
 
@@ -25,6 +26,7 @@ __all__ = [
     "MiraklProductFeedFactory",
     "MiraklProductFeedFileFactory",
     "MiraklProductFeedSubmitFactory",
+    "MiraklTransformationErrorReportIssueSyncFactory",
     "MiraklProductPayloadBuilder",
     "MiraklProductSyncFactory",
     "MiraklProductUpdateFactory",

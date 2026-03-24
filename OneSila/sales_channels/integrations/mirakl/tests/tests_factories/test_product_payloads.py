@@ -8,6 +8,7 @@ from core.tests import TestCase
 from media.models import Media, MediaProductThrough
 from products.models import ConfigurableVariation
 from properties.models import Property, ProductProperty, PropertySelectValue
+from properties.models import ProductPropertyTextTranslation
 from products.models import ProductTranslation, ProductTranslationBulletPoint
 from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
 from sales_channels.integrations.mirakl.factories.feeds.product_payloads import MiraklProductPayloadBuilder
@@ -20,6 +21,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
     MiraklPropertyApplicability,
     MiraklPropertySelectValue,
+    MiraklRemoteLanguage,
     MiraklSalesChannel,
     MiraklSalesChannelView,
 )
@@ -584,6 +586,25 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["parent_sku"], "SKU-1")
 
+    def test_parent_product_id_code_prefers_configurable_sku_in_fallback_detection(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, _ = self._build_builder(
+            remote_code="parent_product_id",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PROPERTY
+        remote_property.save()
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["parent_product_id"], "SKU-1")
+
     def test_required_configurable_id_representation_uses_standalone_product_id(self):
         local_property = baker.make(
             Property,
@@ -602,6 +623,153 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         _, rows = builder.build()
 
         self.assertEqual(rows[0]["parent_product_id"], str(product.id))
+
+    def test_product_title_representation_uses_remote_language_mapping(self):
+        self.multi_tenant_company.language = "en"
+        self.multi_tenant_company.save(update_fields=["language"])
+        MiraklRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance="en",
+            remote_code="en",
+            label="English",
+            is_default=True,
+        )
+        MiraklRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance="fr",
+            remote_code="fr",
+            label="French",
+            is_default=False,
+        )
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="product_title",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_TITLE
+        remote_property.save()
+        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        remote_property_fr = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="product_title_fr",
+            local_instance=None,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+            language="fr",
+        )
+        baker.make(
+            MiraklPropertyApplicability,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            property=remote_property_fr,
+            view=self.view,
+        )
+        baker.make(
+            MiraklProductTypeItem,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=product_type,
+            remote_property=remote_property_fr,
+            required=False,
+        )
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="English Name",
+        )
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="fr",
+            sales_channel=None,
+            name="Nom Francais",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["product_title"], "English Name")
+        self.assertEqual(rows[0]["product_title_fr"], "Nom Francais")
+
+    def test_translated_text_property_uses_remote_language_mapping(self):
+        self.multi_tenant_company.language = "en"
+        self.multi_tenant_company.save(update_fields=["language"])
+        MiraklRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance="fr",
+            remote_code="fr",
+            label="French",
+            is_default=False,
+        )
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="care_label_fr",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.representation_type = remote_property.REPRESENTATION_PROPERTY
+        remote_property.language = "fr"
+        remote_property.save()
+        product_property = ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_property,
+            value_text="English care",
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=product_property,
+            language="fr",
+            value_text="Conseils FR",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["care_label_fr"], "Conseils FR")
+
+    def test_remote_language_falls_back_to_company_language_when_unmapped(self):
+        self.multi_tenant_company.language = "en"
+        self.multi_tenant_company.save(update_fields=["language"])
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="product_title_fr",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_TITLE
+        remote_property.language = "fr"
+        remote_property.save()
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="English Name",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["product_title_fr"], "English Name")
 
     def test_delete_action_uses_placeholder_for_missing_required_text(self):
         local_property = baker.make(

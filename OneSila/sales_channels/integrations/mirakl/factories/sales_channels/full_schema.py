@@ -587,8 +587,11 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         field_type = self._normalize_lookup_token(item.get("type"))
         type_parameters = self._ensure_json_value(item.get("type_parameters"), default=[])
         media_type = self._resolve_media_type(type_parameters=type_parameters)
+        unit = self._resolve_type_parameter_value(type_parameters=type_parameters, name="UNIT")
 
         if code.endswith("_uom") or label.endswith(" unit"):
+            return MiraklProperty.REPRESENTATION_UNIT
+        if unit:
             return MiraklProperty.REPRESENTATION_UNIT
         if field_type in {"list", "list_multiple_values"}:
             value_count = len(inline_values) or (1 if values_list_code in self._value_list_single_defaults else 0)
@@ -609,7 +612,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         if code in {"parent_product_id", "parent_sku", "configurable_sku"}:
             return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU
         if code in {"variant_group_code", "configurable_id"}:
-            return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_ID
+            return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU
         if "url_key" in code:
             return MiraklProperty.REPRESENTATION_PRODUCT_URL_KEY
         if code == "ean" or code.endswith("_ean") or "ean_code" in code:
@@ -875,6 +878,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             return
 
         remote_property.representation_type = public_definition.representation_type
+        remote_property.language = public_definition.language
         remote_property.default_value = public_definition.default_value or remote_property.default_value
         remote_property.yes_text_value = public_definition.yes_text_value or remote_property.yes_text_value
         remote_property.no_text_value = public_definition.no_text_value or remote_property.no_text_value

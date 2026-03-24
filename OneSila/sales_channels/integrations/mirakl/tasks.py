@@ -72,14 +72,14 @@ def sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob():
     return queued_sales_channel_ids
 
 
-@db_periodic_task(crontab(minute="*/30"))
+@db_periodic_task(crontab(minute="0", hour="*/6"))
 def sales_channels__tasks__refresh_mirakl_product_issues_differential__cronjob():
     from sales_channels.integrations.mirakl.flows import refresh_mirakl_product_issues_differential
 
     return refresh_mirakl_product_issues_differential()
 
 
-@db_periodic_task(crontab(hour="*/12", minute="0"))
+@db_periodic_task(crontab(hour="0", minute="0"))
 def sales_channels__tasks__refresh_mirakl_product_issues_full__cronjob():
     from sales_channels.integrations.mirakl.flows import refresh_mirakl_product_issues_full
 

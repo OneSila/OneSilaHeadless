@@ -280,6 +280,7 @@ class MiraklPublicDefinitionAdmin(admin.ModelAdmin):
         "hostname",
         "property_code",
         "representation_type",
+        "language",
         "default_value",
         "yes_text_value",
         "no_text_value",
@@ -290,6 +291,7 @@ class MiraklPublicDefinitionAdmin(admin.ModelAdmin):
 
 @admin.register(MiraklSalesChannelFeed)
 class MiraklSalesChannelFeedAdmin(ModelAdmin):
+    actions = ("set_ready_to_render",)
     list_select_related = ("sales_channel", "multi_tenant_company")
     inlines = (MiraklFeedItemInline,)
     list_display = (
@@ -452,6 +454,21 @@ class MiraklSalesChannelFeedAdmin(ModelAdmin):
             },
         ),
     )
+
+    @admin.action(description="Set selected feeds to Ready To Render")
+    def set_ready_to_render(self, request, queryset):
+        updated = 0
+        for feed in queryset.iterator():
+            if feed.status == MiraklSalesChannelFeed.STATUS_READY_TO_RENDER:
+                continue
+            feed.status = MiraklSalesChannelFeed.STATUS_READY_TO_RENDER
+            feed.save(update_fields=["status"])
+            updated += 1
+
+        self.message_user(
+            request,
+            f"Marked {updated} Mirakl feeds as ready to render.",
+        )
 
     def has_add_permission(self, request):
         return False

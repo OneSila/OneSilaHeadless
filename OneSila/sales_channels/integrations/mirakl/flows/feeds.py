@@ -10,7 +10,6 @@ from sales_channels.models import SalesChannelFeed
 def process_mirakl_gathering_product_feeds(
     *,
     sales_channel_id: int | None = None,
-    force: bool = False,
 ) -> list[SalesChannelFeed]:
     queryset = MiraklSalesChannelFeed.objects.filter(
         type=MiraklSalesChannelFeed.TYPE_PRODUCT,
@@ -20,8 +19,6 @@ def process_mirakl_gathering_product_feeds(
     ).select_related("sales_channel")
     if sales_channel_id is not None:
         queryset = queryset.filter(sales_channel_id=sales_channel_id)
-    # Keep `force` for backward compatibility with existing callers.
-    _ = force
 
     processed: list[SalesChannelFeed] = []
     for feed in queryset.order_by("id").iterator():

@@ -11,6 +11,7 @@ class MiraklPublicDefinition(models.SharedModel):
         choices=MiraklProperty.REPRESENTATION_TYPE_CHOICES,
         default=MiraklProperty.REPRESENTATION_PROPERTY,
     )
+    language = models.CharField(max_length=64, null=True, blank=True, default=None)
     default_value = models.CharField(max_length=255, blank=True, default="")
     yes_text_value = models.CharField(max_length=255, blank=True, default="")
     no_text_value = models.CharField(max_length=255, blank=True, default="")

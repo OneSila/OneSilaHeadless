@@ -29,11 +29,13 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProduct,
     MiraklProductCategory,
     MiraklProductContent,
+    MiraklProductIssue,
     MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
     MiraklPropertySelectValue,
     MiraklPublicDefinition,
+    MiraklRemoteLanguage,
     MiraklSalesChannelFeed,
     MiraklSalesChannelFeedItem,
 )
@@ -138,6 +140,7 @@ class MiraklProductPayloadBuilder:
         self._category_cache: dict[str, MiraklCategory | None] = {}
         self._product_type_cache: dict[tuple[int | None, int | None], MiraklProductType | None] = {}
         self._public_definition_cache: dict[str, MiraklPublicDefinition | None] = {}
+        self._local_language_by_remote_code_cache: dict[str, str | None] = {}
         self._condition_property_cache: MiraklProperty | None | object = self._UNSET
 
     def build(self) -> tuple[MiraklProductType, list[dict[str, str]]]:
@@ -161,9 +164,10 @@ class MiraklProductPayloadBuilder:
         rows: list[dict[str, str]] = []
         for product in products:
             content_product = self._get_content_source_product(product=product)
+            translation_candidates = list(translations.get(content_product.id, []))
             product_context = self._build_product_context(
                 product=product,
-                translation=self._select_translation(translations=translations.get(content_product.id, [])),
+                translations=translation_candidates,
                 product_properties=list(product_properties_by_product.get(product.id, [])),
                 prices=list(prices_by_product.get(product.id, [])),
                 images=list(media_by_product.get(content_product.id, [])),
@@ -210,7 +214,7 @@ class MiraklProductPayloadBuilder:
         self,
         *,
         product: Product,
-        translation: ProductTranslation | None,
+        translations: list[ProductTranslation],
         product_properties: list[ProductProperty],
         prices: list[dict[str, Any]],
         images: list[dict[str, Any]],
@@ -237,7 +241,9 @@ class MiraklProductPayloadBuilder:
             product=product,
             prices=prices,
         )
-        content_payload = self._resolve_content_payload(product=content_product)
+        translation = self._select_translation(translations=translations, language_code=self.language)
+        content_data = self._build_content_payloads(product=content_product)
+        content_payload = self._select_content_payload(content_data=content_data, language_code=self.language)
         fallback_name = getattr(translation, "name", None) or getattr(content_product, "name", None) or getattr(product, "name", "") or ""
 
         return {
@@ -245,6 +251,7 @@ class MiraklProductPayloadBuilder:
             "parent_product": self.local_product if self.local_product and self.local_product.is_configurable() else None,
             "content_product": content_product,
             "translation": translation,
+            "translations": translations,
             "product_type": product_type,
             "category_remote_id": getattr(product_type, "remote_id", "") or "",
             "product_properties": product_properties,
@@ -255,6 +262,8 @@ class MiraklProductPayloadBuilder:
             "ean": ean,
             "price_data": price_data,
             "sku": getattr(product, "sku", "") or "",
+            "content_data": content_data,
+            "content_payload": content_payload,
             "name": self._stringify(content_payload.get("name")) or fallback_name,
             "short_description": self._normalize_content_value(content_payload.get("shortDescription")),
             "description": self._normalize_content_value(content_payload.get("description")),
@@ -555,15 +564,16 @@ class MiraklProductPayloadBuilder:
         queryset = EanCode.objects.filter(product_id__in=[product.id for product in products]).order_by("id")
         return {ean.product_id: ean.ean_code for ean in queryset.iterator() if ean.ean_code}
 
-    def _select_translation(self, *, translations: list[ProductTranslation]) -> ProductTranslation | None:
+    def _select_translation(self, *, translations: list[ProductTranslation], language_code: str | None = None) -> ProductTranslation | None:
         if not translations:
             return None
-        if self.language:
+        preferred_language = str(language_code or self.language or "").strip()
+        if preferred_language:
             for translation in translations:
-                if translation.language == self.language and translation.sales_channel_id in (None, self.sales_channel.id):
+                if translation.language == preferred_language and translation.sales_channel_id in (None, self.sales_channel.id):
                     return translation
             for translation in translations:
-                if translation.language == self.language:
+                if translation.language == preferred_language:
                     return translation
         for translation in translations:
             if translation.sales_channel_id in (None, self.sales_channel.id):
@@ -715,7 +725,7 @@ class MiraklProductPayloadBuilder:
         if normalized_code in {"parent_product_id", "parent_sku", "configurable_sku"}:
             return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU
         if normalized_code in {"variant_group_code", "configurable_id"}:
-            return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_ID
+            return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU
         if normalized_code == "ean" or normalized_code.endswith("_ean") or "ean_code" in normalized_code:
             return MiraklProperty.REPRESENTATION_PRODUCT_EAN
         if normalized_code.startswith("long_description") or normalized_code.startswith("details_and_care"):
@@ -742,6 +752,7 @@ class MiraklProductPayloadBuilder:
             product_property=product_property,
             remote_property=remote_property,
             remote_value_lookup=product_context["remote_select_lookup"],
+            language_code=self._get_effective_local_language_code(remote_property=remote_property),
         )
 
     def _resolve_unit(
@@ -765,22 +776,56 @@ class MiraklProductPayloadBuilder:
         return self._get_effective_default_value(remote_property=remote_property)
 
     def _resolve_product_title(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
-        return product_context["name"]
+        content_payload = self._get_content_payload_for_remote_property(
+            remote_property=remote_property,
+            product_context=product_context,
+        )
+        translation = self._get_translation_for_remote_property(
+            remote_property=remote_property,
+            product_context=product_context,
+        )
+        return (
+            self._stringify(content_payload.get("name"))
+            or getattr(translation, "name", None)
+            or product_context["name"]
+        )
 
     def _resolve_product_subtitle(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
-        translation = product_context["translation"]
-        return getattr(translation, "subtitle", None) or ""
+        translation = self._get_translation_for_remote_property(
+            remote_property=remote_property,
+            product_context=product_context,
+        )
+        return getattr(translation, "subtitle", None) or getattr(product_context.get("translation"), "subtitle", None) or ""
 
     def _resolve_product_description(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
-        return product_context["description"]
+        content_payload = self._get_content_payload_for_remote_property(
+            remote_property=remote_property,
+            product_context=product_context,
+        )
+        return self._normalize_content_value(content_payload.get("description")) or product_context["description"]
 
     def _resolve_product_short_description(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
-        return product_context["short_description"]
+        content_payload = self._get_content_payload_for_remote_property(
+            remote_property=remote_property,
+            product_context=product_context,
+        )
+        return self._normalize_content_value(content_payload.get("shortDescription")) or product_context["short_description"]
 
     def _resolve_product_bullet_point(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
-        bullet_points = list(product_context.get("bullet_points") or [])
+        content_payload = self._get_content_payload_for_remote_property(
+            remote_property=remote_property,
+            product_context=product_context,
+        )
+        bullet_points = [
+            self._stringify(point)
+            for point in content_payload.get("bulletPoints", [])
+            if self._stringify(point)
+        ]
         if not bullet_points:
-            translation = product_context.get("translation")
+            translation = self._get_translation_for_remote_property(
+                remote_property=remote_property,
+                product_context=product_context,
+            )
             if translation is not None:
                 bullet_points = [
                     self._stringify(point.text)
@@ -788,9 +833,11 @@ class MiraklProductPayloadBuilder:
                     if self._stringify(point.text)
                 ]
         if not bullet_points:
+            short_description = self._normalize_content_value(content_payload.get("shortDescription")) or product_context["short_description"]
+            description = self._normalize_content_value(content_payload.get("description")) or product_context["description"]
             bullet_points = self._split_bullet_points(
-                product_context["short_description"],
-                product_context["description"],
+                short_description,
+                description,
             )
         if bullet_index is not None:
             index = bullet_index
@@ -839,7 +886,11 @@ class MiraklProductPayloadBuilder:
         )
 
     def _resolve_product_url_key(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
-        return product_context["url_key"]
+        translation = self._get_translation_for_remote_property(
+            remote_property=remote_property,
+            product_context=product_context,
+        )
+        return getattr(translation, "url_key", None) or product_context["url_key"]
 
     def _resolve_product_ean(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
         return product_context["ean"]
@@ -900,16 +951,17 @@ class MiraklProductPayloadBuilder:
         product_property: ProductProperty,
         remote_property: MiraklProperty,
         remote_value_lookup: dict[tuple[int, int], MiraklPropertySelectValue],
+        language_code: str | None,
     ) -> str:
         value_runner = _MiraklRemoteValueRunner(
             sales_channel=self.sales_channel,
-            language=self.language,
+            language=language_code or self.language,
             remote_select_lookup=remote_value_lookup,
         )
         return value_runner.get_remote_value(
             product_property=product_property,
             remote_property=remote_property,
-            language_code=self.language,
+            language_code=language_code or self.language,
         )
 
     def _serialize_remote_select_value(
@@ -1265,6 +1317,47 @@ class MiraklProductPayloadBuilder:
             )
         return self._public_definition_cache[remote_property.code]
 
+    def _get_effective_local_language_code(self, *, remote_property: MiraklProperty) -> str | None:
+        remote_language_code = remote_property.language
+        if not remote_language_code:
+            return self.language
+        if remote_language_code not in self._local_language_by_remote_code_cache:
+            remote_language = (
+                MiraklRemoteLanguage.objects.filter(
+                    sales_channel=self.sales_channel,
+                    remote_code__iexact=remote_language_code,
+                )
+                .only("local_instance")
+                .order_by("-is_default", "id")
+                .first()
+            )
+            self._local_language_by_remote_code_cache[remote_language_code] = getattr(remote_language, "local_instance", None) or None
+        return self._local_language_by_remote_code_cache[remote_language_code] or self.language
+
+    def _get_translation_for_remote_property(
+        self,
+        *,
+        remote_property: MiraklProperty,
+        product_context: dict[str, Any],
+    ) -> ProductTranslation | None:
+        translation = self._select_translation(
+            translations=list(product_context.get("translations") or []),
+            language_code=self._get_effective_local_language_code(remote_property=remote_property),
+        )
+        return translation or product_context.get("translation")
+
+    def _get_content_payload_for_remote_property(
+        self,
+        *,
+        remote_property: MiraklProperty,
+        product_context: dict[str, Any],
+    ) -> dict[str, Any]:
+        content_payload = self._select_content_payload(
+            content_data=product_context.get("content_data") or {},
+            language_code=self._get_effective_local_language_code(remote_property=remote_property),
+        )
+        return content_payload or product_context.get("content_payload") or {}
+
     def _resolve_select_backed_default_value(self, *, remote_property: MiraklProperty, raw_default: str) -> str:
         normalized_default = self._stringify(raw_default)
         if normalized_default == "":
@@ -1366,16 +1459,19 @@ class MiraklProductPayloadBuilder:
             name=name,
         )
 
-    def _resolve_content_payload(self, *, product: Product) -> dict[str, Any]:
-        content_data = build_content_data(
+    def _build_content_payloads(self, *, product: Product) -> dict[str, Any]:
+        return build_content_data(
             product=product,
             sales_channel=self.sales_channel,
         )
+
+    def _select_content_payload(self, *, content_data: dict[str, Any], language_code: str | None = None) -> dict[str, Any]:
         if not content_data:
             return {}
-
         preferred_languages: list[str] = []
-        if self.language:
+        if language_code:
+            preferred_languages.append(str(language_code))
+        if self.language and str(self.language) not in preferred_languages:
             preferred_languages.append(str(self.language))
         preferred_languages.extend([language for language in content_data.keys() if language not in preferred_languages])
 
@@ -1449,6 +1545,7 @@ class _MiraklFeedPersistenceMixin:
                         "error_message",
                     ]
                 )
+            MiraklProductIssue.objects.filter(remote_product=self.remote_instance).delete()
         self._refresh_feed_summary(feed=feed)
         return item
 

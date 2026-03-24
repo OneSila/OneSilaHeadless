@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
 from core.tests import TestCase
@@ -13,7 +14,10 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelFeed,
     MiraklSalesChannelView,
 )
-from sales_channels.integrations.mirakl.flows import refresh_mirakl_product_issues_full
+from sales_channels.integrations.mirakl.flows import (
+    refresh_mirakl_product_issues_differential,
+    refresh_mirakl_product_issues_full,
+)
 from sales_channels.integrations.mirakl.tasks import (
     _queue_delete_rows_for_mirakl_remote_products,
     mirakl_import_db_task,
@@ -349,3 +353,73 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
         result = refresh_mirakl_product_issues_full()
 
         self.assertEqual(result, [{"sales_channel_id": good_channel.id}])
+
+    @patch("sales_channels.integrations.mirakl.flows.issues.timezone.now")
+    @patch("sales_channels.integrations.mirakl.flows.issues.MiraklProductIssuesFetchFactory")
+    def test_differential_issues_flow_only_processes_channels_due_after_six_hours(self, issues_factory_mock, now_mock):
+        now = timezone.make_aware(datetime(2026, 3, 23, 12, 0, 0))
+        now_mock.return_value = now
+        stale_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+            hostname="https://stale-diff.example.com",
+            shop_id=33,
+            api_key="token-33",
+            last_full_issues_fetch=now,
+            last_differential_issues_fetch=now - timedelta(hours=6, minutes=1),
+        )
+        baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+            hostname="https://fresh-diff.example.com",
+            shop_id=44,
+            api_key="token-44",
+            last_full_issues_fetch=now,
+            last_differential_issues_fetch=now - timedelta(hours=5, minutes=59),
+        )
+        issues_factory_mock.MODE_DIFFERENTIAL = "differential"
+        issues_factory_mock.return_value.run.return_value = {"sales_channel_id": stale_channel.id}
+
+        result = refresh_mirakl_product_issues_differential()
+
+        self.assertEqual(result, [{"sales_channel_id": stale_channel.id}])
+        issues_factory_mock.assert_called_once_with(
+            sales_channel=stale_channel,
+            mode="differential",
+        )
+
+    @patch("sales_channels.integrations.mirakl.flows.issues.timezone.now")
+    @patch("sales_channels.integrations.mirakl.flows.issues.MiraklProductIssuesFetchFactory")
+    def test_full_issues_flow_only_processes_channels_due_after_twenty_four_hours(self, issues_factory_mock, now_mock):
+        now = timezone.make_aware(datetime(2026, 3, 23, 12, 0, 0))
+        now_mock.return_value = now
+        stale_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+            hostname="https://stale-full.example.com",
+            shop_id=55,
+            api_key="token-55",
+            last_full_issues_fetch=now - timedelta(hours=24, minutes=1),
+        )
+        baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+            hostname="https://fresh-full.example.com",
+            shop_id=66,
+            api_key="token-66",
+            last_full_issues_fetch=now - timedelta(hours=23, minutes=59),
+        )
+        issues_factory_mock.MODE_FULL = "full"
+        issues_factory_mock.return_value.run.return_value = {"sales_channel_id": stale_channel.id}
+
+        result = refresh_mirakl_product_issues_full()
+
+        self.assertEqual(result, [{"sales_channel_id": stale_channel.id}])
+        issues_factory_mock.assert_called_once_with(
+            sales_channel=stale_channel,
+            mode="full",
+        )

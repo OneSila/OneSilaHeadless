@@ -89,6 +89,7 @@ class MiraklProperty(RemoteProperty):
         choices=REPRESENTATION_TYPE_CHOICES,
         default=REPRESENTATION_PROPERTY,
     )
+    language = models.CharField(max_length=64, null=True, blank=True, default=None)
     representation_type_decided = models.BooleanField(default=False)
     default_value = models.CharField(max_length=255, blank=True, default="")
     value_list_code = models.CharField(max_length=255, blank=True, default="")

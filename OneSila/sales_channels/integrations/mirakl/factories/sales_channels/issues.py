@@ -20,6 +20,7 @@ class MiraklProductIssuesFetchFactory(GetMiraklAPIMixin):
 
     MODE_DIFFERENTIAL = "differential"
     MODE_FULL = "full"
+    API_SOURCES = {"warning", "rejection_detail", "integration_detail", "error"}
 
     def __init__(self, *, sales_channel, mode: str) -> None:
         self.sales_channel = sales_channel
@@ -88,6 +89,7 @@ class MiraklProductIssuesFetchFactory(GetMiraklAPIMixin):
         if self.mode == self.MODE_FULL:
             MiraklProductIssue.objects.filter(
                 remote_product__sales_channel=self.sales_channel,
+                raw_data__source__in=self.API_SOURCES,
             ).delete()
         self._persist_boundary(boundary=boundary)
 
@@ -159,7 +161,10 @@ class MiraklProductIssuesFetchFactory(GetMiraklAPIMixin):
     def _sync_remote_product_issues(self, *, remote_product: MiraklProduct, record: dict[str, Any]) -> int:
         issue_payloads = self._build_issue_payloads(record=record)
         with transaction.atomic():
-            MiraklProductIssue.objects.filter(remote_product=remote_product).delete()
+            MiraklProductIssue.objects.filter(
+                remote_product=remote_product,
+                raw_data__source__in=self.API_SOURCES,
+            ).delete()
             created_issues = 0
             for issue_payload in issue_payloads:
                 views = self._resolve_views(channel_codes=issue_payload.pop("channel_codes"))

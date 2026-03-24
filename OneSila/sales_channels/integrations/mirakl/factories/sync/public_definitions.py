@@ -22,6 +22,7 @@ class MiraklPublicDefinitionSyncFactory:
                 property_code=remote_property.code,
             )
             public_definition.representation_type = remote_property.representation_type
+            public_definition.language = remote_property.language
             public_definition.default_value = remote_property.default_value or ""
             yes_value, no_value = self._resolve_boolean_values(remote_property=remote_property)
             public_definition.yes_text_value = yes_value
