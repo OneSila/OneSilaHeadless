@@ -101,6 +101,46 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
                     MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
                 )
 
+    def test_detect_representation_type_keeps_details_and_care_as_property(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        self.assertEqual(
+            factory._detect_representation_type(
+                item={
+                    "code": "details_and_care",
+                    "label": "Details and Care",
+                    "type": "TEXT",
+                    "type_parameters": [],
+                },
+                values_list_code="",
+                inline_values=[],
+            ),
+            MiraklProperty.REPRESENTATION_PROPERTY,
+        )
+
+    def test_detect_representation_type_keeps_video_named_property_as_property(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        self.assertEqual(
+            factory._detect_representation_type(
+                item={
+                    "code": "Style_VideoPlayersRecorders",
+                    "label": "Style Video Players Recorders",
+                    "type": "TEXT",
+                    "type_parameters": [],
+                },
+                values_list_code="",
+                inline_values=[],
+            ),
+            MiraklProperty.REPRESENTATION_PROPERTY,
+        )
+
     def test_apply_public_definition_sets_language(self):
         factory = MiraklFullSchemaSyncFactory(
             sales_channel=self.sales_channel,
@@ -395,7 +435,7 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(category2_child_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
         self.assertEqual(category2_child_property.default_value, "child_default")
         package_length_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="package_length")
-        self.assertEqual(package_length_property.representation_type, MiraklProperty.REPRESENTATION_UNIT)
+        self.assertEqual(package_length_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
         self.assertEqual(package_length_property.name, "Package Length (cm)")
         title_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="product_title")
         self.assertEqual(title_property.representation_type, MiraklProperty.REPRESENTATION_PRODUCT_TITLE)
@@ -455,7 +495,6 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.import_process.refresh_from_db()
         self.assertGreaterEqual(summary["properties"], 4)
 
-
 class MiraklSchemaImportProcessorTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):
         super().setUp()
@@ -481,9 +520,15 @@ class MiraklSchemaImportProcessorTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=self.sales_channel,
         )
 
-        with patch(
-            "sales_channels.integrations.mirakl.factories.imports.schema_imports.MiraklFullSchemaSyncFactory"
-        ) as mock_factory:
+        with (
+            self.assertLogs(
+                "sales_channels.integrations.mirakl.factories.imports.schema_imports",
+                level="INFO",
+            ) as captured,
+            patch(
+                "sales_channels.integrations.mirakl.factories.imports.schema_imports.MiraklFullSchemaSyncFactory"
+            ) as mock_factory,
+        ):
             mock_factory.return_value.run.return_value = {}
             processor.run()
 
@@ -493,9 +538,45 @@ class MiraklSchemaImportProcessorTests(DisableMiraklConnectionMixin, TestCase):
         )
         mock_factory.return_value.run.assert_called_once_with()
 
+        logs = "\n".join(captured.output)
+        self.assertIn("Preparing Mirakl schema import", logs)
+        self.assertIn("Mirakl schema import completed", logs)
+        self.assertIn("Restored Mirakl schema import channel state", logs)
+
         self.import_process.refresh_from_db()
         self.assertEqual(self.import_process.status, MiraklSalesChannelImport.STATUS_SUCCESS)
         self.assertEqual(self.import_process.percentage, 100)
+
+        self.sales_channel.refresh_from_db()
+        self.assertTrue(self.sales_channel.active)
+        self.assertFalse(self.sales_channel.is_importing)
+
+    def test_run_logs_failure_and_restores_channel_state(self):
+        processor = MiraklSchemaImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        )
+
+        with (
+            self.assertLogs(
+                "sales_channels.integrations.mirakl.factories.imports.schema_imports",
+                level="INFO",
+            ) as captured,
+            patch(
+                "sales_channels.integrations.mirakl.factories.imports.schema_imports.MiraklFullSchemaSyncFactory"
+            ) as mock_factory,
+            self.assertRaises(RuntimeError),
+        ):
+            mock_factory.return_value.run.side_effect = RuntimeError("schema exploded")
+            processor.run()
+
+        logs = "\n".join(captured.output)
+        self.assertIn("Preparing Mirakl schema import", logs)
+        self.assertIn("Mirakl schema import failed", logs)
+        self.assertIn("Restored Mirakl schema import channel state", logs)
+
+        self.import_process.refresh_from_db()
+        self.assertEqual(self.import_process.status, MiraklSalesChannelImport.STATUS_FAILED)
 
         self.sales_channel.refresh_from_db()
         self.assertTrue(self.sales_channel.active)

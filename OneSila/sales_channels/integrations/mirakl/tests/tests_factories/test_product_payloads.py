@@ -179,6 +179,28 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         ):
             builder.build()
 
+    def test_required_unit_without_default_value_raises_missing_value_error_not_mapping_error(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, _ = self._build_builder(
+            remote_code="package_length_unit",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_UNIT
+        remote_property.default_value = ""
+        remote_property.save(update_fields=["local_instance", "representation_type", "default_value"])
+
+        with self.assertRaisesMessage(
+            PreFlightCheckError,
+            "Mirakl preflight errors:\n- Mirakl required field 'package_length_unit' is missing for product SKU-1.",
+        ):
+            builder.build()
+
     def test_required_mapped_field_for_variation_mentions_variation_product(self):
         local_property = baker.make(
             Property,
@@ -928,6 +950,33 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         _, rows = builder.build()
 
         self.assertEqual(rows[0]["package_length"], "12.34")
+
+    def test_details_and_care_resolves_from_property_value(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="details_and_care",
+            local_property=local_property,
+            required=True,
+        )
+        product_property = ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_property,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=product_property,
+            language=self.multi_tenant_company.language,
+            value_text="Machine wash cold",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["details_and_care"], "Machine wash cold")
 
     def test_date_pattern_type_parameter_formats_date_value(self):
         local_property = baker.make(

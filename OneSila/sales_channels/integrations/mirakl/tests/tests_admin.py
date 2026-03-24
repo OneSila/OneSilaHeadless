@@ -5,8 +5,13 @@ from django.contrib.admin.sites import AdminSite
 from model_bakery import baker
 
 from core.tests import TestCase
-from sales_channels.integrations.mirakl.admin import MiraklSalesChannelFeedAdmin
-from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelFeed
+from sales_channels.integrations.mirakl.admin import (
+    MiraklPropertyAdmin,
+    MiraklSalesChannelFeedAdmin,
+    set_mirakl_properties_as_bullet_point,
+    set_mirakl_properties_as_unit,
+)
+from sales_channels.integrations.mirakl.models import MiraklProperty, MiraklSalesChannel, MiraklSalesChannelFeed
 from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
@@ -76,4 +81,103 @@ class MiraklSalesChannelFeedAdminTests(DisableMiraklConnectionMixin, TestCase):
         message_user_mock.assert_called_once_with(
             None,
             "Marked 1 Mirakl feeds as ready to render.",
+        )
+
+
+class MiraklPropertyAdminTests(DisableMiraklConnectionMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="mirakl.example.com",
+            shop_id=123,
+            api_key="secret-token",
+        )
+        self.model_admin = MiraklPropertyAdmin(MiraklProperty, AdminSite())
+
+    def test_search_results_match_role_type_from_raw_data(self):
+        matching_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="product_identifier",
+            raw_data={
+                "roles": [
+                    {"type": "UNIQUE_IDENTIFIER"},
+                    {"type": "TITLE"},
+                ],
+            },
+        )
+        baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="product_title",
+            raw_data={
+                "roles": [
+                    {"type": "TITLE"},
+                ],
+            },
+        )
+
+        queryset, use_distinct = self.model_admin.get_search_results(
+            request=None,
+            queryset=MiraklProperty.objects.all(),
+            search_term="UNIQUE_IDENTIFIER",
+        )
+
+        self.assertTrue(use_distinct)
+        self.assertEqual(list(queryset), [matching_property])
+
+    def test_set_as_unit_action_updates_selected_properties(self):
+        first_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            representation_type=MiraklProperty.REPRESENTATION_PROPERTY,
+        )
+        second_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            representation_type=MiraklProperty.REPRESENTATION_IMAGE,
+        )
+        queryset = MiraklProperty.objects.filter(id__in=[first_property.id, second_property.id]).order_by("id")
+
+        with patch.object(self.model_admin, "message_user") as message_user_mock:
+            set_mirakl_properties_as_unit(self.model_admin, request=None, queryset=queryset)
+
+        first_property.refresh_from_db()
+        second_property.refresh_from_db()
+        self.assertEqual(first_property.representation_type, MiraklProperty.REPRESENTATION_UNIT)
+        self.assertEqual(second_property.representation_type, MiraklProperty.REPRESENTATION_UNIT)
+        message_user_mock.assert_called_once_with(
+            None,
+            "Set 2 Mirakl properties to unit.",
+        )
+
+    def test_set_as_bullet_point_action_updates_selected_properties(self):
+        remote_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            representation_type=MiraklProperty.REPRESENTATION_PROPERTY,
+        )
+
+        with patch.object(self.model_admin, "message_user") as message_user_mock:
+            set_mirakl_properties_as_bullet_point(
+                self.model_admin,
+                request=None,
+                queryset=MiraklProperty.objects.filter(id=remote_property.id),
+            )
+
+        remote_property.refresh_from_db()
+        self.assertEqual(
+            remote_property.representation_type,
+            MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT,
+        )
+        message_user_mock.assert_called_once_with(
+            None,
+            "Set 1 Mirakl properties to bullet point.",
         )

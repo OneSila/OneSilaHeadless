@@ -704,7 +704,6 @@ class MiraklProductPayloadBuilder:
         remote_property = product_type_item.remote_property
         if representation_type not in {
             MiraklProperty.REPRESENTATION_PROPERTY,
-            MiraklProperty.REPRESENTATION_UNIT,
             MiraklProperty.REPRESENTATION_CONDITION,
         }:
             return False
@@ -728,7 +727,7 @@ class MiraklProductPayloadBuilder:
             return MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU
         if normalized_code == "ean" or normalized_code.endswith("_ean") or "ean_code" in normalized_code:
             return MiraklProperty.REPRESENTATION_PRODUCT_EAN
-        if normalized_code.startswith("long_description") or normalized_code.startswith("details_and_care"):
+        if normalized_code.startswith("long_description"):
             return MiraklProperty.REPRESENTATION_PRODUCT_DESCRIPTION
         return representation_type or MiraklProperty.REPRESENTATION_PROPERTY
 

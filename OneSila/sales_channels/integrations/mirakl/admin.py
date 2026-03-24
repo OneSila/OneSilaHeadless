@@ -30,6 +30,58 @@ def sync_mirakl_public_definitions(modeladmin, request, queryset):
     )
 
 
+def _set_mirakl_property_representation_type(*, modeladmin, request, queryset, representation_type: str, label: str) -> None:
+    updated = queryset.update(representation_type=representation_type)
+    modeladmin.message_user(
+        request,
+        f"Set {updated} Mirakl properties to {label}.",
+    )
+
+
+@admin.action(description="Set representation type to Property")
+def set_mirakl_properties_as_property(modeladmin, request, queryset):
+    _set_mirakl_property_representation_type(
+        modeladmin=modeladmin,
+        request=request,
+        queryset=queryset,
+        representation_type=MiraklProperty.REPRESENTATION_PROPERTY,
+        label="property",
+    )
+
+
+@admin.action(description="Set representation type to Unit")
+def set_mirakl_properties_as_unit(modeladmin, request, queryset):
+    _set_mirakl_property_representation_type(
+        modeladmin=modeladmin,
+        request=request,
+        queryset=queryset,
+        representation_type=MiraklProperty.REPRESENTATION_UNIT,
+        label="unit",
+    )
+
+
+@admin.action(description="Set representation type to Bullet Point")
+def set_mirakl_properties_as_bullet_point(modeladmin, request, queryset):
+    _set_mirakl_property_representation_type(
+        modeladmin=modeladmin,
+        request=request,
+        queryset=queryset,
+        representation_type=MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT,
+        label="bullet point",
+    )
+
+
+@admin.action(description="Set representation type to Image")
+def set_mirakl_properties_as_image(modeladmin, request, queryset):
+    _set_mirakl_property_representation_type(
+        modeladmin=modeladmin,
+        request=request,
+        queryset=queryset,
+        representation_type=MiraklProperty.REPRESENTATION_IMAGE,
+        label="image",
+    )
+
+
 @admin.register(MiraklSalesChannel)
 class MiraklSalesChannelAdmin(admin.ModelAdmin):
     list_display = ("hostname", "shop_id", "sub_type", "active", "representation_status")
@@ -273,6 +325,12 @@ class MiraklPropertyAdmin(admin.ModelAdmin):
         "last_update_by_multi_tenant_user",
     )
     ordering = ("sales_channel", "code")
+    actions = (
+        set_mirakl_properties_as_property,
+        set_mirakl_properties_as_unit,
+        set_mirakl_properties_as_bullet_point,
+        set_mirakl_properties_as_image,
+    )
     readonly_fields = (
         "representation_type_with_code",
         "local_property_summary",
@@ -417,6 +475,29 @@ class MiraklPropertyAdmin(admin.ModelAdmin):
     @admin.display(description="Raw Data")
     def pretty_raw_data(self, obj):
         return self._pretty_json(value=obj.raw_data)
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
+
+        role_type = self._extract_role_type_search_term(search_term=search_term)
+        if not role_type:
+            return queryset, use_distinct
+
+        role_matches = queryset.model.objects.filter(
+            raw_data__roles__contains=[{"type": role_type}],
+        )
+        return (queryset | role_matches).distinct(), True
+
+    def _extract_role_type_search_term(self, *, search_term: str) -> str:
+        normalized = str(search_term or "").strip()
+        if not normalized:
+            return ""
+        if ":" in normalized:
+            prefix, value = normalized.split(":", 1)
+            if prefix.strip().lower() != "role":
+                return ""
+            normalized = value.strip()
+        return normalized.upper()
 
 
 @admin.register(MiraklProductType)

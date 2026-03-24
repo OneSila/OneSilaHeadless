@@ -54,8 +54,18 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         }
         self._progress_total = 0
         self._progress_processed = 0
+        self._progress_log_interval = 0
+        self._next_progress_log_at = 0
+        self._phase_name = "initializing"
+        self._phase_total = 0
+        self._phase_log_interval = 0
+        self._next_phase_log_at = 0
 
     def run(self) -> dict[str, int]:
+        self._log_info(
+            message="Starting Mirakl schema sync",
+            hostname=self.sales_channel.hostname,
+        )
         document_types = self._get_document_types()
         offer_states = self._get_offer_states()
         hierarchies = self._get_hierarchies()
@@ -68,6 +78,14 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self._descendant_hierarchy_codes = self._build_descendant_hierarchy_codes(hierarchies=hierarchies)
         value_lists = self._get_value_lists()
         attributes = self._get_attributes()
+        self._log_info(
+            message="Fetched Mirakl schema payloads",
+            document_types=len(document_types),
+            offer_states=len(offer_states),
+            hierarchies=len(hierarchies),
+            value_lists=len(value_lists),
+            attributes=len(attributes),
+        )
 
         self._prepare_progress(
             document_types=document_types,
@@ -78,12 +96,24 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         )
         self._index_value_lists(value_lists=value_lists)
 
+        self._set_phase(phase_name="document_types", total=len(document_types))
         self.sync_document_types(document_types=document_types)
+        self._set_phase(phase_name="categories", total=len(hierarchies))
         self.sync_categories(hierarchies=hierarchies)
+        self._set_phase(phase_name="properties", total=len(attributes))
         self.sync_properties(attributes=attributes)
+        self._set_phase(phase_name="select_values", total=len(value_lists))
         self.sync_select_values(value_lists=value_lists)
+        self._set_phase(phase_name="offer_states", total=len(offer_states))
         self.sync_offer_state_property(offer_states=offer_states)
+        self._set_phase(phase_name="default_value_labels", total=0)
         self.sync_default_value_labels()
+        self._log_info(
+            message="Completed Mirakl schema sync",
+            processed=self._progress_processed,
+            total=self._progress_total,
+            **self.summary_data,
+        )
         return self.summary_data
 
     def _get_document_types(self) -> list[dict[str, Any]]:
@@ -134,6 +164,13 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             1,
             len(document_types) + len(hierarchies) + len(attributes) + 1 + value_count,
         )
+        self._progress_log_interval = self._build_log_interval(total=self._progress_total, minimum=500)
+        self._next_progress_log_at = self._progress_log_interval
+        self._log_info(
+            message="Prepared Mirakl schema progress tracking",
+            total_records=self._progress_total,
+            progress_log_interval=self._progress_log_interval,
+        )
 
         if self.import_process is None:
             return
@@ -142,6 +179,70 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self.import_process.processed_records = 0
         self.import_process.percentage = 0
         self.import_process.save(update_fields=["total_records", "processed_records", "percentage"])
+
+    def _build_log_context(self, *, extra: dict[str, Any] | None = None) -> str:
+        context: dict[str, Any] = {
+            "channel_id": getattr(self.sales_channel, "id", None),
+            "import_id": getattr(self.import_process, "id", None),
+        }
+        if extra:
+            context.update(extra)
+
+        parts: list[str] = []
+        for key, value in context.items():
+            if value in (None, ""):
+                continue
+            parts.append(f"{key}={value}")
+        return " ".join(parts)
+
+    def _log_info(self, *, message: str, **context: Any) -> None:
+        logger.info("%s %s", message, self._build_log_context(extra=context))
+
+    @staticmethod
+    def _build_log_interval(*, total: int, minimum: int) -> int:
+        return max(minimum, math.floor(max(1, total) * 0.01))
+
+    def _set_phase(self, *, phase_name: str, total: int) -> None:
+        self._phase_name = phase_name
+        self._phase_total = max(0, total)
+        self._phase_log_interval = self._build_log_interval(total=max(1, total), minimum=25)
+        self._next_phase_log_at = 1
+        self._log_info(
+            message="Starting Mirakl schema phase",
+            phase=phase_name,
+            items=total,
+        )
+
+    def _log_phase_item(
+        self,
+        *,
+        index: int,
+        code: str,
+        force: bool = False,
+        **context: Any,
+    ) -> None:
+        if self._phase_total <= 0:
+            return
+
+        should_log = (
+            force
+            or index == 1
+            or index == self._phase_total
+            or index >= self._next_phase_log_at
+        )
+        if not should_log:
+            return
+
+        while index >= self._next_phase_log_at:
+            self._next_phase_log_at += self._phase_log_interval
+
+        self._log_info(
+            message="Mirakl schema phase item",
+            phase=self._phase_name,
+            item=f"{index}/{self._phase_total}",
+            code=code,
+            **context,
+        )
 
     def _index_value_lists(self, *, value_lists: list[dict[str, Any]]) -> None:
         for value_list in value_lists:
@@ -155,16 +256,39 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
 
     def _increment_progress(self, *, amount: int = 1) -> None:
         self._progress_processed += amount
-        if self.import_process is None:
-            return
-
         percentage = min(
             99,
             math.floor((self._progress_processed / max(1, self._progress_total)) * 100),
         )
-        self.import_process.processed_records = min(self._progress_processed, self._progress_total)
-        self.import_process.percentage = percentage
-        self.import_process.save(update_fields=["processed_records", "percentage"])
+        processed = min(self._progress_processed, self._progress_total)
+        if self.import_process is not None:
+            self.import_process.processed_records = processed
+            self.import_process.percentage = percentage
+            self.import_process.save(update_fields=["processed_records", "percentage"])
+
+        if processed >= self._progress_total:
+            self._log_info(
+                message="Mirakl schema import progress",
+                phase=self._phase_name,
+                processed=processed,
+                total=self._progress_total,
+                percentage=percentage,
+            )
+            return
+
+        if processed < self._next_progress_log_at:
+            return
+
+        while processed >= self._next_progress_log_at:
+            self._next_progress_log_at += self._progress_log_interval
+
+        self._log_info(
+            message="Mirakl schema import progress",
+            phase=self._phase_name,
+            processed=processed,
+            total=self._progress_total,
+            percentage=percentage,
+        )
 
     def sync_categories(self, *, hierarchies: list[dict[str, Any]]) -> None:
         categories_by_code: dict[str, MiraklCategory] = {}
@@ -264,16 +388,27 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             for product_type in product_types_by_code.values()
         }
 
-        for item in self._sort_attributes_for_import(attributes=attributes):
+        sorted_attributes = self._sort_attributes_for_import(attributes=attributes)
+
+        for index, item in enumerate(sorted_attributes, start=1):
+            code = self._clean_string(item.get("code"))
+            target_product_types = self._resolve_target_product_types(
+                item=item,
+                product_types_by_code=product_types_by_code,
+            )
+            self._log_phase_item(
+                index=index,
+                code=code or "<missing>",
+                hierarchy_code=self._clean_string(item.get("hierarchy_code")),
+                target_product_types=len(target_product_types),
+                force=len(target_product_types) >= 100,
+            )
             remote_property = self._upsert_property(item=item)
             if remote_property is None:
                 continue
 
             self._sync_property_applicabilities(remote_property=remote_property, item=item)
-            for product_type in self._resolve_target_product_types(
-                item=item,
-                product_types_by_code=product_types_by_code,
-            ):
+            for product_type in target_product_types:
                 expected_property_ids_by_product_type.setdefault(product_type.id, set()).add(remote_property.id)
                 self._upsert_product_type_item(
                     product_type=product_type,
@@ -282,7 +417,27 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 )
             self._increment_progress()
 
-        for product_type in product_types_by_code.values():
+        self._log_info(
+            message="Cleaning stale Mirakl product type items",
+            product_types=len(product_types_by_code),
+        )
+        cleanup_total = len(product_types_by_code)
+        cleanup_log_interval = self._build_log_interval(total=max(1, cleanup_total), minimum=25)
+        next_cleanup_log_at = 1
+
+        for cleanup_index, product_type in enumerate(product_types_by_code.values(), start=1):
+            if (
+                cleanup_index == 1
+                or cleanup_index == cleanup_total
+                or cleanup_index >= next_cleanup_log_at
+            ):
+                while cleanup_index >= next_cleanup_log_at:
+                    next_cleanup_log_at += cleanup_log_interval
+                self._log_info(
+                    message="Cleaning stale Mirakl product type item set",
+                    item=f"{cleanup_index}/{cleanup_total}",
+                    product_type=product_type.remote_id,
+                )
             expected_property_ids = expected_property_ids_by_product_type.get(product_type.id, set())
             stale_items = MiraklProductTypeItem.objects.filter(product_type=product_type)
             if expected_property_ids:
@@ -422,25 +577,33 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             self.summary_data["property_applicabilities"] += 1
 
     def sync_select_values(self, *, value_lists: list[dict[str, Any]]) -> None:
-        for value_list in value_lists:
+        for index, value_list in enumerate(value_lists, start=1):
             value_list_code = self._clean_string(value_list.get("code"))
             value_list_label = self._clean_string(value_list.get("label"))
             if not value_list_code:
                 continue
 
             self._value_list_labels[value_list_code] = value_list_label
+            value_payloads = self._parse_value_entries(value_list.get("values"))
             matching_properties = list(
                 MiraklProperty.objects.filter(
                     sales_channel=self.sales_channel,
                     value_list_code=value_list_code,
                 )
             )
+            self._log_phase_item(
+                index=index,
+                code=value_list_code,
+                values=len(value_payloads),
+                matching_properties=len(matching_properties),
+                force=(len(value_payloads) * max(1, len(matching_properties))) >= 100,
+            )
             if matching_properties:
                 MiraklProperty.objects.filter(
                     id__in=[item.id for item in matching_properties],
                 ).update(value_list_label=value_list_label)
 
-            for value_payload in self._parse_value_entries(value_list.get("values")):
+            for value_payload in value_payloads:
                 for remote_property in matching_properties:
                     self._upsert_select_value(
                         remote_property=remote_property,
@@ -452,6 +615,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
 
     def sync_offer_state_property(self, *, offer_states: list[dict[str, Any]]) -> None:
         if not offer_states:
+            self._log_info(message="Skipping Mirakl offer state sync because no states were returned")
             return
 
         remote_property = self._get_existing_by_lookup(
@@ -587,11 +751,8 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         field_type = self._normalize_lookup_token(item.get("type"))
         type_parameters = self._ensure_json_value(item.get("type_parameters"), default=[])
         media_type = self._resolve_media_type(type_parameters=type_parameters)
-        unit = self._resolve_type_parameter_value(type_parameters=type_parameters, name="UNIT")
 
         if code.endswith("_uom") or label.endswith(" unit"):
-            return MiraklProperty.REPRESENTATION_UNIT
-        if unit:
             return MiraklProperty.REPRESENTATION_UNIT
         if field_type in {"list", "list_multiple_values"}:
             value_count = len(inline_values) or (1 if values_list_code in self._value_list_single_defaults else 0)
@@ -627,13 +788,11 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             return MiraklProperty.REPRESENTATION_IMAGE
         if "image" in code:
             return MiraklProperty.REPRESENTATION_IMAGE
-        if "video" in code:
-            return MiraklProperty.REPRESENTATION_VIDEO
         if "vat" in code or "tax_rate" in code:
             return MiraklProperty.REPRESENTATION_VAT_RATE
         if "backorder" in code:
             return MiraklProperty.REPRESENTATION_ALLOW_BACKORDER
-        if code in {"long_description", "description", "details_and_care"} or code.startswith("long_description_") or code.startswith("details_and_care_"):
+        if code in {"long_description", "description"} or code.startswith("long_description_"):
             return MiraklProperty.REPRESENTATION_PRODUCT_DESCRIPTION
         if code == "active":
             return MiraklProperty.REPRESENTATION_PRODUCT_ACTIVE
