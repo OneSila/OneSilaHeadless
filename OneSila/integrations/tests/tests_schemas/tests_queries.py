@@ -4,6 +4,7 @@ from model_bakery import baker
 from strawberry.relay import to_base64
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
+from integrations.helpers import _get_public_integration_type_cached
 from integrations.models import PublicIntegrationType, PublicIntegrationTypeTranslation
 from integrations.tests.helpers import PublicIntegrationTypeSchemaMixin
 from media.tests.helpers import CreateImageMixin
@@ -92,8 +93,43 @@ class MiraklIntegrationQueryTests(
             api_key="secret-token",
             sub_type="tesco",
         )
-        self.mirakl_base_public_type = PublicIntegrationType.objects.get(key="mirakl")
-        self.mirakl_subtype_public_type = PublicIntegrationType.objects.get(key="tesco")
+        self.mirakl_base_public_type, _ = PublicIntegrationType.objects.update_or_create(
+            key="mirakl",
+            defaults={
+                "type": "mirakl",
+                "category": PublicIntegrationType.CATEGORY_MARKETPLACE,
+                "active": True,
+                "sort_order": 1,
+            },
+        )
+        PublicIntegrationTypeTranslation.objects.update_or_create(
+            public_integration_type=self.mirakl_base_public_type,
+            language="en",
+            defaults={
+                "name": "Mirakl",
+                "description": "Mirakl base integration",
+            },
+        )
+        self.mirakl_subtype_public_type, _ = PublicIntegrationType.objects.update_or_create(
+            key="tesco",
+            defaults={
+                "type": "mirakl",
+                "subtype": "tesco",
+                "based_to": self.mirakl_base_public_type,
+                "category": PublicIntegrationType.CATEGORY_MARKETPLACE,
+                "active": True,
+                "sort_order": 2,
+            },
+        )
+        PublicIntegrationTypeTranslation.objects.update_or_create(
+            public_integration_type=self.mirakl_subtype_public_type,
+            language="en",
+            defaults={
+                "name": "Tesco",
+                "description": "Mirakl Tesco integration",
+            },
+        )
+        _get_public_integration_type_cached.cache_clear()
 
         self.mirakl_base_public_type.logo_png.save("mirakl-base.png", self.get_image_file("red.png"), save=True)
         self.mirakl_base_public_type.logo_svg.save(

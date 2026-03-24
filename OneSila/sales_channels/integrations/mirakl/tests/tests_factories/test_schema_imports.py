@@ -412,7 +412,7 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
 
         made_to_order_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="made_to_order")
         self.assertEqual(made_to_order_property.representation_type, MiraklProperty.REPRESENTATION_DEFAULT_VALUE)
-        self.assertEqual(made_to_order_property.default_value, "Yes")
+        self.assertEqual(made_to_order_property.default_value, "yes")
         self.assertEqual(
             MiraklProductTypeItem.objects.filter(product_type=parent_product_type, remote_property=made_to_order_property).count(),
             1,

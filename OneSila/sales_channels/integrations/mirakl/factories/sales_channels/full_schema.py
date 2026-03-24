@@ -679,7 +679,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         raw_default = self._clean_string(remote_property.default_value)
         if len(select_values) == 1:
             select_value = select_values[0]
-            return self._clean_string(select_value.value) or self._clean_string(select_value.code) or raw_default
+            return self._clean_string(select_value.code) or self._clean_string(select_value.remote_id) or self._clean_string(select_value.value) or raw_default
 
         if not raw_default:
             return ""
@@ -690,7 +690,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 self._clean_string(select_value.remote_id),
                 self._clean_string(select_value.value),
             }:
-                return self._clean_string(select_value.value) or self._clean_string(select_value.code) or raw_default
+                return self._clean_string(select_value.code) or self._clean_string(select_value.remote_id) or self._clean_string(select_value.value) or raw_default
 
         return raw_default
 

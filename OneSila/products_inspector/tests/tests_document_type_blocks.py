@@ -302,7 +302,7 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
             remote_document_type.save()
 
         mock_refresh.assert_called_once_with(
-            product_ids={product.id},
+            product_ids=set(),
             multi_tenant_company_id=self.multi_tenant_company.id,
         )
 

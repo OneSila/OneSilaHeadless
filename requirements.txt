@@ -37,6 +37,7 @@ uvicorn
 WooCommerce
 markdown
 mkdocs
+openpyxl>=3.1,<4
 
 strawberry-graphql==0.266.0
 strawberry-graphql-django==0.59.1

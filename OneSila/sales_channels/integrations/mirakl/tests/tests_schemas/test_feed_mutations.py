@@ -46,8 +46,8 @@ class MiraklFeedMutationTests(
             api_key="secret-token",
         )
 
-    @patch("sales_channels.integrations.mirakl.flows.resync_mirakl_feed")
-    def test_resync_feed_returns_new_feed(self, flow_mock):
+    @patch("sales_channels.integrations.mirakl.flows.feeds.MiraklFeedResyncFactory")
+    def test_resync_feed_returns_new_feed(self, factory_cls):
         source_feed = baker.make(
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
@@ -62,7 +62,7 @@ class MiraklFeedMutationTests(
             type=MiraklSalesChannelFeed.TYPE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
         )
-        flow_mock.return_value = resynced_feed
+        factory_cls.return_value.run.return_value = resynced_feed
 
         response = self.strawberry_test_client(
             query=RESYNC_MIRAKL_FEED_MUTATION,
@@ -71,7 +71,9 @@ class MiraklFeedMutationTests(
 
         self.assertIsNone(response.errors)
         self.assertEqual(response.data["resyncMiraklFeed"]["status"], MiraklSalesChannelFeed.STATUS_SUBMITTED)
-        flow_mock.assert_called_once_with(feed_id=source_feed.id)
+        factory_cls.assert_called_once()
+        self.assertEqual(factory_cls.call_args.kwargs["feed"].id, source_feed.id)
+        factory_cls.return_value.run.assert_called_once_with()
 
     def test_removed_start_mutation_is_absent(self):
         response = self.strawberry_test_client(

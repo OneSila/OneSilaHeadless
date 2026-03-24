@@ -229,6 +229,196 @@ class MiraklCategoryAdmin(admin.ModelAdmin):
         )
 
 
+@admin.register(MiraklProperty)
+class MiraklPropertyAdmin(admin.ModelAdmin):
+    list_select_related = ("sales_channel", "local_instance", "multi_tenant_company")
+    list_display = (
+        "code",
+        "name",
+        "representation_type_with_code",
+        "sales_channel",
+        "representation_type_decided",
+        "local_property_summary",
+        "type_summary",
+        "is_common",
+        "updated_at",
+    )
+    list_filter = (
+        "sales_channel",
+        "representation_type",
+        "representation_type_decided",
+        "is_common",
+        "language",
+        "type",
+        "original_type",
+        "allows_unmapped_values",
+    )
+    search_fields = (
+        "code",
+        "name",
+        "description",
+        "example",
+        "default_value",
+        "value_list_code",
+        "value_list_label",
+        "sales_channel__hostname",
+        "local_instance__internal_name",
+        "local_instance__propertytranslation__name",
+    )
+    raw_id_fields = (
+        "sales_channel",
+        "multi_tenant_company",
+        "local_instance",
+        "created_by_multi_tenant_user",
+        "last_update_by_multi_tenant_user",
+    )
+    ordering = ("sales_channel", "code")
+    readonly_fields = (
+        "representation_type_with_code",
+        "local_property_summary",
+        "pretty_validations",
+        "pretty_transformations",
+        "pretty_type_parameters",
+        "pretty_label_translations",
+        "pretty_description_translations",
+        "pretty_raw_data",
+        "created_at",
+        "updated_at",
+        "created_by_multi_tenant_user",
+        "last_update_by_multi_tenant_user",
+    )
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "sales_channel",
+                    "multi_tenant_company",
+                    "code",
+                    "remote_id",
+                    "name",
+                    "language",
+                    "is_common",
+                    "local_instance",
+                    "local_property_summary",
+                )
+            },
+        ),
+        (
+            "Representation",
+            {
+                "fields": (
+                    "representation_type",
+                    "representation_type_with_code",
+                    "representation_type_decided",
+                    "default_value",
+                )
+            },
+        ),
+        (
+            "Typing",
+            {
+                "fields": (
+                    "original_type",
+                    "type",
+                    "allows_unmapped_values",
+                    "yes_text_value",
+                    "no_text_value",
+                    "value_list_code",
+                    "value_list_label",
+                )
+            },
+        ),
+        (
+            "Descriptions",
+            {
+                "fields": (
+                    "description",
+                    "example",
+                    "pretty_label_translations",
+                    "pretty_description_translations",
+                )
+            },
+        ),
+        (
+            "Structured Data",
+            {
+                "fields": (
+                    "pretty_type_parameters",
+                    "pretty_validations",
+                    "pretty_transformations",
+                    "pretty_raw_data",
+                )
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                    "created_by_multi_tenant_user",
+                    "last_update_by_multi_tenant_user",
+                )
+            },
+        ),
+    )
+
+    @admin.display(description="Representation")
+    def representation_type_with_code(self, obj):
+        representation_code = getattr(obj, "representation_type", "") or "-"
+        representation_label = getattr(obj, "get_representation_type_display", lambda: "")() or representation_code
+        return f"{representation_label} ({representation_code})"
+
+    @admin.display(description="Local Property")
+    def local_property_summary(self, obj):
+        local_property = getattr(obj, "local_instance", None)
+        if not local_property:
+            return "-"
+
+        property_name = getattr(local_property, "name", None) or "-"
+        property_code = getattr(local_property, "internal_name", None) or "-"
+        property_type = getattr(local_property, "get_type_display", lambda: getattr(local_property, "type", "-"))()
+        return f"{property_name} ({property_code}) [{property_type}]"
+
+    @admin.display(description="Type")
+    def type_summary(self, obj):
+        property_type = getattr(obj, "get_type_display", lambda: getattr(obj, "type", None))()
+        original_type = getattr(obj, "get_original_type_display", lambda: getattr(obj, "original_type", None))()
+        if property_type and original_type and property_type != original_type:
+            return f"{property_type} / original: {original_type}"
+        return property_type or original_type or "-"
+
+    def _pretty_json(self, *, value):
+        rendered = json.dumps(value or {}, indent=2, sort_keys=True, default=str, ensure_ascii=False)
+        return format_html("<pre style='white-space: pre-wrap; max-width: 100%;'>{}</pre>", rendered)
+
+    @admin.display(description="Validations")
+    def pretty_validations(self, obj):
+        return self._pretty_json(value=obj.validations)
+
+    @admin.display(description="Transformations")
+    def pretty_transformations(self, obj):
+        return self._pretty_json(value=obj.transformations)
+
+    @admin.display(description="Type Parameters")
+    def pretty_type_parameters(self, obj):
+        return self._pretty_json(value=obj.type_parameters)
+
+    @admin.display(description="Label Translations")
+    def pretty_label_translations(self, obj):
+        return self._pretty_json(value=obj.label_translations)
+
+    @admin.display(description="Description Translations")
+    def pretty_description_translations(self, obj):
+        return self._pretty_json(value=obj.description_translations)
+
+    @admin.display(description="Raw Data")
+    def pretty_raw_data(self, obj):
+        return self._pretty_json(value=obj.raw_data)
+
+
 @admin.register(MiraklProductType)
 class MiraklProductTypeAdmin(admin.ModelAdmin):
     list_select_related = ("sales_channel", "category", "local_instance")

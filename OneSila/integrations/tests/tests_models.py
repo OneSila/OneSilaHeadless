@@ -31,7 +31,7 @@ class PublicIntegrationTypeModelTests(PublicIntegrationTypeSchemaMixin, Transact
 
         self.assertEqual(integration_type.name(language="de"), "Amazon DE")
         self.assertEqual(integration_type.description(language="de"), "English description")
-        self.assertEqual(integration_type.name(language="fr"), "Amazon")
+        self.assertEqual(integration_type.name(language="fr"), "Amazon DE")
         self.assertEqual(integration_type.description(language="fr"), "English description")
 
     def test_str_falls_back_to_key_when_no_translation_exists(self):

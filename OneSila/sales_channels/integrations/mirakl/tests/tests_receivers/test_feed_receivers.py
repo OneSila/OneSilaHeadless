@@ -163,4 +163,10 @@ class MiraklLiveReceiversTests(DisableMiraklConnectionMixin, TestCase):
 
         task = IntegrationTaskQueue.objects.get(task_name=get_import_path(process_mirakl_feed_db_task))
         self.assertEqual(task.integration_id, self.sales_channel.id)
-        self.assertEqual(task.task_kwargs, {"feed_id": feed.id})
+        self.assertEqual(
+            task.task_kwargs,
+            {
+                "feed_id": feed.id,
+                "sales_channel_id": self.sales_channel.id,
+            },
+        )

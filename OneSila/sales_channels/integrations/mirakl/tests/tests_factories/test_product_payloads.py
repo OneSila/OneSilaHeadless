@@ -729,6 +729,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=product,
             property=local_property,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=product_property,
+            language="en",
             value_text="English care",
         )
         ProductPropertyTextTranslation.objects.create(
