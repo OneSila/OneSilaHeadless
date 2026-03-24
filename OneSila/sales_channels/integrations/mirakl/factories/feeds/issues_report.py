@@ -44,6 +44,7 @@ class MiraklTransformationErrorReportIssueSyncFactory:
             return 0
 
         remote_product_lookup = self._build_remote_product_lookup()
+        touched_remote_product_ids: set[int] = set()
 
         synced_issues = 0
         with self.feed.transformation_error_report_file.open("rb") as file_handle:
@@ -75,9 +76,13 @@ class MiraklTransformationErrorReportIssueSyncFactory:
                         remote_product=remote_product,
                         row=row,
                     )
+                    touched_remote_product_ids.add(remote_product.id)
             finally:
                 workbook.close()
 
+        self._refresh_remote_product_statuses(
+            remote_product_ids=sorted(touched_remote_product_ids),
+        )
         return synced_issues
 
     def _resolve_sales_channel_instance(self, *, feed):
@@ -329,3 +334,10 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         if value in (None, ""):
             return ""
         return str(value)
+
+    def _refresh_remote_product_statuses(self, *, remote_product_ids: list[int]) -> None:
+        if not remote_product_ids:
+            return
+
+        for remote_product in MiraklProduct.objects.filter(id__in=remote_product_ids).order_by("id").iterator():
+            remote_product.refresh_status(commit=True)

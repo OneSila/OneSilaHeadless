@@ -1,4 +1,5 @@
 from .build import MiraklProductFeedBuildFactory, MiraklProductFeedFactory
+from .new_product_report import MiraklNewProductReportSyncFactory
 from .product_payloads import (
     MiraklProductCreateFactory,
     MiraklProductCreatePayloadFactory,
@@ -18,6 +19,7 @@ from .submit import MiraklProductFeedSubmitFactory
 __all__ = [
     "MiraklFeedResyncFactory",
     "MiraklImportStatusSyncFactory",
+    "MiraklNewProductReportSyncFactory",
     "MiraklProductCreateFactory",
     "MiraklProductCreatePayloadFactory",
     "MiraklProductDeleteFactory",

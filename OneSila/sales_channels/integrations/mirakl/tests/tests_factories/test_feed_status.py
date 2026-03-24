@@ -6,7 +6,13 @@ from model_bakery import baker
 
 from core.tests import TestCase
 from sales_channels.integrations.mirakl.factories.feeds import MiraklImportStatusSyncFactory
-from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelFeed
+from sales_channels.integrations.mirakl.models import (
+    MiraklProduct,
+    MiraklProductIssue,
+    MiraklSalesChannel,
+    MiraklSalesChannelFeed,
+    MiraklSalesChannelFeedItem,
+)
 from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
@@ -22,7 +28,8 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
             api_key="secret-token",
         )
 
-    def test_run_updates_only_submitted_feeds_with_remote_id_and_downloads_reports(self):
+    @patch("sales_channels.integrations.mirakl.factories.feeds.new_product_report.MiraklNewProductReportSyncFactory.run")
+    def test_run_updates_feed_reports_and_resolves_product_statuses(self, new_product_report_mock):
         submitted_feed = baker.make(
             MiraklSalesChannelFeed,
             sales_channel=self.sales_channel,
@@ -31,6 +38,43 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
             remote_id="2008",
             product_remote_id="2008",
+        )
+        clean_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="SKU-CLEAN",
+            syncing_current_percentage=100,
+        )
+        rejected_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="SKU-REJECTED",
+            syncing_current_percentage=100,
+        )
+        baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=submitted_feed,
+            remote_product=clean_remote_product,
+            status=MiraklSalesChannelFeedItem.STATUS_PENDING,
+        )
+        baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=submitted_feed,
+            remote_product=rejected_remote_product,
+            status=MiraklSalesChannelFeedItem.STATUS_PENDING,
+        )
+        baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=rejected_remote_product,
+            code="1000",
+            main_code="1000",
+            severity="ERROR",
+            raw_data={"source": "transformation_error_report_error"},
         )
         ignored_feed = baker.make(
             MiraklSalesChannelFeed,
@@ -105,6 +149,11 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
         self.assertTrue(bool(submitted_feed.transformation_error_report_file))
         self.assertIsNotNone(self.sales_channel.last_product_imports_request_date)
         self.assertEqual(ignored_feed.status, MiraklSalesChannelFeed.STATUS_PENDING)
+        clean_remote_product.refresh_from_db()
+        rejected_remote_product.refresh_from_db()
+        self.assertEqual(clean_remote_product.status, MiraklProduct.STATUS_COMPLETED)
+        self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+        new_product_report_mock.assert_called_once()
 
     def test_run_uses_last_request_date_when_present(self):
         boundary = timezone.now() - timedelta(minutes=30)

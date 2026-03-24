@@ -32,6 +32,7 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_sku="shopSku1",
+            syncing_current_percentage=100,
         )
         baker.make(
             MiraklEanCode,
@@ -179,6 +180,8 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
         self.assertEqual(warning_issue.severity, "WARNING")
         self.assertEqual(warning_issue.attribute_code, "mainImageLarge")
         self.assertFalse(warning_issue.views.exists())
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
 
     @patch("sales_channels.integrations.mirakl.factories.sales_channels.issues.MiraklProductIssuesFetchFactory._request")
     def test_differential_sync_keeps_existing_issues_on_204(self, request_mock):
@@ -219,7 +222,9 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
             main_code="OLD",
             code="OLD",
             severity="ERROR",
+            raw_data={"source": "error"},
         )
+        self.remote_product.refresh_status(commit=True)
         boundary = timezone.make_aware(datetime(2026, 3, 19, 11, 0, 0))
         request_mock.return_value = self._response(status_code=204, payload=None)
 
@@ -233,6 +238,8 @@ class MiraklProductIssuesFetchFactoryTests(DisableMiraklConnectionMixin, TestCas
             ).run()
 
         self.assertFalse(MiraklProductIssue.objects.filter(remote_product=self.remote_product).exists())
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_COMPLETED)
         self.sales_channel.refresh_from_db()
         self.assertEqual(self.sales_channel.last_full_issues_fetch, boundary)
         self.assertEqual(self.sales_channel.last_differential_issues_fetch, boundary)

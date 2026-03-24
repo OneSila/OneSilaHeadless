@@ -1546,6 +1546,9 @@ class _MiraklFeedPersistenceMixin:
                     ]
                 )
             MiraklProductIssue.objects.filter(remote_product=self.remote_instance).delete()
+            self.remote_instance.refresh_status(
+                override_status=self.remote_instance.STATUS_PENDING_APPROVAL,
+            )
         self._refresh_feed_summary(feed=feed)
         return item
 

@@ -149,4 +149,5 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
         )
         self.assertEqual(warning_issue.severity, "WARNING")
         self.assertEqual(warning_issue.raw_data["source"], "transformation_error_report_warning")
-
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)

@@ -87,10 +87,17 @@ class MiraklProductIssuesFetchFactory(GetMiraklAPIMixin):
 
     def _handle_empty_payload(self, *, boundary) -> None:
         if self.mode == self.MODE_FULL:
+            remote_product_ids = list(
+                MiraklProductIssue.objects.filter(
+                    remote_product__sales_channel=self.sales_channel,
+                    raw_data__source__in=self.API_SOURCES,
+                ).values_list("remote_product_id", flat=True).distinct()
+            )
             MiraklProductIssue.objects.filter(
                 remote_product__sales_channel=self.sales_channel,
                 raw_data__source__in=self.API_SOURCES,
             ).delete()
+            self._refresh_remote_product_statuses(remote_product_ids=remote_product_ids)
         self._persist_boundary(boundary=boundary)
 
     def _persist_boundary(self, *, boundary) -> None:
@@ -176,7 +183,15 @@ class MiraklProductIssuesFetchFactory(GetMiraklAPIMixin):
                 if views:
                     issue.views.set(views)
                 created_issues += 1
+        remote_product.refresh_status(commit=True)
         return created_issues
+
+    def _refresh_remote_product_statuses(self, *, remote_product_ids: list[int]) -> None:
+        if not remote_product_ids:
+            return
+
+        for remote_product in MiraklProduct.objects.filter(id__in=remote_product_ids).order_by("id").iterator():
+            remote_product.refresh_status(commit=True)
 
     def _build_issue_payloads(self, *, record: dict[str, Any]) -> list[dict[str, Any]]:
         issue_payloads: list[dict[str, Any]] = []

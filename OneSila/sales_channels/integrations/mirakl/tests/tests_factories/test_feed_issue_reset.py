@@ -59,6 +59,7 @@ class MiraklFeedIssueResetTests(DisableMiraklConnectionMixin, TestCase):
         )
 
     def test_persisting_feed_rows_clears_existing_mirakl_product_issues(self):
+        self.remote_product.set_new_sync_percentage(100)
         baker.make(
             MiraklProductIssue,
             multi_tenant_company=self.multi_tenant_company,
@@ -92,3 +93,5 @@ class MiraklFeedIssueResetTests(DisableMiraklConnectionMixin, TestCase):
         self.assertIsNotNone(item)
         self.assertEqual(item.status, MiraklSalesChannelFeedItem.STATUS_PENDING)
         self.assertFalse(MiraklProductIssue.objects.filter(remote_product=self.remote_product).exists())
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_PENDING_APPROVAL)
