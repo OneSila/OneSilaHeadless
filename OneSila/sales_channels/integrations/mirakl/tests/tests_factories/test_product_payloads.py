@@ -1,6 +1,7 @@
 from unittest.mock import patch
 from datetime import date
 
+from django.test import override_settings
 from eancodes.models import EanCode
 from model_bakery import baker
 
@@ -928,6 +929,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         ):
             factory.preflight_process()
 
+    @override_settings(TESTING=False)
     def test_configurable_create_factory_preflight_requires_template_before_pushing(self):
         parent_product = baker.make(
             "products.Product",

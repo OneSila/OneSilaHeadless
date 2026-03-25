@@ -106,7 +106,7 @@ class MiraklSalesChannelMutation:
         sales_channel.refresh_from_db()
         return sales_channel
 
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def resync_mirakl_feed(
         self,
         instance: SalesChannelFeedPartialInput,

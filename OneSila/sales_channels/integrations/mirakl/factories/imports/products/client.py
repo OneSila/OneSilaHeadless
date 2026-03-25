@@ -21,14 +21,7 @@ class MiraklProductsImportClient(GetMiraklAPIMixin):
                 "max": effective_page_size,
             },
         )
-        self._log_response(
-            path="/api/offers",
-            params={
-                "offset": max(offset, 0),
-                "max": effective_page_size,
-            },
-            payload=payload,
-        )
+
         offers = payload.get("offers") or []
         if not isinstance(offers, list):
             offers = []
@@ -72,30 +65,13 @@ class MiraklProductsImportClient(GetMiraklAPIMixin):
                 path=path,
                 params=params,
             )
-            self._log_response(
-                path=path,
-                params=params,
-                payload=payload,
-            )
+
             products = payload.get("products") or []
             if not isinstance(products, list):
                 continue
             collected_products.extend(product for product in products if isinstance(product, dict))
 
         return collected_products
-
-    def _log_response(self, *, path: str, params: dict[str, Any], payload: dict[str, Any]) -> None:
-        label = {
-            "/api/offers": "Mirakl import OF response",
-            "/api/products/offers": "Mirakl import P11 response",
-            "/api/products": "Mirakl import P31 response",
-        }.get(path, "Mirakl import response")
-        print(
-            f"{label} "
-            f"path={path} "
-            f"params={json.dumps(params, sort_keys=True, default=str, ensure_ascii=False)} "
-            f"payload={json.dumps(payload, sort_keys=True, default=str, ensure_ascii=False)}"
-        )
 
     def _normalize_product_references(self, *, product_references: list[tuple[str, str]]) -> list[tuple[str, str]]:
         normalized_references: list[tuple[str, str]] = []

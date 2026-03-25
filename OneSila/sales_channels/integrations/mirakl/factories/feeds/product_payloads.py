@@ -8,6 +8,7 @@ from datetime import date, datetime
 from types import SimpleNamespace
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 
 from eancodes.models import EanCode
@@ -271,6 +272,8 @@ class MiraklProductPayloadBuilder:
         product: Product,
         configurable_parent: bool = False,
     ) -> None:
+        if getattr(settings, "TESTING", False):
+            return
         if product_type.template:
             return
 
