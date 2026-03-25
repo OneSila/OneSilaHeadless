@@ -1,5 +1,6 @@
 from urllib.request import Request, urlopen
 
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import migrations
 
@@ -472,6 +473,10 @@ PUBLIC_INTEGRATION_TYPES = [
 
 
 def seed_public_integration_types(apps, schema_editor):
+
+    if getattr(settings, "TESTING", False):
+        return
+
     PublicIntegrationType = apps.get_model(APP_LABEL, "PublicIntegrationType")
     PublicIntegrationTypeTranslation = apps.get_model(APP_LABEL, "PublicIntegrationTypeTranslation")
 

@@ -159,6 +159,14 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
         boundary = timezone.now() - timedelta(minutes=30)
         self.sales_channel.last_product_imports_request_date = boundary
         self.sales_channel.save(update_fields=["last_product_imports_request_date"])
+        baker.make(
+            MiraklSalesChannelFeed,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            remote_id="2008",
+        )
 
         with patch.object(
             MiraklImportStatusSyncFactory,

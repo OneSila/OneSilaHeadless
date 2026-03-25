@@ -659,11 +659,14 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=None,
         )
 
-        with patch.object(media, "image_url", return_value="https://cdn.example.com/parent.jpg"), patch.object(
-            child_media,
-            "image_url",
-            return_value="https://cdn.example.com/child.jpg",
-        ):
+        def _image_url(media_instance):
+            if media_instance.id == child_media.id:
+                return "https://cdn.example.com/child.jpg"
+            if media_instance.id == media.id:
+                return "https://cdn.example.com/parent.jpg"
+            return ""
+
+        with patch("media.models.Media.image_url", autospec=True, side_effect=_image_url):
             _, rows = MiraklProductPayloadBuilder(
                 remote_product=remote_product,
                 sales_channel_view=self.view,

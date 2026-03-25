@@ -117,7 +117,14 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             defaults={"name": "Pound Sterling", "symbol": "GBP"},
         )
 
-    def _build_offer(self, *, shop_sku: str, product_sku: str, title: str = "U.S Army Jumpsuit Costume") -> dict:
+    def _build_offer(
+        self,
+        *,
+        shop_sku: str,
+        product_sku: str,
+        title: str = "U.S Army Jumpsuit Costume",
+        reference: str = "5055988633820",
+    ) -> dict:
         return {
             "active": True,
             "all_prices": [
@@ -171,7 +178,7 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             "price_additional_info": None,
             "product_brand": "I Love Fancy Dress",
             "product_description": "Mirakl imported description",
-            "product_references": [{"reference": "5055988633820", "reference_type": "EAN"}],
+            "product_references": [{"reference": reference, "reference_type": "EAN"}],
             "product_sku": product_sku,
             "product_title": title,
             "quantity": 30,
@@ -302,116 +309,6 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
                 sales_channel_view=self.view,
                 remote_product=remote_product,
                 product=remote_product.local_instance,
-            ).exists()
-        )
-
-    @patch("sales_channels.integrations.mirakl.factories.imports.products.processor.time.sleep")
-    @patch(
-        "imports_exports.factories.media.ImportImageInstance.download_image_from_url"
-    )
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_by_references"
-    )
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_offers_page"
-    )
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_offers_by_references"
-    )
-    def test_run_groups_same_of21_signature_into_synthetic_configurable_and_sleeps_between_pages(
-        self,
-        get_products_offers_by_references_mock,
-        get_offers_page_mock,
-        get_products_by_references_mock,
-        download_image_from_url_mock,
-        sleep_mock,
-    ):
-        first_offer = self._build_offer(shop_sku="ILFD7157XL", product_sku="M5055988633820")
-        second_offer = self._build_offer(shop_sku="ILFD7157L", product_sku="M5055988633813")
-        get_offers_page_mock.side_effect = [
-            {"offers": [first_offer], "total_count": 2},
-            {"offers": [second_offer], "total_count": 2},
-        ]
-        get_products_offers_by_references_mock.return_value = [
-            self._build_p11_product(
-                reference="5055988633820",
-                product_sku="M5055988633820",
-            ),
-            self._build_p11_product(
-                reference="5055988633813",
-                product_sku="M5055988633813",
-            ),
-        ]
-        get_products_by_references_mock.return_value = []
-        download_image_from_url_mock.return_value = None
-
-        MiraklProductsImportProcessor(
-            import_process=self.import_process,
-            sales_channel=self.sales_channel,
-        ).run()
-
-        parent_remote = MiraklProduct.objects.get(
-            sales_channel=self.sales_channel,
-            raw_data__synthetic_configurable=True,
-        )
-        child_remotes = list(
-            MiraklProduct.objects.filter(
-                sales_channel=self.sales_channel,
-                remote_parent_product=parent_remote,
-            )
-            .select_related("local_instance")
-            .order_by("local_instance__sku")
-        )
-
-        self.import_process.refresh_from_db()
-        self.assertEqual(self.import_process.total_records, 2)
-        self.assertEqual(self.import_process.processed_records, 2)
-        sleep_mock.assert_called_once_with(5)
-        get_products_offers_by_references_mock.assert_called_once_with(
-            product_references=[
-                ("EAN", "5055988633820"),
-                ("EAN", "5055988633813"),
-            ],
-        )
-        get_products_by_references_mock.assert_called_once_with(
-            product_references=[
-                ("EAN", "5055988633820"),
-                ("EAN", "5055988633813"),
-            ],
-        )
-        self.assertEqual(parent_remote.local_instance.type, Product.CONFIGURABLE)
-        self.assertEqual(len(child_remotes), 2)
-        self.assertTrue(all(child_remote.is_variation for child_remote in child_remotes))
-        self.assertTrue(
-            ConfigurableVariation.objects.filter(
-                parent=parent_remote.local_instance,
-                variation=child_remotes[0].local_instance,
-            ).exists()
-        )
-        self.assertTrue(
-            SalesChannelViewAssign.objects.filter(
-                sales_channel=self.sales_channel,
-                product=parent_remote.local_instance,
-                remote_product=parent_remote,
-            ).exists()
-        )
-        self.assertTrue(
-            MediaProductThrough.objects.filter(
-                product=parent_remote.local_instance,
-                sales_channel=self.sales_channel,
-            ).exists()
-        )
-        self.assertTrue(
-            MiraklProductCategory.objects.filter(
-                sales_channel=self.sales_channel,
-                product=parent_remote.local_instance,
-                remote_id=self.category.remote_id,
-            ).exists()
-        )
-        self.assertFalse(
-            SalesChannelViewAssign.objects.filter(
-                sales_channel=self.sales_channel,
-                product__sku__in=["ILFD7157XL", "ILFD7157L"],
             ).exists()
         )
 

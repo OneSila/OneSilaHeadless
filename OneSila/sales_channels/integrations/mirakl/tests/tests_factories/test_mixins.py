@@ -53,7 +53,7 @@ class GetMiraklAPIMixinTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(mirakl_get.call_args_list[1].kwargs["params"]["offset"], 2)
 
     @patch("sales_channels.integrations.mirakl.factories.mixins.time.sleep")
-    @patch("sales_channels.integrations.mirakl.factories.mixins.requests.request")
+    @patch("sales_channels.integrations.mirakl.factories.mixins.requests.sessions.Session.request")
     def test_request_retries_after_rate_limit(self, request_mock, sleep_mock):
         api = DummyMiraklAPI(sales_channel=self.sales_channel)
         rate_limited = Mock(status_code=429, headers={"Retry-After": "0"}, text="rate limited")
