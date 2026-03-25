@@ -12,7 +12,7 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     Model representing the remote mirror of a local Property.
     This model tracks the remote property associated with a local Property.
     """
-    local_instance = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True,
+    local_instance = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True, blank=True,
                                        help_text="The local property associated with this remote property.")
 
     allow_multiple = models.BooleanField(
@@ -96,7 +96,7 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     def save(self, *args, **kwargs):
         app_label = self._resolve_sales_channel_app_label()
 
-        if app_label in {"amazon", "shein", "ebay"} and self.allow_multiple is not True:
+        if app_label in {"amazon", "shein", "ebay", "mirakl"} and self.allow_multiple is not True:
             self.allow_multiple = True
 
         if app_label in {"magento2", "woocommerce"} and self.local_instance and self.local_instance.type:

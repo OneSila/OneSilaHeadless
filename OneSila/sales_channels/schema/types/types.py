@@ -7,13 +7,16 @@ from core.schema.core.types.types import type, relay, field, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
-from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
+from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION, MIRAKL_INTEGRATION
 from integrations.schema.types.types import IntegrationType
+from integrations.helpers import get_public_integration_asset_url
 
 from sales_channels.models import (
     ImportCurrency,
     ImportImage,
     SalesChannelImport,
+    SalesChannelFeed,
+    SalesChannelFeedItem,
     ImportProduct,
     ImportProperty,
     ImportPropertySelectValue,
@@ -44,6 +47,8 @@ from .filters import (
     ImportCurrencyFilter,
     ImportImageFilter,
     SalesChannelImportFilter,
+    SalesChannelFeedFilter,
+    SalesChannelFeedItemFilter,
     ImportProductFilter,
     ImportPropertyFilter,
     ImportPropertySelectValueFilter,
@@ -74,6 +79,8 @@ from .ordering import (
     ImportCurrencyOrder,
     ImportImageOrder,
     SalesChannelImportOrder,
+    SalesChannelFeedOrder,
+    SalesChannelFeedItemOrder,
     ImportProductOrder,
     ImportPropertyOrder,
     ImportPropertySelectValueOrder,
@@ -102,6 +109,7 @@ from .ordering import (
 )
 from ...integrations.amazon.models import AmazonSalesChannelImport, AmazonSalesChannel
 from ...integrations.ebay.models import EbaySalesChannelImport
+from ...integrations.mirakl.models import MiraklSalesChannelImport
 from ...integrations.shein.models.imports import SheinSalesChannelImport
 from ...models.sales_channels import RemoteLanguage
 
@@ -139,10 +147,28 @@ class SalesChannelGptFeedType(relay.Node, GetQuerysetMultiTenantMixin):
         return SalesChannelGptFeed.file_url.fget(self)
 
 
+@type(SalesChannelFeed, filters=SalesChannelFeedFilter, order=SalesChannelFeedOrder, pagination=True, fields='__all__')
+class SalesChannelFeedType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated['SalesChannelType', lazy("sales_channels.schema.types.types")]
+    items: List[Annotated['SalesChannelFeedItemType', lazy("sales_channels.schema.types.types")]]
+
+    @field()
+    def file_url(self) -> Optional[str]:
+        return SalesChannelFeed.file_url.fget(self)
+
+
+@type(SalesChannelFeedItem, filters=SalesChannelFeedItemFilter, order=SalesChannelFeedItemOrder, pagination=True, fields='__all__')
+class SalesChannelFeedItemType(relay.Node, GetQuerysetMultiTenantMixin):
+    feed: Annotated['SalesChannelFeedType', lazy("sales_channels.schema.types.types")]
+    remote_product: Annotated['RemoteProductType', lazy("sales_channels.schema.types.types")]
+    sales_channel_view: Optional[Annotated['SalesChannelViewType', lazy("sales_channels.schema.types.types")]]
+
+
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
 class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     saleschannelimport_set: List[Annotated['SalesChannelImportType', lazy("sales_channels.schema.types.types")]]
     gpt_feed: Optional[Annotated['SalesChannelGptFeedType', lazy("sales_channels.schema.types.types")]]
+    feed_batches: List[Annotated['SalesChannelFeedType', lazy("sales_channels.schema.types.types")]]
 
     @field()
     def amazon_imports(self) -> List[Annotated['AmazonSalesChannelImportType', lazy("sales_channels.integrations.amazon.schema.types.types")]]:
@@ -157,8 +183,17 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
         return SheinSalesChannelImport.objects.filter(sales_channel=self)
 
     @field()
+    def mirakl_imports(self) -> List[Annotated['MiraklSalesChannelImportType', lazy("sales_channels.integrations.mirakl.schema.types.types")]]:
+        return MiraklSalesChannelImport.objects.filter(sales_channel=self)
+
+    @field()
     def type(self, info) -> str:
-        return INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
+        integration_type = INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
+        if integration_type != MIRAKL_INTEGRATION:
+            return integration_type
+
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+        return getattr(instance, "sub_type", None) or MIRAKL_INTEGRATION
 
     @field()
     def proxy_id(self, info) -> str:
@@ -176,6 +211,8 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.integrations.ebay.schema.types.types import EbaySalesChannelType
         from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.shein.schema.types.types import SheinSalesChannelType
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+        from sales_channels.integrations.mirakl.schema.types.types import MiraklSalesChannelType
 
 
         if isinstance(self, MagentoSalesChannel):
@@ -192,10 +229,26 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = WebhookIntegrationType
         elif isinstance(self, EbaySalesChannel):
             graphql_type = EbaySalesChannelType
+        elif isinstance(self, MiraklSalesChannel):
+            graphql_type = MiraklSalesChannelType
         else:
             raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
         return to_base64(graphql_type, self.pk)
+
+    @field()
+    def icon_svg(self, info) -> Optional[str]:
+        return get_public_integration_asset_url(
+            integration=self,
+            field_name="logo_svg",
+        )
+
+    @field()
+    def logo_png(self, info) -> Optional[str]:
+        return get_public_integration_asset_url(
+            integration=self,
+            field_name="logo_png",
+        )
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
 class ImportCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):

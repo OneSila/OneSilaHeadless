@@ -4,6 +4,9 @@ from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany
 from core.signals import post_create, post_update
 from core.schema.core.subscriptions import refresh_subscription_receiver
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from sales_channels.integrations.ebay.models import EbaySalesChannel
+from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+from sales_channels.integrations.shein.models import SheinSalesChannel
 from core.factories.dashboard import DashboardDefaultsFactory
 
 
@@ -52,6 +55,12 @@ def core__multi_tenant_company__pres_save__ensure_languages_contains_default(sen
 
 @receiver(post_save, sender=AmazonSalesChannel)
 @receiver(post_delete, sender=AmazonSalesChannel)
+@receiver(post_save, sender=EbaySalesChannel)
+@receiver(post_delete, sender=EbaySalesChannel)
+@receiver(post_save, sender=SheinSalesChannel)
+@receiver(post_delete, sender=SheinSalesChannel)
+@receiver(post_save, sender=MiraklSalesChannel)
+@receiver(post_delete, sender=MiraklSalesChannel)
 def core__multi_tenant_company__has_amazon_integration_refresh(sender, instance, **kwargs):
     if instance:
         refresh_subscription_receiver(instance.multi_tenant_company)

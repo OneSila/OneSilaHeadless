@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 from core.tests import TestCase
 from model_bakery import baker
 
@@ -8,6 +10,7 @@ from sales_channels.integrations.shein.factories.products import (
 )
 from sales_channels.integrations.shein.models import SheinProduct, SheinSalesChannel
 from sales_channels.models.logs import RemoteLog
+from sales_channels.models.products import RemoteProduct
 
 
 class SheinProductIdentifierTestCase(TestCase):
@@ -89,3 +92,90 @@ class SheinProductIdentifierTestCase(TestCase):
         )
 
         self.assertFalse(self.remote_product.has_errors)
+
+    def _build_publish_response(self) -> MagicMock:
+        response = MagicMock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "Filtered attribute values",
+            "info": {
+                "success": True,
+                "spu_name": "k2603260107694591",
+                "skc_list": [
+                    {
+                        "skc_name": "sk260326010769459125787",
+                        "sku_list": [
+                            {
+                                "sku_code": "I5mn6aqurfimd0",
+                                "supplier_sku": "SKU-ID-1",
+                            }
+                        ],
+                    }
+                ],
+                "version": "SPMP260326016592032",
+                "filtered_result": [
+                    {
+                        "scene": "attribute_filter",
+                        "message": "Filtered attribute value",
+                    }
+                ],
+            },
+        }
+        return response
+
+    @patch.object(SheinProductCreateFactory, "shein_post")
+    def test_create_success_with_filtered_result_keeps_pending_approval(self, shein_post: MagicMock) -> None:
+        remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_sku="SKU-ID-1",
+        )
+        shein_post.return_value = self._build_publish_response()
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=remote_product,
+        )
+        factory.payload = {"source_system": "openapi"}
+
+        factory.perform_remote_action()
+        factory.finalize_progress()
+
+        remote_product.refresh_from_db()
+        self.assertEqual(remote_product.remote_id, "k2603260107694591")
+        self.assertEqual(remote_product.spu_name, "k2603260107694591")
+        self.assertEqual(remote_product.skc_name, "sk260326010769459125787")
+        self.assertEqual(remote_product.sku_code, "I5mn6aqurfimd0")
+        self.assertEqual(remote_product.status, RemoteProduct.STATUS_PENDING_APPROVAL)
+
+    @patch.object(SheinProductUpdateFactory, "shein_post")
+    def test_update_success_with_filtered_result_persists_identifiers(self, shein_post: MagicMock) -> None:
+        self.remote_product.remote_id = None
+        self.remote_product.spu_name = ""
+        self.remote_product.skc_name = ""
+        self.remote_product.sku_code = ""
+        self.remote_product.status = RemoteProduct.STATUS_COMPLETED
+        self.remote_product.save(
+            update_fields=["remote_id", "spu_name", "skc_name", "sku_code", "status"],
+            skip_status_check=False,
+        )
+        shein_post.return_value = self._build_publish_response()
+
+        factory = SheinProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+        )
+        factory.payload = {"source_system": "openapi"}
+
+        factory.perform_remote_action()
+        factory.finalize_progress()
+
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.remote_id, "k2603260107694591")
+        self.assertEqual(self.remote_product.spu_name, "k2603260107694591")
+        self.assertEqual(self.remote_product.skc_name, "sk260326010769459125787")
+        self.assertEqual(self.remote_product.sku_code, "I5mn6aqurfimd0")
+        self.assertEqual(self.remote_product.status, RemoteProduct.STATUS_PENDING_APPROVAL)

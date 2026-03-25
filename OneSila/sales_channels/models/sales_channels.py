@@ -332,6 +332,8 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         from sales_channels.integrations.ebay.models import (
             EbaySalesChannel,
         )
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+        from sales_channels.integrations.mirakl.utils.url_helpers import get_mirakl_remote_url
 
         link = str(self.link or "").strip()
         if link:
@@ -382,6 +384,8 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
                     except AmazonExternalProductId.DoesNotExist:
                         pass
             return None
+        elif isinstance(sales_channel, MiraklSalesChannel):
+            return get_mirakl_remote_url(self)
         elif isinstance(sales_channel, EbaySalesChannel):
             listing_id = None
 

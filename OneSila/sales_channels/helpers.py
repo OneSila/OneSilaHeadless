@@ -449,6 +449,19 @@ def mark_remote_products_for_feed_updates(*, product_ids: Iterable[int]) -> None
     ).update(required_feed_sync=True)
 
 
+def mark_remote_products_for_sales_channel_updates(*, product_ids: Iterable[int], sales_channel_ids: Iterable[int] | None = None) -> None:
+    ids = {product_id for product_id in product_ids if product_id}
+    if not ids:
+        return
+
+    queryset = RemoteProduct.objects.filter(local_instance_id__in=ids)
+    channel_ids = {sales_channel_id for sales_channel_id in (sales_channel_ids or []) if sales_channel_id}
+    if channel_ids:
+        queryset = queryset.filter(sales_channel_id__in=channel_ids)
+
+    queryset.update(required_feed_sync=True)
+
+
 def run_generic_sales_channel_factory(sales_channel_id, factory_class, local_instance_id=None, local_instance_class=None, factory_kwargs=None, sales_channel_class=MagentoSalesChannel):
     # Tasks only carry primitive IDs, so resolve those IDs into model instances here before instantiating factories.
     sales_channel = sales_channel_class.objects.get(id=sales_channel_id)
