@@ -48,6 +48,7 @@ class MiraklProperty(RemoteProperty):
     REPRESENTATION_VAT_RATE = "vat_rate"
     REPRESENTATION_ALLOW_BACKORDER = "allow_backorder"
     REPRESENTATION_CONDITION = "condition"
+    REPRESENTATION_LOGISTIC_CLASS = "logistic_class"
 
     REPRESENTATION_TYPE_CHOICES = [
         (REPRESENTATION_PROPERTY, "Property"),
@@ -77,6 +78,7 @@ class MiraklProperty(RemoteProperty):
         (REPRESENTATION_VAT_RATE, "VAT rate"),
         (REPRESENTATION_ALLOW_BACKORDER, "Allow backorder"),
         (REPRESENTATION_CONDITION, "Condition"),
+        (REPRESENTATION_LOGISTIC_CLASS, "Logistic class"),
     ]
 
     code = models.CharField(max_length=255, help_text="Mirakl attribute code.")

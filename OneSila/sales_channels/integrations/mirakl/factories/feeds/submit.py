@@ -25,14 +25,15 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
             raw_data["product_submit_skipped"] = True
             raw_data["product_submit_skip_reason"] = "Skipped OF01 upload because settings.DEBUG is True."
             self.feed.__class__.objects.filter(id=self.feed.id).update(
-                status=self.feed.STATUS_READY_TO_RENDER,
+                status=SalesChannelFeed.STATUS_SUCCESS,
                 stage=self.feed.STAGE_PRODUCT,
                 raw_data=raw_data,
                 updated_at=timezone.now(),
             )
-            self.feed.status = self.feed.STATUS_READY_TO_RENDER
+            self.feed.status = SalesChannelFeed.STATUS_SUCCESS
             self.feed.stage = self.feed.STAGE_PRODUCT
             self.feed.raw_data = raw_data
+            self._mark_items_success_for_debug_skip()
             return self.feed
 
         with self.feed.file.open("rb") as file_handle:
@@ -76,3 +77,18 @@ class MiraklProductFeedSubmitFactory(GetMiraklAPIMixin):
             ]
         )
         return self.feed
+
+    def _mark_items_success_for_debug_skip(self) -> None:
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeedItem
+
+        for item in MiraklSalesChannelFeedItem.objects.filter(feed=self.feed).select_related("remote_product"):
+            item.status = MiraklSalesChannelFeedItem.STATUS_SUCCESS
+            item.error_message = ""
+            item.save(update_fields=["status", "error_message"])
+
+            remote_product = item.remote_product
+            if remote_product is None:
+                continue
+            remote_product.refresh_status(
+                override_status=remote_product.STATUS_COMPLETED,
+            )

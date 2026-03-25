@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import time
 from typing import Any, Iterator
 
@@ -44,7 +45,10 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
         self.mapper = MiraklReverseProductMapper(sales_channel=sales_channel)
         self._prepared_groups: list[dict[str, Any]] | None = None
         self._offers_total_count = 0
-        self._p31_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
+        self._p11_products_by_reference: dict[tuple[str, str], dict[str, Any]] = {}
+        self._p11_products_by_sku: dict[str, dict[str, Any]] = {}
+        self._p31_products_by_reference: dict[tuple[str, str], dict[str, Any]] = {}
+        self._p31_products_by_sku: dict[str, dict[str, Any]] = {}
 
     def prepare_import_process(self):
         super().prepare_import_process()
@@ -76,8 +80,17 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             offer_count = len(payload.get("offers") or [])
             self._process_group_payload(payload=payload)
             self.import_process.processed_records = (self.import_process.processed_records or 0) + offer_count
-            self.import_process.save(update_fields=["processed_records"])
-            self.update_percentage(to_add=offer_count)
+            total_records = self.import_process.total_records or self.total_import_instances_cnt or 0
+            if total_records > 0:
+                new_percentage = math.floor((self.import_process.processed_records / total_records) * 100)
+                if self.import_process.processed_records > 0:
+                    new_percentage = max(1, new_percentage)
+                self.current_percent = min(new_percentage, 99)
+                self.import_process.percentage = self.current_percent
+                self.import_process.save(update_fields=["processed_records", "percentage"])
+            else:
+                self.import_process.save(update_fields=["processed_records"])
+            self.total_imported_instances = self.import_process.processed_records or 0
 
     def _process_group_payload(self, *, payload: dict[str, Any]) -> None:
         offer_entries = payload.get("offers") or []
@@ -114,6 +127,7 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
     ) -> None:
         mapper_payload = {
             "offer": offer_entry.get("offer") or {},
+            "p11_product": offer_entry.get("p11_product") or {},
             "p31_product": self._get_p31_product(offer=offer_entry.get("offer") or {}),
         }
         structured, structured_log, product_rule = self.mapper.build(payload=mapper_payload)
@@ -178,7 +192,7 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
         )
         import_instance.set_remote_instance(remote_product)
 
-        self._update_product_category(import_instance=import_instance, offer=mapper_payload["offer"])
+        self._update_product_category(import_instance=import_instance, mapper_payload=mapper_payload)
         self._update_content_mirror(import_instance=import_instance)
         self._update_price_mirror(import_instance=import_instance)
         self._update_ean_mirrors(import_instance=import_instance, mapper_payload=mapper_payload)
@@ -204,7 +218,11 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             .first()
         )
         existing_parent_local = getattr(existing_parent_remote, "local_instance", None)
-        parent_payload = self._build_synthetic_parent_payload(payload=payload)
+        representative_mapper_payload, representative_structured = self._get_representative_parent_data(payload=payload)
+        parent_payload = self._build_synthetic_parent_payload(
+            payload=payload,
+            representative_structured=representative_structured,
+        )
         import_instance = ImportProductInstance(
             parent_payload,
             import_process=self.import_process,
@@ -220,8 +238,7 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             parent_remote_product=None,
             structured=parent_payload,
             mapper_payload={
-                "offer": {},
-                "p31_product": {},
+                **representative_mapper_payload,
                 "synthetic": True,
                 "group_values": payload["group_values"],
             },
@@ -231,15 +248,27 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             brand=str(payload["group_values"].get("product_brand") or "").strip(),
         )
         import_instance.set_remote_instance(remote_product)
+        self._update_product_category(
+            import_instance=import_instance,
+            mapper_payload={
+                **representative_mapper_payload,
+                "group_values": payload["group_values"],
+            },
+        )
         self._update_content_mirror(import_instance=import_instance)
         return import_instance.instance, remote_product
 
-    def _build_synthetic_parent_payload(self, *, payload: dict[str, Any]) -> dict[str, Any]:
+    def _build_synthetic_parent_payload(
+        self,
+        *,
+        payload: dict[str, Any],
+        representative_structured: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         group_values = payload["group_values"]
         title = str(group_values.get("product_title") or "").strip() or f"Mirakl Group {payload['group_hash'][:10]}"
         description = str(group_values.get("product_description") or "").strip()
         short_description = str(group_values.get("internal_description") or "").strip()
-        return {
+        parent_payload = {
             "name": title,
             "type": Product.CONFIGURABLE,
             "active": any(self._is_offer_active(offer=entry.get("offer") or {}) for entry in payload.get("offers") or []),
@@ -256,6 +285,35 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
                 }
             ],
         }
+        representative_structured = representative_structured or {}
+        if representative_structured.get("images"):
+            parent_payload["images"] = representative_structured["images"]
+        if representative_structured.get("documents"):
+            parent_payload["documents"] = representative_structured["documents"]
+        return parent_payload
+
+    def _get_representative_parent_data(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        fallback_mapper_payload = {
+            "offer": {},
+            "p11_product": {},
+            "p31_product": {},
+        }
+        fallback_structured: dict[str, Any] = {}
+
+        for offer_entry in payload.get("offers") or []:
+            mapper_payload = {
+                "offer": offer_entry.get("offer") or {},
+                "p11_product": offer_entry.get("p11_product") or {},
+                "p31_product": offer_entry.get("p31_product") or {},
+            }
+            structured, _, _ = self.mapper.build(payload=mapper_payload)
+            if not fallback_structured:
+                fallback_mapper_payload = mapper_payload
+                fallback_structured = structured
+            if structured.get("images") or structured.get("documents"):
+                return mapper_payload, structured
+
+        return fallback_mapper_payload, fallback_structured
 
     def _upsert_remote_product(
         self,
@@ -299,6 +357,7 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
                 if brand is not None
                 else str(
                     (mapper_payload.get("offer") or {}).get("product_brand")
+                    or (mapper_payload.get("p11_product") or {}).get("product_brand")
                     or (mapper_payload.get("p31_product") or {}).get("product_brand")
                     or ""
                 ),
@@ -309,6 +368,7 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
                     "configurable_group_hash": group_hash,
                     "synthetic_configurable": bool(mapper_payload.get("synthetic")),
                     "offer": mapper_payload.get("offer") or {},
+                    "p11_product": mapper_payload.get("p11_product") or {},
                     "p31_product": mapper_payload.get("p31_product") or {},
                     "group_values": mapper_payload.get("group_values") or {},
                 },
@@ -323,12 +383,14 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
         return remote_product
 
     def _resolve_product_id_type(self, *, mapper_payload: dict[str, Any]) -> str:
+        p11_product = mapper_payload.get("p11_product") or {}
         p31_product = mapper_payload.get("p31_product") or {}
         offer = mapper_payload.get("offer") or {}
         references = self._extract_references(mapper_payload=mapper_payload)
         primary_reference = references[0] if references else {}
         return str(
             p31_product.get("product_id_type")
+            or p11_product.get("product_id_type")
             or p31_product.get("reference_type")
             or primary_reference.get("reference_type")
             or offer.get("product_id_type")
@@ -336,18 +398,20 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
         )
 
     def _resolve_product_reference(self, *, mapper_payload: dict[str, Any]) -> str:
+        p11_product = mapper_payload.get("p11_product") or {}
         p31_product = mapper_payload.get("p31_product") or {}
         references = self._extract_references(mapper_payload=mapper_payload)
         primary_reference = references[0] if references else {}
         return str(
             p31_product.get("product_reference")
             or p31_product.get("product_id")
+            or p11_product.get("product_reference")
             or primary_reference.get("reference")
             or ""
         )
 
     def _extract_references(self, *, mapper_payload: dict[str, Any]) -> list[dict[str, Any]]:
-        for key in ("offer", "p31_product"):
+        for key in ("offer", "p11_product", "p31_product"):
             references = (mapper_payload.get(key) or {}).get("product_references") or []
             if isinstance(references, list) and references:
                 return [reference for reference in references if isinstance(reference, dict)]
@@ -376,8 +440,13 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
         mirror.content_data = content_data
         mirror.save()
 
-    def _update_product_category(self, *, import_instance: ImportProductInstance, offer: dict[str, Any]) -> None:
-        category_code = str(offer.get("category_code") or "").strip()
+    def _update_product_category(self, *, import_instance: ImportProductInstance, mapper_payload: dict[str, Any]) -> None:
+        merged_fields = self._merge_product_data(
+            offer=mapper_payload.get("offer") or {},
+            p11_product=mapper_payload.get("p11_product") or {},
+            p31_product=mapper_payload.get("p31_product") or {},
+        )
+        category_code = str(merged_fields.get("category_code") or "").strip()
         if not category_code or import_instance.instance is None:
             return
         if not MiraklCategory.objects.filter(sales_channel=self.sales_channel, remote_id=category_code).exists():
@@ -478,6 +547,8 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
         page_size = min(100, self.client.default_page_size)
         offset = 0
         total_count: int | None = None
+        offers_payloads: list[dict[str, Any]] = []
+        product_references: list[tuple[str, str]] = []
         grouped_payloads: dict[str, dict[str, Any]] = {}
 
         while True:
@@ -486,7 +557,8 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
             if total_count is None and isinstance(page_payload.get("total_count"), int):
                 total_count = max(page_payload["total_count"], 0)
             for offer in offers:
-                self._append_offer_to_group(groups=grouped_payloads, offer=offer)
+                offers_payloads.append(offer)
+                product_references.extend(self._extract_product_references(offer=offer))
 
             offset += len(offers)
             reached_total = isinstance(total_count, int) and offset >= total_count
@@ -495,12 +567,32 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
                 break
             time.sleep(self.page_interval_seconds)
 
+        self._populate_product_enrichment_indexes(product_references=product_references)
+        for offer in offers_payloads:
+            self._append_offer_to_group(
+                groups=grouped_payloads,
+                offer=offer,
+                p11_product=self._get_p11_product(offer=offer),
+                p31_product=self._get_p31_product(offer=offer),
+            )
+
         self._offers_total_count = total_count if isinstance(total_count, int) else offset
         self._prepared_groups = list(grouped_payloads.values())
         return self._prepared_groups
 
-    def _append_offer_to_group(self, *, groups: dict[str, dict[str, Any]], offer: dict[str, Any]) -> None:
-        group_values = self._build_group_values(offer=offer)
+    def _append_offer_to_group(
+        self,
+        *,
+        groups: dict[str, dict[str, Any]],
+        offer: dict[str, Any],
+        p11_product: dict[str, Any] | None = None,
+        p31_product: dict[str, Any] | None = None,
+    ) -> None:
+        group_values = self._build_group_values(
+            offer=offer,
+            p11_product=p11_product or {},
+            p31_product=p31_product or {},
+        )
         group_hash = hashlib.sha256(
             "||".join(
                 [
@@ -520,43 +612,142 @@ class MiraklProductsImportProcessor(GetMiraklAPIMixin, SalesChannelImportMixin):
                 "offers": [],
             },
         )
-        group["offers"].append({"offer": offer})
+        group["offers"].append(
+            {
+                "offer": offer,
+                "p11_product": p11_product or {},
+                "p31_product": p31_product or {},
+            }
+        )
 
-    def _build_group_values(self, *, offer: dict[str, Any]) -> dict[str, str]:
+    def _build_group_values(
+        self,
+        *,
+        offer: dict[str, Any],
+        p11_product: dict[str, Any],
+        p31_product: dict[str, Any],
+    ) -> dict[str, str]:
+        merged_fields = self._merge_product_data(
+            offer=offer,
+            p11_product=p11_product,
+            p31_product=p31_product,
+        )
         return {
-            "product_title": self._normalize_group_value(offer.get("product_title")),
-            "product_brand": self._normalize_group_value(offer.get("product_brand")),
-            "product_description": self._normalize_group_value(offer.get("product_description")),
+            "product_title": self._normalize_group_value(merged_fields.get("product_title")),
+            "product_brand": self._normalize_group_value(merged_fields.get("product_brand")),
+            "product_description": self._normalize_group_value(merged_fields.get("product_description")),
             "internal_description": self._normalize_group_value(offer.get("internal_description")),
-            "category_code": self._normalize_group_value(offer.get("category_code")),
+            "category_code": self._normalize_group_value(merged_fields.get("category_code")),
         }
 
     def _normalize_group_value(self, value: Any) -> str:
         return str(value or "").strip()
 
-    def _get_p31_product(self, *, offer: dict[str, Any]) -> dict[str, Any] | None:
-        reference_type, reference = self._extract_ean_reference(offer=offer)
-        if not reference_type or not reference:
-            return None
-        cache_key = (reference_type, reference)
-        if cache_key not in self._p31_cache:
-            self._p31_cache[cache_key] = self.client.get_product_by_reference(
-                reference_type=reference_type,
-                reference=reference,
-            )
-        return self._p31_cache[cache_key]
-
-    def _extract_ean_reference(self, *, offer: dict[str, Any]) -> tuple[str, str]:
+    def _extract_product_references(self, *, offer: dict[str, Any]) -> list[tuple[str, str]]:
         references = offer.get("product_references") or []
         if not isinstance(references, list):
-            return "", ""
+            return []
+        extracted_references: list[tuple[str, str]] = []
         for reference in references:
             if not isinstance(reference, dict):
                 continue
             reference_type = str(reference.get("reference_type") or "").upper()
-            if reference_type == "EAN" or reference_type.startswith("EAN-"):
-                return reference_type, str(reference.get("reference") or "").strip()
-        return "", ""
+            reference_value = str(reference.get("reference") or "").strip()
+            if not reference_type or not reference_value:
+                continue
+            if reference_type in {"SHOP_SKU", "SKU"}:
+                continue
+            extracted_references.append((reference_type, reference_value))
+        return extracted_references
+
+    def _populate_product_enrichment_indexes(self, *, product_references: list[tuple[str, str]]) -> None:
+        self._p11_products_by_reference = {}
+        self._p11_products_by_sku = {}
+        self._p31_products_by_reference = {}
+        self._p31_products_by_sku = {}
+
+        for product in self.client.get_products_offers_by_references(product_references=product_references):
+            product_sku = self._normalize_remote_value(product.get("product_sku"))
+            if product_sku and product_sku not in self._p11_products_by_sku:
+                self._p11_products_by_sku[product_sku] = product
+            for reference_key in self._extract_reference_keys_from_product(product=product):
+                self._p11_products_by_reference.setdefault(reference_key, product)
+
+        for product in self.client.get_products_by_references(product_references=product_references):
+            product_sku = self._normalize_remote_value(product.get("product_sku"))
+            if product_sku and product_sku not in self._p31_products_by_sku:
+                self._p31_products_by_sku[product_sku] = product
+            reference_key = self._build_reference_key(
+                reference_type=product.get("product_id_type"),
+                reference=product.get("product_id"),
+            )
+            if reference_key is not None:
+                self._p31_products_by_reference.setdefault(reference_key, product)
+
+    def _get_p11_product(self, *, offer: dict[str, Any]) -> dict[str, Any] | None:
+        for reference_key in self._extract_reference_keys_from_offer(offer=offer):
+            if reference_key in self._p11_products_by_reference:
+                return self._p11_products_by_reference[reference_key]
+        product_sku = self._normalize_remote_value(offer.get("product_sku"))
+        if product_sku:
+            return self._p11_products_by_sku.get(product_sku)
+        return None
+
+    def _get_p31_product(self, *, offer: dict[str, Any]) -> dict[str, Any] | None:
+        for reference_key in self._extract_reference_keys_from_offer(offer=offer):
+            if reference_key in self._p31_products_by_reference:
+                return self._p31_products_by_reference[reference_key]
+        product_sku = self._normalize_remote_value(offer.get("product_sku"))
+        if product_sku:
+            return self._p31_products_by_sku.get(product_sku)
+        return None
+
+    def _extract_reference_keys_from_offer(self, *, offer: dict[str, Any]) -> list[tuple[str, str]]:
+        return [
+            reference_key
+            for reference_type, reference in self._extract_product_references(offer=offer)
+            if (reference_key := self._build_reference_key(reference_type=reference_type, reference=reference)) is not None
+        ]
+
+    def _extract_reference_keys_from_product(self, *, product: dict[str, Any]) -> list[tuple[str, str]]:
+        references = product.get("product_references") or []
+        if not isinstance(references, list):
+            return []
+
+        extracted_keys: list[tuple[str, str]] = []
+        for reference in references:
+            if not isinstance(reference, dict):
+                continue
+            reference_key = self._build_reference_key(
+                reference_type=reference.get("reference_type"),
+                reference=reference.get("reference"),
+            )
+            if reference_key is not None:
+                extracted_keys.append(reference_key)
+        return extracted_keys
+
+    def _build_reference_key(self, *, reference_type: Any, reference: Any) -> tuple[str, str] | None:
+        normalized_reference_type = str(reference_type or "").strip().upper()
+        normalized_reference = str(reference or "").strip()
+        if not normalized_reference_type or not normalized_reference:
+            return None
+        if normalized_reference_type in {"SHOP_SKU", "SKU"}:
+            return None
+        return normalized_reference_type, normalized_reference
+
+    def _merge_product_data(
+        self,
+        *,
+        offer: dict[str, Any],
+        p11_product: dict[str, Any],
+        p31_product: dict[str, Any],
+    ) -> dict[str, Any]:
+        merged_fields = dict(offer)
+        for source in (p11_product, p31_product):
+            for key, value in source.items():
+                if key not in merged_fields or merged_fields.get(key) in (None, "", [], {}):
+                    merged_fields[key] = value
+        return merged_fields
 
     def _find_local_product(self, *, sku: str) -> Product | None:
         normalized_sku = str(sku or "").strip()

@@ -197,6 +197,8 @@ def sales_channels__gpt_feed_sync_on_enable(sender, instance, **kwargs):
 @receiver(post_update, sender=SalesChannelImport)
 @receiver(post_update, sender=AmazonSalesChannelImport)
 @receiver(post_update, sender=EbaySalesChannelImport)
+@receiver(post_update, sender=MiraklSalesChannelImport)
+@receiver(post_update, sender=SheinSalesChannelImport)
 def import_process_post_update_fist_import_complete_receiver(sender, instance: SalesChannelImport, **kwargs):
 
     sales_channel = instance.sales_channel

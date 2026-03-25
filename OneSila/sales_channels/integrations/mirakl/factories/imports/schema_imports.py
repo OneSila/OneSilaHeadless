@@ -7,6 +7,9 @@ from imports_exports.factories.imports import ImportMixin
 from sales_channels.integrations.mirakl.factories.sales_channels.full_schema import (
     MiraklFullSchemaSyncFactory,
 )
+from sales_channels.integrations.mirakl.factories.sales_channels.views import (
+    MiraklSalesChannelViewPullFactory,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -70,6 +73,7 @@ class MiraklSchemaImportProcessor(ImportMixin):
         return 100
 
     def import_rules_process(self):
+        MiraklSalesChannelViewPullFactory(sales_channel=self.sales_channel).run()
         factory = MiraklFullSchemaSyncFactory(
             sales_channel=self.sales_channel,
             import_process=self.import_process,

@@ -12,7 +12,7 @@ def process_mirakl_gathering_product_feeds(
     sales_channel_id: int | None = None,
 ) -> list[SalesChannelFeed]:
     queryset = MiraklSalesChannelFeed.objects.filter(
-        type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+        type=MiraklSalesChannelFeed.TYPE_COMBINED,
         stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
         status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
         sales_channel__active=True,

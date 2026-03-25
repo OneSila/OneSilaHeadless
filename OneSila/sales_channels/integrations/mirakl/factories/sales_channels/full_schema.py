@@ -44,6 +44,9 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self._offer_states_value_list_code = "offer_states"
         self._offer_states_value_list_label = "Offer states"
         self._offer_state_property_code = "offer_state"
+        self._logistic_classes_value_list_code = "logistic_classes"
+        self._logistic_classes_value_list_label = "Logistic classes"
+        self._logistic_class_property_code = "logistic_class"
         self.summary_data = {
             "categories": 0,
             "document_types": 0,
@@ -68,6 +71,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         )
         document_types = self._get_document_types()
         offer_states = self._get_offer_states()
+        logistic_classes = self._get_logistic_classes()
         hierarchies = self._get_hierarchies()
         self._hierarchy_levels = {
             self._clean_string(item.get("code")): self._to_int(item.get("level"))
@@ -82,6 +86,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             message="Fetched Mirakl schema payloads",
             document_types=len(document_types),
             offer_states=len(offer_states),
+            logistic_classes=len(logistic_classes),
             hierarchies=len(hierarchies),
             value_lists=len(value_lists),
             attributes=len(attributes),
@@ -90,6 +95,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self._prepare_progress(
             document_types=document_types,
             offer_states=offer_states,
+            logistic_classes=logistic_classes,
             hierarchies=hierarchies,
             attributes=attributes,
             value_lists=value_lists,
@@ -106,6 +112,8 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self.sync_select_values(value_lists=value_lists)
         self._set_phase(phase_name="offer_states", total=len(offer_states))
         self.sync_offer_state_property(offer_states=offer_states)
+        self._set_phase(phase_name="logistic_classes", total=len(logistic_classes))
+        self.sync_logistic_class_property(logistic_classes=logistic_classes)
         self._set_phase(phase_name="default_value_labels", total=0)
         self.sync_default_value_labels()
         self._log_info(
@@ -127,6 +135,10 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         )
         return self._normalize_records(response.get("offer_states"))
 
+    def _get_logistic_classes(self) -> list[dict[str, Any]]:
+        response = self.mirakl_get(path="/api/shipping/logistic_classes")
+        return self._normalize_records(response.get("logistic_classes"))
+
     def _get_hierarchies(self) -> list[dict[str, Any]]:
         response = self.mirakl_get(path="/api/hierarchies")
         return self._normalize_records(response.get("hierarchies"))
@@ -147,6 +159,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         *,
         document_types: list[dict[str, Any]],
         offer_states: list[dict[str, Any]],
+        logistic_classes: list[dict[str, Any]],
         hierarchies: list[dict[str, Any]],
         attributes: list[dict[str, Any]],
         value_lists: list[dict[str, Any]],
@@ -159,10 +172,13 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 continue
             value_count += len(self._normalize_records(attribute.get("values")))
         value_count += len(offer_states)
+        value_count += len(logistic_classes)
+
+        synthetic_property_total = int(bool(offer_states)) + int(bool(logistic_classes))
 
         self._progress_total = max(
             1,
-            len(document_types) + len(hierarchies) + len(attributes) + 1 + value_count,
+            len(document_types) + len(hierarchies) + len(attributes) + synthetic_property_total + value_count,
         )
         self._progress_log_interval = self._build_log_interval(total=self._progress_total, minimum=500)
         self._next_progress_log_at = self._progress_log_interval
@@ -614,8 +630,43 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 self._increment_progress()
 
     def sync_offer_state_property(self, *, offer_states: list[dict[str, Any]]) -> None:
-        if not offer_states:
-            self._log_info(message="Skipping Mirakl offer state sync because no states were returned")
+        self._sync_offer_select_property(
+            values=offer_states,
+            property_code=self._offer_state_property_code,
+            property_name="Condition",
+            description="Offer state / condition values imported from OF61.",
+            representation_type=MiraklProperty.REPRESENTATION_CONDITION,
+            value_list_code=self._offer_states_value_list_code,
+            value_list_label=self._offer_states_value_list_label,
+            empty_log_message="Skipping Mirakl offer state sync because no states were returned",
+        )
+
+    def sync_logistic_class_property(self, *, logistic_classes: list[dict[str, Any]]) -> None:
+        self._sync_offer_select_property(
+            values=logistic_classes,
+            property_code=self._logistic_class_property_code,
+            property_name="Logistic Class",
+            description="Offer logistic classes imported from SH31.",
+            representation_type=MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
+            value_list_code=self._logistic_classes_value_list_code,
+            value_list_label=self._logistic_classes_value_list_label,
+            empty_log_message="Skipping Mirakl logistic class sync because no classes were returned",
+        )
+
+    def _sync_offer_select_property(
+        self,
+        *,
+        values: list[dict[str, Any]],
+        property_code: str,
+        property_name: str,
+        description: str,
+        representation_type: str,
+        value_list_code: str,
+        value_list_label: str,
+        empty_log_message: str,
+    ) -> None:
+        if not values:
+            self._log_info(message=empty_log_message)
             return
 
         remote_property = self._get_existing_by_lookup(
@@ -623,35 +674,35 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             lookup={
                 "sales_channel": self.sales_channel,
                 "multi_tenant_company": self.sales_channel.multi_tenant_company,
-                "code": self._offer_state_property_code,
+                "code": property_code,
             },
         )
         if remote_property is None:
             remote_property = MiraklProperty(
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
-                code=self._offer_state_property_code,
+                code=property_code,
             )
 
-        remote_property.code = self._offer_state_property_code
-        remote_property.name = "Condition"
-        remote_property.description = "Offer state / condition values imported from OF61."
+        remote_property.code = property_code
+        remote_property.name = property_name
+        remote_property.description = description
         remote_property.example = ""
         remote_property.is_common = False
         remote_property.type = Property.TYPES.SELECT
         remote_property.allows_unmapped_values = False
-        remote_property.representation_type = MiraklProperty.REPRESENTATION_CONDITION
-        remote_property.value_list_code = self._offer_states_value_list_code
-        remote_property.value_list_label = self._offer_states_value_list_label
+        remote_property.representation_type = representation_type
+        remote_property.value_list_code = value_list_code
+        remote_property.value_list_label = value_list_label
         remote_property.save()
         self.summary_data["properties"] += 1
 
-        for offer_state in offer_states:
+        for value_payload in values:
             self._upsert_select_value(
                 remote_property=remote_property,
-                value_payload=offer_state,
-                value_list_code=self._offer_states_value_list_code,
-                value_list_label=self._offer_states_value_list_label,
+                value_payload=value_payload,
+                value_list_code=value_list_code,
+                value_list_label=value_list_label,
             )
             self._increment_progress()
 

@@ -36,8 +36,13 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
 
     def run(self) -> list[MiraklSalesChannelFeed]:
         boundary = timezone.now()
-        trackings = self._fetch_trackings()
         local_feeds = self._get_local_feeds()
+        if not local_feeds:
+            self.sales_channel.last_product_imports_request_date = boundary
+            self.sales_channel.save(update_fields=["last_product_imports_request_date"])
+            return []
+
+        trackings = self._fetch_trackings()
         feed_by_remote_id = {
             str(feed.remote_id): feed
             for feed in local_feeds

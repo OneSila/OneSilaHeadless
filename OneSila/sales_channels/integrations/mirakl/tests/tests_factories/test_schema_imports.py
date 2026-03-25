@@ -239,6 +239,20 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
                     },
                 ],
             },
+            "/api/shipping/logistic_classes": {
+                "logistic_classes": [
+                    {
+                        "code": "S",
+                        "description": "Small",
+                        "label": "Small",
+                    },
+                    {
+                        "code": "L",
+                        "description": "Large",
+                        "label": "Large",
+                    },
+                ],
+            },
             "/api/hierarchies": {
                 "hierarchies": [
                     {"code": "PARENT", "label": "Parent", "level": 1, "parent_code": ""},
@@ -525,6 +539,20 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             MiraklProductTypeItem.objects.filter(remote_property=condition_property).exists()
         )
 
+        logistic_class_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="logistic_class")
+        self.assertEqual(logistic_class_property.representation_type, MiraklProperty.REPRESENTATION_LOGISTIC_CLASS)
+        self.assertEqual(logistic_class_property.type, Property.TYPES.SELECT)
+        self.assertFalse(logistic_class_property.allows_unmapped_values)
+        self.assertEqual(logistic_class_property.value_list_code, "logistic_classes")
+        self.assertEqual(logistic_class_property.value_list_label, "Logistic classes")
+        self.assertEqual(
+            MiraklPropertySelectValue.objects.filter(remote_property=logistic_class_property).count(),
+            2,
+        )
+        self.assertFalse(
+            MiraklProductTypeItem.objects.filter(remote_property=logistic_class_property).exists()
+        )
+
         self.import_process.refresh_from_db()
         self.assertGreaterEqual(summary["properties"], 4)
 
@@ -535,6 +563,9 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             },
             "/api/offers/states": {
                 "offer_states": [],
+            },
+            "/api/shipping/logistic_classes": {
+                "logistic_classes": [],
             },
             "/api/hierarchies": {
                 "hierarchies": [
@@ -645,12 +676,18 @@ class MiraklSchemaImportProcessorTests(DisableMiraklConnectionMixin, TestCase):
                 level="INFO",
             ) as captured,
             patch(
+                "sales_channels.integrations.mirakl.factories.imports.schema_imports.MiraklSalesChannelViewPullFactory"
+            ) as mock_view_pull_factory,
+            patch(
                 "sales_channels.integrations.mirakl.factories.imports.schema_imports.MiraklFullSchemaSyncFactory"
             ) as mock_factory,
         ):
+            mock_view_pull_factory.return_value.run.return_value = None
             mock_factory.return_value.run.return_value = {}
             processor.run()
 
+        mock_view_pull_factory.assert_called_once_with(sales_channel=self.sales_channel)
+        mock_view_pull_factory.return_value.run.assert_called_once_with()
         mock_factory.assert_called_once_with(
             sales_channel=self.sales_channel,
             import_process=self.import_process,
@@ -682,12 +719,19 @@ class MiraklSchemaImportProcessorTests(DisableMiraklConnectionMixin, TestCase):
                 level="INFO",
             ) as captured,
             patch(
+                "sales_channels.integrations.mirakl.factories.imports.schema_imports.MiraklSalesChannelViewPullFactory"
+            ) as mock_view_pull_factory,
+            patch(
                 "sales_channels.integrations.mirakl.factories.imports.schema_imports.MiraklFullSchemaSyncFactory"
             ) as mock_factory,
             self.assertRaises(RuntimeError),
         ):
+            mock_view_pull_factory.return_value.run.return_value = None
             mock_factory.return_value.run.side_effect = RuntimeError("schema exploded")
             processor.run()
+
+        mock_view_pull_factory.assert_called_once_with(sales_channel=self.sales_channel)
+        mock_view_pull_factory.return_value.run.assert_called_once_with()
 
         logs = "\n".join(captured.output)
         self.assertIn("Preparing Mirakl schema import", logs)

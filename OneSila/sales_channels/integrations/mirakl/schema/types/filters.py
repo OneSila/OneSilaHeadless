@@ -152,6 +152,7 @@ class MiraklPropertyFilter(
                     representation_type__in=[
                         MiraklProperty.REPRESENTATION_PROPERTY,
                         MiraklProperty.REPRESENTATION_CONDITION,
+                        MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
                     ]
                 )
             )

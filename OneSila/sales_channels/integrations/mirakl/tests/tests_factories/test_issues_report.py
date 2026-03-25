@@ -71,7 +71,7 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
             product_type=self.product_type,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_PARTIAL,
         )

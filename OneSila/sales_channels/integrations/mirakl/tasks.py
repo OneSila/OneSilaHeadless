@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from huey import crontab
 from huey.contrib.djhuey import db_periodic_task, db_task
@@ -10,6 +10,7 @@ from integrations.factories.remote_task import BaseRemoteTask
 from sales_channels.integrations.mirakl.factories.imports.schema_imports import (
     MiraklSchemaImportProcessor,
 )
+from sales_channels.integrations.mirakl.factories.task_queue_factory import MiraklTaskQueueFactory
 from sales_channels.integrations.mirakl.factories.imports.products import (
     MiraklProductsImportProcessor,
 )
@@ -131,54 +132,57 @@ def _get_mirakl_remote_product_ids_for_product(*, sales_channel_id: int, product
 
 
 def _enqueue_mirakl_feed_processing_task(*, feed_id: int, sales_channel_id: int) -> None:
-    from integrations.factories.task_queue import TaskQueueFactory
-    from integrations.helpers import get_import_path
-
-    TaskQueueFactory(
-        integration_id=sales_channel_id,
-        task_func_path=get_import_path(process_mirakl_feed_db_task),
+    MiraklTaskQueueFactory(
+        sales_channel_id=sales_channel_id,
+        task_func=process_mirakl_feed_db_task,
         task_kwargs={"feed_id": feed_id},
-        number_of_remote_requests=getattr(
-            process_mirakl_feed_db_task,
-            "number_of_remote_requests",
-            1,
-        ),
-        priority=getattr(process_mirakl_feed_db_task, "priority", CRUCIAL_PRIORITY),
     ).run()
 
 
 def _get_due_mirakl_product_import_status_channel_ids(*, sales_channel_id: int | None = None) -> list[int]:
-    queryset = MiraklSalesChannel.objects.filter(active=True)
+    from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeed
+
+    boundary = timezone.now()
+    queryset = MiraklSalesChannel.objects.filter(active=True).annotate(
+        has_submitted_product_imports=Exists(
+            MiraklSalesChannelFeed.objects.filter(
+                sales_channel_id=OuterRef("pk"),
+                status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            ).exclude(remote_id="")
+        )
+    )
     if sales_channel_id is not None:
         queryset = queryset.filter(id=sales_channel_id)
     else:
-        cutoff = timezone.now() - timedelta(minutes=15)
+        cutoff = boundary - timedelta(minutes=15)
         queryset = queryset.filter(
             Q(last_product_imports_request_date__isnull=True)
             | Q(last_product_imports_request_date__lt=cutoff)
         )
 
-    return [
-        mirakl_sales_channel.id
-        for mirakl_sales_channel in queryset.order_by("id").iterator()
-        if mirakl_sales_channel.connected
-    ]
+    queued_channel_ids: list[int] = []
+    skipped_channel_ids: list[int] = []
+    for mirakl_sales_channel in queryset.order_by("id").iterator():
+        if not mirakl_sales_channel.connected:
+            continue
+        if mirakl_sales_channel.has_submitted_product_imports:
+            queued_channel_ids.append(mirakl_sales_channel.id)
+            continue
+        skipped_channel_ids.append(mirakl_sales_channel.id)
+
+    if skipped_channel_ids:
+        MiraklSalesChannel.objects.filter(id__in=skipped_channel_ids).update(
+            last_product_imports_request_date=boundary,
+        )
+
+    return queued_channel_ids
 
 
 def _enqueue_mirakl_product_import_status_task(*, sales_channel_id: int) -> None:
-    from integrations.factories.task_queue import TaskQueueFactory
-    from integrations.helpers import get_import_path
-
-    TaskQueueFactory(
-        integration_id=sales_channel_id,
-        task_func_path=get_import_path(sync_mirakl_product_import_statuses_db_task),
+    MiraklTaskQueueFactory(
+        sales_channel_id=sales_channel_id,
+        task_func=sync_mirakl_product_import_statuses_db_task,
         task_kwargs={"sales_channel_id": sales_channel_id},
-        number_of_remote_requests=getattr(
-            sync_mirakl_product_import_statuses_db_task,
-            "number_of_remote_requests",
-            1,
-        ),
-        priority=getattr(sync_mirakl_product_import_statuses_db_task, "priority", CRUCIAL_PRIORITY),
     ).run()
 
 
@@ -247,6 +251,7 @@ def process_mirakl_feed_db_task(
     task_queue_item_id,
     *,
     feed_id: int,
+    sales_channel_id: int | None = None,
 ):
     task = BaseRemoteTask(task_queue_item_id)
 

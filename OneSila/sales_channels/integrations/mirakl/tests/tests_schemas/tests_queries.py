@@ -446,6 +446,15 @@ class MiraklQueryTests(
             remote_id="color",
             name="Color",
         )
+        baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="logistic_class",
+            remote_id="logistic_class",
+            name="Logistic class",
+            representation_type=MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
+        )
 
         response = self.strawberry_test_client(
             query=MIRAKL_PROPERTY_FILTER_BY_MAPPED_LOCALLY,
@@ -579,7 +588,7 @@ class MiraklQueryTests(
             MiraklSalesChannelFeed,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
             import_status="COMPLETE",
             conversion_type="AI_CONVERTER",

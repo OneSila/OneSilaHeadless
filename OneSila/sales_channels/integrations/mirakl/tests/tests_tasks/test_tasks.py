@@ -80,7 +80,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
         )
@@ -88,7 +88,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
         )
@@ -111,7 +111,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
         )
@@ -137,7 +137,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_READY_TO_RENDER,
         )
@@ -151,6 +151,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
         process_mirakl_feed_db_task.call_local(
             1,
             feed_id=feed.id,
+            sales_channel_id=self.sales_channel.id,
         )
 
         base_remote_task_mock.assert_called_once_with(1)
@@ -163,6 +164,16 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
         new=_noop_dispatch_task,
     )
     def test_manual_product_import_status_sync_task_queues_remote_task(self, *, _unused=None):
+        baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
+            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            remote_id="2008",
+        )
+
         queued_sales_channel_ids = sales_channels__tasks__sync_mirakl_product_import_statuses.call_local(
             sales_channel_id=self.sales_channel.id,
         )
@@ -179,6 +190,15 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
         new=_noop_dispatch_task,
     )
     def test_product_import_status_sync_cronjob_queues_remote_task(self, *, _unused=None):
+        baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
+            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            remote_id="2008",
+        )
         disconnected_channel = baker.make(
             MiraklSalesChannel,
             multi_tenant_company=self.multi_tenant_company,
@@ -208,6 +228,23 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(task.number_of_remote_requests, 1)
         self.assertNotEqual(task.integration_id, disconnected_channel.id)
         self.assertNotEqual(task.integration_id, not_due_channel.id)
+
+    @patch(
+        "integrations.factories.task_queue.TaskQueueFactory.dispatch_task",
+        new=_noop_dispatch_task,
+    )
+    def test_manual_product_import_status_sync_task_skips_queue_without_submitted_feeds_and_updates_boundary(self, *, _unused=None):
+        self.assertIsNone(self.sales_channel.last_product_imports_request_date)
+
+        queued_sales_channel_ids = sales_channels__tasks__sync_mirakl_product_import_statuses.call_local(
+            sales_channel_id=self.sales_channel.id,
+        )
+
+        self.assertEqual(queued_sales_channel_ids, [])
+        self.sales_channel.refresh_from_db()
+        self.assertIsNotNone(self.sales_channel.last_product_imports_request_date)
+        tasks = IntegrationTaskQueue.objects.filter(task_name=get_import_path(sync_mirakl_product_import_statuses_db_task))
+        self.assertEqual(tasks.count(), 0)
 
     @patch("sales_channels.integrations.mirakl.tasks.BaseRemoteTask")
     @patch("sales_channels.integrations.mirakl.factories.feeds.MiraklImportStatusSyncFactory")

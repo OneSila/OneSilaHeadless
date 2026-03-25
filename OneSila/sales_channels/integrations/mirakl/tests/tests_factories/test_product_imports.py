@@ -6,6 +6,7 @@ from unittest.mock import patch
 from currencies.models import PublicCurrency
 from core.tests import TestCase
 from model_bakery import baker
+from media.models import MediaProductThrough
 from products.models import ConfigurableVariation, Product
 from properties.models import (
     Property,
@@ -14,10 +15,13 @@ from properties.models import (
     PropertyTranslation,
 )
 from sales_prices.models import SalesPrice
+from sales_channels.integrations.mirakl.factories.imports.products.client import MiraklProductsImportClient
 from sales_channels.integrations.mirakl.factories.imports.products import MiraklProductsImportProcessor
 from sales_channels.integrations.mirakl.models import (
+    MiraklCategory,
     MiraklPrice,
     MiraklProduct,
+    MiraklProductCategory,
     MiraklProductContent,
     MiraklProperty,
     MiraklPropertySelectValue,
@@ -54,6 +58,14 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             sales_channel=self.sales_channel,
             remote_id="INIT",
             name="INIT",
+        )
+        self.category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="toys-dress_up_and_role_play",
+            name="Dress Up & Role Play",
+            is_leaf=True,
         )
         self.brand_property = Property.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
@@ -170,28 +182,83 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             "warehouses": None,
         }
 
+    def _build_p11_product(
+        self,
+        *,
+        reference: str,
+        product_sku: str,
+        title: str = "U.S Army Jumpsuit Costume",
+        description: str = "P11 product description",
+        brand: str = "I Love Fancy Dress",
+    ) -> dict:
+        return {
+            "category_code": "toys-dress_up_and_role_play",
+            "category_label": "Dress Up & Role Play",
+            "product_brand": brand,
+            "product_description": description,
+            "product_media": {
+                "media_url": "https://cdn.example.com/mirakl-image.jpg",
+                "type": "LARGE",
+            },
+            "product_references": [{"reference": reference, "reference_type": "EAN"}],
+            "product_sku": product_sku,
+            "product_title": title,
+            "offers": [],
+            "total_count": 1,
+        }
+
+    def _build_p31_product(self, *, reference: str, product_sku: str) -> dict:
+        return {
+            "category_code": "toys-dress_up_and_role_play",
+            "category_label": "Dress Up & Role Play",
+            "product_id": "P31-123",
+            "product_id_type": "EAN",
+            "product_sku": product_sku,
+            "product_title": "U.S Army Jumpsuit Costume",
+            "product_references": [{"reference": reference, "reference_type": "EAN"}],
+        }
+
     @patch("sales_channels.integrations.mirakl.factories.imports.products.processor.time.sleep")
     @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_product_by_reference"
+        "imports_exports.factories.media.ImportImageInstance.download_image_from_url"
     )
     @patch(
         "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_offers_page"
     )
+    @patch(
+        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_by_references"
+    )
+    @patch(
+        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_offers_by_references"
+    )
     def test_run_imports_of21_offer_prices_and_p31_remote_id(
         self,
+        get_products_offers_by_references_mock,
+        get_products_by_references_mock,
         get_offers_page_mock,
-        get_product_by_reference_mock,
+        download_image_from_url_mock,
         _sleep_mock,
     ):
         offer = self._build_offer(shop_sku="ILFD7157XL", product_sku="M5055988633820")
+        offer["product_description"] = ""
         get_offers_page_mock.return_value = {
             "offers": [offer],
             "total_count": 1,
         }
-        get_product_by_reference_mock.return_value = {
-            "product_id": "P31-123",
-            "product_references": [{"reference": "5055988633820", "reference_type": "EAN"}],
-        }
+        get_products_offers_by_references_mock.return_value = [
+            self._build_p11_product(
+                reference="5055988633820",
+                product_sku="M5055988633820",
+                description="P11 enriched description",
+            )
+        ]
+        get_products_by_references_mock.return_value = [
+            self._build_p31_product(
+                reference="5055988633820",
+                product_sku="M5055988633820",
+            )
+        ]
+        download_image_from_url_mock.return_value = None
 
         MiraklProductsImportProcessor(
             import_process=self.import_process,
@@ -217,8 +284,18 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             content.content_data[self.multi_tenant_company.language]["short_description"],
             "Back office copy",
         )
+        self.assertEqual(
+            content.content_data[self.multi_tenant_company.language]["description"],
+            "P11 enriched description",
+        )
         self.assertEqual(remote_price.price_data["GBP"]["discount_price"], 15.99)
         self.assertEqual(remote_price.price_data["GBP"]["price"], 21.99)
+        get_products_offers_by_references_mock.assert_called_once_with(
+            product_references=[("EAN", "5055988633820")],
+        )
+        get_products_by_references_mock.assert_called_once_with(
+            product_references=[("EAN", "5055988633820")],
+        )
         self.assertTrue(
             SalesChannelViewAssign.objects.filter(
                 sales_channel=self.sales_channel,
@@ -230,15 +307,23 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
 
     @patch("sales_channels.integrations.mirakl.factories.imports.products.processor.time.sleep")
     @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_product_by_reference"
+        "imports_exports.factories.media.ImportImageInstance.download_image_from_url"
+    )
+    @patch(
+        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_by_references"
     )
     @patch(
         "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_offers_page"
     )
+    @patch(
+        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_offers_by_references"
+    )
     def test_run_groups_same_of21_signature_into_synthetic_configurable_and_sleeps_between_pages(
         self,
+        get_products_offers_by_references_mock,
         get_offers_page_mock,
-        get_product_by_reference_mock,
+        get_products_by_references_mock,
+        download_image_from_url_mock,
         sleep_mock,
     ):
         first_offer = self._build_offer(shop_sku="ILFD7157XL", product_sku="M5055988633820")
@@ -247,7 +332,18 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             {"offers": [first_offer], "total_count": 2},
             {"offers": [second_offer], "total_count": 2},
         ]
-        get_product_by_reference_mock.return_value = None
+        get_products_offers_by_references_mock.return_value = [
+            self._build_p11_product(
+                reference="5055988633820",
+                product_sku="M5055988633820",
+            ),
+            self._build_p11_product(
+                reference="5055988633813",
+                product_sku="M5055988633813",
+            ),
+        ]
+        get_products_by_references_mock.return_value = []
+        download_image_from_url_mock.return_value = None
 
         MiraklProductsImportProcessor(
             import_process=self.import_process,
@@ -271,6 +367,18 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
         self.assertEqual(self.import_process.total_records, 2)
         self.assertEqual(self.import_process.processed_records, 2)
         sleep_mock.assert_called_once_with(5)
+        get_products_offers_by_references_mock.assert_called_once_with(
+            product_references=[
+                ("EAN", "5055988633820"),
+                ("EAN", "5055988633813"),
+            ],
+        )
+        get_products_by_references_mock.assert_called_once_with(
+            product_references=[
+                ("EAN", "5055988633820"),
+                ("EAN", "5055988633813"),
+            ],
+        )
         self.assertEqual(parent_remote.local_instance.type, Product.CONFIGURABLE)
         self.assertEqual(len(child_remotes), 2)
         self.assertTrue(all(child_remote.is_variation for child_remote in child_remotes))
@@ -287,6 +395,19 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
                 remote_product=parent_remote,
             ).exists()
         )
+        self.assertTrue(
+            MediaProductThrough.objects.filter(
+                product=parent_remote.local_instance,
+                sales_channel=self.sales_channel,
+            ).exists()
+        )
+        self.assertTrue(
+            MiraklProductCategory.objects.filter(
+                sales_channel=self.sales_channel,
+                product=parent_remote.local_instance,
+                remote_id=self.category.remote_id,
+            ).exists()
+        )
         self.assertFalse(
             SalesChannelViewAssign.objects.filter(
                 sales_channel=self.sales_channel,
@@ -296,22 +417,27 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
 
     @patch("sales_channels.integrations.mirakl.factories.imports.products.processor.time.sleep")
     @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_product_by_reference"
+        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_by_references"
     )
     @patch(
         "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_offers_page"
     )
+    @patch(
+        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_offers_by_references"
+    )
     def test_p31_not_found_does_not_mark_import_broken(
         self,
+        get_products_offers_by_references_mock,
         get_offers_page_mock,
-        get_product_by_reference_mock,
+        get_products_by_references_mock,
         _sleep_mock,
     ):
         get_offers_page_mock.return_value = {
             "offers": [self._build_offer(shop_sku="ILFD4538XXL", product_sku="M5060347859551")],
             "total_count": 1,
         }
-        get_product_by_reference_mock.return_value = None
+        get_products_offers_by_references_mock.return_value = []
+        get_products_by_references_mock.return_value = []
 
         MiraklProductsImportProcessor(
             import_process=self.import_process,
@@ -321,3 +447,32 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
         self.import_process.refresh_from_db()
         self.assertEqual(self.import_process.status, MiraklSalesChannelImport.STATUS_SUCCESS)
         self.assertEqual(self.import_process.broken_records, [])
+
+
+class MiraklProductsImportClientTests(DisableMiraklConnectionMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://mirakl.example.com",
+            shop_id=123,
+            api_key="secret-token",
+            active=True,
+        )
+
+    def test_get_products_by_references_batches_requests_by_100(self):
+        client = MiraklProductsImportClient(sales_channel=self.sales_channel)
+        product_references = [("EAN", f"code-{index}") for index in range(205)]
+
+        with patch.object(client, "mirakl_get", return_value={"products": []}) as mirakl_get_mock:
+            client.get_products_by_references(product_references=product_references)
+
+        self.assertEqual(mirakl_get_mock.call_count, 3)
+        first_batch = mirakl_get_mock.call_args_list[0].kwargs["params"]["product_references"].split(",")
+        second_batch = mirakl_get_mock.call_args_list[1].kwargs["params"]["product_references"].split(",")
+        third_batch = mirakl_get_mock.call_args_list[2].kwargs["params"]["product_references"].split(",")
+
+        self.assertEqual(len(first_batch), 100)
+        self.assertEqual(len(second_batch), 100)
+        self.assertEqual(len(third_batch), 5)

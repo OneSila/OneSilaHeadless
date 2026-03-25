@@ -28,8 +28,8 @@ class MiraklFeedResyncFactory:
     def _validate_source_feed(self) -> None:
         if self.feed.status not in SalesChannelFeed.CONCLUDED_STATUSES:
             raise ValidationError("Only concluded Mirakl feeds can be resynced.")
-        if self.feed.type != MiraklSalesChannelFeed.TYPE_PRODUCT:
-            raise ValidationError("Only Mirakl product feeds can be resynced.")
+        if self.feed.type != MiraklSalesChannelFeed.TYPE_COMBINED:
+            raise ValidationError("Only Mirakl combined feeds can be resynced.")
 
     def _create_feed(self) -> MiraklSalesChannelFeed:
         return MiraklSalesChannelFeed.objects.create(

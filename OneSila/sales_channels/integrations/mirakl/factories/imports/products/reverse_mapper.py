@@ -46,6 +46,7 @@ class MiraklReverseProductMapper:
         "msrp",
         "offer_additional_fields",
         "offer_id",
+        "offers",
         "package_quantity",
         "price",
         "price_additional_info",
@@ -53,6 +54,8 @@ class MiraklReverseProductMapper:
         "product_description",
         "product_id",
         "product_id_type",
+        "product_media",
+        "product_medias",
         "product_references",
         "product_sku",
         "product_tax_code",
@@ -65,7 +68,9 @@ class MiraklReverseProductMapper:
         "shop_sku",
         "state_code",
         "total_price",
+        "total_count",
         "warehouses",
+        "measurement",
     }
 
     def __init__(self, *, sales_channel) -> None:
@@ -82,8 +87,13 @@ class MiraklReverseProductMapper:
 
     def build(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], object | None]:
         offer = dict(payload.get("offer") or {})
+        p11_product = dict(payload.get("p11_product") or {})
         p31_product = dict(payload.get("p31_product") or {})
-        merged_fields = self._merge_fields(offer=offer, p31_product=p31_product)
+        merged_fields = self._merge_fields(
+            offer=offer,
+            p11_product=p11_product,
+            p31_product=p31_product,
+        )
 
         sku = self._first_non_empty(
             offer.get("shop_sku"),
@@ -120,10 +130,14 @@ class MiraklReverseProductMapper:
             "",
         )
         bullet_points = self._collect_bullet_points(merged_fields=merged_fields)
-        references = self._extract_references(offer=offer, p31_product=p31_product)
+        references = self._extract_references(
+            offer=offer,
+            p11_product=p11_product,
+            p31_product=p31_product,
+        )
         ean_code = self._extract_ean_code(references=references)
         price_entries, sales_pricelist_items = self._build_price_entries(offer=offer)
-        images, documents = self._build_media_entries(product_data=p31_product)
+        images, documents = self._build_media_entries(product_data=p11_product or p31_product)
         active = self._resolve_active(offer=offer)
 
         structured: dict[str, Any] = {
@@ -176,6 +190,7 @@ class MiraklReverseProductMapper:
         structured_log = {
             "remote_payload": {
                 "offer": offer,
+                "p11_product": p11_product,
                 "p31_product": p31_product,
                 "merged_fields": merged_fields,
             },
@@ -187,15 +202,30 @@ class MiraklReverseProductMapper:
         }
         return structured, structured_log, product_rule
 
-    def _merge_fields(self, *, offer: dict[str, Any], p31_product: dict[str, Any]) -> dict[str, Any]:
+    def _merge_fields(
+        self,
+        *,
+        offer: dict[str, Any],
+        p11_product: dict[str, Any],
+        p31_product: dict[str, Any],
+    ) -> dict[str, Any]:
         merged = dict(offer)
-        for key, value in p31_product.items():
-            if key not in merged or merged.get(key) in (None, "", [], {}):
-                merged[key] = value
+        for source in (p11_product, p31_product):
+            for key, value in source.items():
+                if key not in merged or merged.get(key) in (None, "", [], {}):
+                    merged[key] = value
         return merged
 
-    def _extract_references(self, *, offer: dict[str, Any], p31_product: dict[str, Any]) -> list[dict[str, Any]]:
+    def _extract_references(
+        self,
+        *,
+        offer: dict[str, Any],
+        p11_product: dict[str, Any],
+        p31_product: dict[str, Any],
+    ) -> list[dict[str, Any]]:
         references = offer.get("product_references") or []
+        if not isinstance(references, list) or not references:
+            references = p11_product.get("product_references") or []
         if not isinstance(references, list) or not references:
             references = p31_product.get("product_references") or []
         if not isinstance(references, list):
@@ -529,9 +559,7 @@ class MiraklReverseProductMapper:
     def _build_media_entries(self, *, product_data: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         images: list[dict[str, Any]] = []
         documents: list[dict[str, Any]] = []
-        product_media = product_data.get("product_media") or []
-        if isinstance(product_media, dict):
-            product_media = [product_media]
+        product_media = self._extract_product_media(product_data=product_data)
         for index, media in enumerate(product_media):
             if not isinstance(media, dict):
                 continue
@@ -539,7 +567,7 @@ class MiraklReverseProductMapper:
             if not url:
                 continue
             media_type = str(media.get("type") or "").lower()
-            if "image" in media_type or media_type in {"small", "large", "thumbnail"}:
+            if self._is_image_media(url=url, media_type=media_type):
                 images.append(
                     {
                         "image_url": url,
@@ -550,6 +578,45 @@ class MiraklReverseProductMapper:
             else:
                 documents.append({"document_url": url})
         return images, documents
+
+    def _extract_product_media(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
+        for key in ("product_media", "product_medias", "media", "medias"):
+            media_payload = product_data.get(key)
+            normalized = self._normalize_media_payload(media_payload=media_payload)
+            if normalized:
+                return normalized
+        return []
+
+    def _normalize_media_payload(self, *, media_payload: Any) -> list[dict[str, Any]]:
+        if isinstance(media_payload, list):
+            return [item for item in media_payload if isinstance(item, dict)]
+
+        if not isinstance(media_payload, dict):
+            return []
+
+        if media_payload.get("dam_url") or media_payload.get("media_url"):
+            return [media_payload]
+
+        for nested_key in ("items", "results", "product_media", "product_medias", "media", "medias"):
+            nested_payload = media_payload.get(nested_key)
+            normalized = self._normalize_media_payload(media_payload=nested_payload)
+            if normalized:
+                return normalized
+
+        return []
+
+    def _is_image_media(self, *, url: str, media_type: str) -> bool:
+        if "image" in media_type or media_type in {"small", "large", "thumbnail"}:
+            return True
+
+        lowered_url = url.lower()
+        if any(lowered_url.endswith(extension) for extension in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg")):
+            return True
+
+        if any(lowered_url.endswith(extension) for extension in (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".zip")):
+            return False
+
+        return not media_type
 
     def _resolve_active(self, *, offer: dict[str, Any]) -> bool:
         deleted = offer.get("deleted")

@@ -20,6 +20,13 @@ class GetMiraklAPIMixin:
     def get_api(self):
         return self
 
+    def get_mirakl_session(self) -> requests.Session:
+        session = getattr(self, "_mirakl_session", None)
+        if session is None:
+            session = requests.Session()
+            self._mirakl_session = session
+        return session
+
     def get_mirakl_base_url(self) -> str:
         base_url = getattr(self.sales_channel, "normalized_base_url", "")
         if not base_url:
@@ -75,7 +82,7 @@ class GetMiraklAPIMixin:
             headers.setdefault("Content-Type", "application/json")
 
         for attempt in range(1, max_attempts + 1):
-            response = requests.request(
+            response = self.get_mirakl_session().request(
                 method=method,
                 url=url,
                 params=request_params,

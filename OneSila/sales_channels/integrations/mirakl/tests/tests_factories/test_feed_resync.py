@@ -34,7 +34,7 @@ class MiraklFeedResyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             MiraklSalesChannelFeed,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
             product_type=self.product_type,
         )
@@ -51,7 +51,7 @@ class MiraklFeedResyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             MiraklSalesChannelFeed,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status=MiraklSalesChannelFeed.STATUS_PARTIAL,
             remote_id="2008",
             product_remote_id="2008",

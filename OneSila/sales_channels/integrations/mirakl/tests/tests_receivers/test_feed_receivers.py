@@ -148,7 +148,7 @@ class MiraklLiveReceiversTests(DisableMiraklConnectionMixin, TestCase):
         feed = MiraklSalesChannelFeed.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
         )

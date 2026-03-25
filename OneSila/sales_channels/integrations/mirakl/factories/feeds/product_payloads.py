@@ -5,6 +5,7 @@ import re
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_DOWN
 from datetime import date, datetime
+from types import SimpleNamespace
 from typing import Any
 
 from django.db import transaction
@@ -12,7 +13,7 @@ from django.db import transaction
 from eancodes.models import EanCode
 from media.models import Media, MediaProductThrough
 from products.models import Product, ProductTranslation
-from properties.models import ProductProperty
+from properties.models import ProductProperty, Property
 from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
 from sales_channels.factories.products.products import (
     RemoteProductCreateFactory,
@@ -57,6 +58,13 @@ class _MiraklRemoteValueRunner(RemoteValueMixin):
         self.remote_select_lookup = remote_select_lookup
 
     def get_select_value(self, *, product_property=None, remote_property=None, language_code=None):
+        if not self._requires_remote_select_mapping(remote_property=remote_property):
+            return super().get_select_value(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
+            )
+
         selected_value = self.get_select_value_local(
             product_property=product_property,
             multiple=False,
@@ -83,6 +91,13 @@ class _MiraklRemoteValueRunner(RemoteValueMixin):
         return self._serialize_remote_select_value(select_value=mapped_value)
 
     def get_select_value_multiple(self, *, product_property=None, remote_property=None, language_code=None):
+        if not self._requires_remote_select_mapping(remote_property=remote_property):
+            return super().get_select_value_multiple(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
+            )
+
         if product_property is None or remote_property is None:
             return super().get_select_value_multiple(
                 product_property=product_property,
@@ -101,6 +116,25 @@ class _MiraklRemoteValueRunner(RemoteValueMixin):
 
         separator = getattr(self.sales_channel, "list_of_multiple_values_separator", None) or ","
         return separator.join([value for value in mapped_values if value])
+
+    def _requires_remote_select_mapping(self, *, remote_property=None) -> bool:
+        if remote_property is None:
+            return False
+
+        original_type = str(getattr(remote_property, "original_type", "") or "").upper()
+        if original_type in {Property.TYPES.SELECT, Property.TYPES.MULTISELECT}:
+            return True
+        if original_type:
+            return False
+
+        if getattr(remote_property, "value_list_code", ""):
+            return True
+        return bool(
+            MiraklPropertySelectValue.objects.filter(
+                remote_property=remote_property,
+                sales_channel=self.sales_channel,
+            ).exists()
+        )
 
     def _serialize_remote_select_value(self, *, select_value: MiraklPropertySelectValue) -> str:
         return str(select_value.code or select_value.remote_id or select_value.value or "")
@@ -141,9 +175,10 @@ class MiraklProductPayloadBuilder:
         self._product_type_cache: dict[tuple[int | None, int | None], MiraklProductType | None] = {}
         self._public_definition_cache: dict[str, MiraklPublicDefinition | None] = {}
         self._local_language_by_remote_code_cache: dict[str, str | None] = {}
-        self._condition_property_cache: MiraklProperty | None | object = self._UNSET
+        self._offer_property_cache: dict[str, MiraklProperty | None] = {}
 
     def build(self) -> tuple[MiraklProductType, list[dict[str, str]]]:
+        self.validate_feed_prerequisites()
         if self.local_product is None:
             raise PreFlightCheckError("Mirakl remote product has no linked local product.")
 
@@ -170,7 +205,7 @@ class MiraklProductPayloadBuilder:
                 translations=translation_candidates,
                 product_properties=list(product_properties_by_product.get(product.id, [])),
                 prices=list(prices_by_product.get(product.id, [])),
-                images=list(media_by_product.get(content_product.id, [])),
+                images=list(media_by_product.get(product.id, [])) or list(media_by_product.get(content_product.id, [])),
                 ean=eans_by_product.get(product.id, ""),
                 content_product=content_product,
             )
@@ -190,6 +225,65 @@ class MiraklProductPayloadBuilder:
                 f"Mirakl product type could not be resolved for {getattr(self.local_product, 'sku', self.local_product.id)}."
             )
         return resolved_product_type, rows
+
+    def validate_feed_prerequisites(self) -> None:
+        if self.local_product is None:
+            raise PreFlightCheckError("Mirakl remote product has no linked local product.")
+
+        self._validate_configurable_parent_mapping()
+        products = self._resolve_products()
+        if not products:
+            raise PreFlightCheckError(
+                f"Mirakl product {getattr(self.local_product, 'sku', self.local_product.id)} has no rows to push."
+            )
+
+        for product in products:
+            product_type = self._resolve_product_type(product=product)
+            if product_type is None:
+                raise MissingMappingError(
+                    f"Map product {getattr(product, 'sku', product.id)} to a Mirakl category or product type before pushing."
+                )
+            self._validate_product_type_template(product_type=product_type, product=product)
+
+    def _validate_configurable_parent_mapping(self) -> None:
+        if self.action != SalesChannelFeedItem.ACTION_CREATE:
+            return
+        if self.local_product is None or not self.local_product.is_configurable():
+            return
+
+        product_type = self._resolve_product_type(product=self.local_product)
+        if product_type is None:
+            raise MissingMappingError(
+                f"Map configurable parent product {getattr(self.local_product, 'sku', self.local_product.id)} "
+                "to a Mirakl category or product type before pushing."
+            )
+        self._validate_product_type_template(
+            product_type=product_type,
+            product=self.local_product,
+            configurable_parent=True,
+        )
+        return
+
+    def _validate_product_type_template(
+        self,
+        *,
+        product_type: MiraklProductType,
+        product: Product,
+        configurable_parent: bool = False,
+    ) -> None:
+        if product_type.template:
+            return
+
+        if configurable_parent:
+            raise PreFlightCheckError(
+                f"Upload a CSV template for Mirakl product type '{product_type}' "
+                f"before pushing configurable parent product {getattr(product, 'sku', product.id)}."
+            )
+
+        raise PreFlightCheckError(
+            f"Upload a CSV template for Mirakl product type '{product_type}' "
+            f"before pushing product {getattr(product, 'sku', product.id)}."
+        )
 
     def _resolve_products(self) -> list[Product]:
         if self.local_product is None:
@@ -381,7 +475,7 @@ class MiraklProductPayloadBuilder:
             "state": self._resolve_offer_state(product_context=product_context),
             "available-start-date": "",
             "available-end-date": "",
-            "logistic-class": "",
+            "logistic-class": self._resolve_logistic_class(product_context=product_context),
             "discount-price": self._stringify(price_data.get("discounted_price")),
             "discount-start-date": self._format_date(price_data.get("start_date")),
             "discount-end-date": self._format_date(price_data.get("end_date")),
@@ -407,16 +501,35 @@ class MiraklProductPayloadBuilder:
         )
 
     def _get_condition_property(self) -> MiraklProperty | None:
-        if self._condition_property_cache is self._UNSET:
-            self._condition_property_cache = (
+        return self._get_offer_property_by_representation(
+            representation_type=MiraklProperty.REPRESENTATION_CONDITION,
+        )
+
+    def _resolve_logistic_class(self, *, product_context: dict[str, Any]) -> str:
+        remote_property = self._get_logistic_class_property()
+        if remote_property is None:
+            return ""
+        return self._resolve_property(
+            remote_property=remote_property,
+            product_context=product_context,
+        )
+
+    def _get_logistic_class_property(self) -> MiraklProperty | None:
+        return self._get_offer_property_by_representation(
+            representation_type=MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
+        )
+
+    def _get_offer_property_by_representation(self, *, representation_type: str) -> MiraklProperty | None:
+        if representation_type not in self._offer_property_cache:
+            self._offer_property_cache[representation_type] = (
                 MiraklProperty.objects.filter(
                     sales_channel=self.sales_channel,
-                    representation_type=MiraklProperty.REPRESENTATION_CONDITION,
+                    representation_type=representation_type,
                 )
                 .order_by("id")
                 .first()
             )
-        return None if self._condition_property_cache is self._UNSET else self._condition_property_cache
+        return self._offer_property_cache[representation_type]
 
     def _resolve_product_type(self, *, product: Product) -> MiraklProductType | None:
         category_mapping = (
@@ -705,6 +818,7 @@ class MiraklProductPayloadBuilder:
         if representation_type not in {
             MiraklProperty.REPRESENTATION_PROPERTY,
             MiraklProperty.REPRESENTATION_CONDITION,
+            MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
         }:
             return False
         if getattr(remote_property, "local_instance_id", None):
@@ -1557,7 +1671,7 @@ class _MiraklFeedPersistenceMixin:
                 MiraklSalesChannelFeed.objects.select_for_update()
                 .filter(
                     sales_channel=self.sales_channel,
-                    type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+                    type=MiraklSalesChannelFeed.TYPE_COMBINED,
                     stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
                     status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
                     product_type=product_type,
@@ -1572,7 +1686,7 @@ class _MiraklFeedPersistenceMixin:
             return MiraklSalesChannelFeed.objects.create(
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
-                type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+                type=MiraklSalesChannelFeed.TYPE_COMBINED,
                 stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
                 status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
                 product_type=product_type,
@@ -1624,6 +1738,16 @@ class MiraklProductBaseFactory(GetMiraklAPIMixin, _MiraklFeedPersistenceMixin):
     sync_product_factory = property(get_sync_product_factory)
     create_product_factory = property(get_create_product_factory)
     delete_product_factory = property(get_delete_product_factory)
+
+    def preflight_process(self):
+        MiraklProductPayloadBuilder(
+            remote_product=SimpleNamespace(
+                local_instance=self.local_instance,
+                sales_channel=self.sales_channel,
+            ),
+            sales_channel_view=self.view,
+            action=self.feed_action,
+        ).validate_feed_prerequisites()
 
     def __init__(self, *args, view=None, force_validation_only: bool = False, force_full_update: bool = False, **kwargs):
         if view is None:

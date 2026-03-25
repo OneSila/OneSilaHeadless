@@ -34,7 +34,7 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
             MiraklSalesChannelFeed,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
             remote_id="2008",
             product_remote_id="2008",
@@ -80,7 +80,7 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
             MiraklSalesChannelFeed,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status=MiraklSalesChannelFeed.STATUS_PENDING,
             remote_id="2009",
         )
@@ -168,3 +168,15 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
             MiraklImportStatusSyncFactory(sales_channel=self.sales_channel).run()
 
         self.assertIn("last_request_date", paginated_get_mock.call_args.kwargs["params"])
+
+    def test_run_skips_remote_call_without_submitted_local_feeds(self):
+        with patch.object(
+            MiraklImportStatusSyncFactory,
+            "mirakl_paginated_get",
+        ) as paginated_get_mock:
+            refreshed = MiraklImportStatusSyncFactory(sales_channel=self.sales_channel).run()
+
+        self.assertEqual(refreshed, [])
+        paginated_get_mock.assert_not_called()
+        self.sales_channel.refresh_from_db()
+        self.assertIsNotNone(self.sales_channel.last_product_imports_request_date)

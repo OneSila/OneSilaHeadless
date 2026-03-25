@@ -50,7 +50,7 @@ class MiraklProductStatusTests(DisableMiraklConnectionMixin, TestCase):
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
         )

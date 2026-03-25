@@ -8,10 +8,14 @@ from core.tests import TestCase
 from media.models import Media, MediaProductThrough
 from products.models import ConfigurableVariation
 from properties.models import Property, ProductProperty, PropertySelectValue
+from properties.models import ProductPropertiesRule, PropertySelectValueTranslation
 from properties.models import ProductPropertyTextTranslation
 from products.models import ProductTranslation, ProductTranslationBulletPoint
 from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
-from sales_channels.integrations.mirakl.factories.feeds.product_payloads import MiraklProductPayloadBuilder
+from sales_channels.integrations.mirakl.factories.feeds.product_payloads import (
+    MiraklProductCreateFactory,
+    MiraklProductPayloadBuilder,
+)
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklProduct,
@@ -44,6 +48,34 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_id="default-view",
+        )
+
+    def _assign_product_rule(self, *, product, sales_channel=None):
+        product_type_property = Property.objects.get(
+            type=Property.TYPES.SELECT,
+            is_product_type=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_type_value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=product_type_property,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=product_type_value,
+            language="en",
+            value=f"Rule {product.id}",
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=product_type_property,
+            value_select=product_type_value,
+        )
+        return ProductPropertiesRule.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_type=product_type_value,
+            sales_channel=sales_channel,
         )
 
     def _build_builder(
@@ -302,6 +334,57 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["colour"], "PURPLE_CODE")
 
+    def test_logistic_class_offer_field_uses_mapped_remote_code_in_payload(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, product = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+        )
+        logistic_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        logistic_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=logistic_property,
+        )
+        baker.make(
+            ProductProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=logistic_property,
+            value_select=logistic_local_value,
+        )
+        remote_logistic_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="logistic_class",
+            type=Property.TYPES.SELECT,
+            local_instance=logistic_property,
+            representation_type=MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=remote_logistic_property,
+            local_instance=logistic_local_value,
+            code="L",
+            value="Large",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["logistic-class"], "L")
+
     def test_multiselect_field_uses_mapped_remote_codes_in_payload(self):
         local_property = baker.make(
             Property,
@@ -448,8 +531,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["bullet_1"], "First shared bullet")
 
-    @patch("media.models.Media.image_url", return_value="https://cdn.example.com/parent.jpg")
-    def test_configurable_variations_reuse_parent_content_and_images(self, _image_url_mock):
+    def test_configurable_variations_reuse_parent_content_and_prefer_variation_images(self):
         parent_product = baker.make(
             "products.Product",
             multi_tenant_company=self.multi_tenant_company,
@@ -553,6 +635,138 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             type=Media.IMAGE,
             image_type=Media.PACK_SHOT,
         )
+        child_media = baker.make(
+            Media,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.IMAGE,
+            image_type=Media.PACK_SHOT,
+        )
+        baker.make(
+            MediaProductThrough,
+            multi_tenant_company=self.multi_tenant_company,
+            product=parent_product,
+            media=media,
+            is_main_image=True,
+            sales_channel=None,
+        )
+        baker.make(
+            MediaProductThrough,
+            multi_tenant_company=self.multi_tenant_company,
+            product=child_product,
+            media=child_media,
+            is_main_image=True,
+            sales_channel=None,
+        )
+
+        with patch.object(media, "image_url", return_value="https://cdn.example.com/parent.jpg"), patch.object(
+            child_media,
+            "image_url",
+            return_value="https://cdn.example.com/child.jpg",
+        ):
+            _, rows = MiraklProductPayloadBuilder(
+                remote_product=remote_product,
+                sales_channel_view=self.view,
+            ).build()
+
+        self.assertEqual(rows[0]["title_field"], "Parent Name")
+        self.assertEqual(rows[0]["main_image"], "https://cdn.example.com/child.jpg")
+
+    @patch("media.models.Media.image_url", return_value="https://cdn.example.com/parent.jpg")
+    def test_configurable_variations_fallback_to_parent_images_when_variation_has_none(self, _image_url_mock):
+        parent_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+            sku="PARENT-1",
+        )
+        child_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="CHILD-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=parent_product,
+            variation=child_product,
+        )
+        remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent_product,
+        )
+        category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="cat-1",
+            name="Category 1",
+            is_leaf=True,
+        )
+        product_type = baker.make(
+            MiraklProductType,
+            category=category,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            remote_id="cat-1",
+        )
+        baker.make(
+            MiraklProductCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=child_product,
+            remote_id="cat-1",
+        )
+        title_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="title_field",
+            local_instance=None,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+        )
+        image_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="main_image",
+            local_instance=None,
+            representation_type=MiraklProperty.REPRESENTATION_THUMBNAIL_IMAGE,
+        )
+        for remote_property in (title_property, image_property):
+            baker.make(
+                MiraklPropertyApplicability,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                property=remote_property,
+                view=self.view,
+            )
+            baker.make(
+                MiraklProductTypeItem,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                product_type=product_type,
+                remote_property=remote_property,
+                required=False,
+            )
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=parent_product,
+            language=self.multi_tenant_company.language,
+            sales_channel=None,
+            name="Parent Name",
+            short_description="Parent short",
+            description="Parent description",
+        )
+        media = baker.make(
+            Media,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.IMAGE,
+            image_type=Media.PACK_SHOT,
+        )
         baker.make(
             MediaProductThrough,
             multi_tenant_company=self.multi_tenant_company,
@@ -569,6 +783,231 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["title_field"], "Parent Name")
         self.assertEqual(rows[0]["main_image"], "https://cdn.example.com/parent.jpg")
+
+    def test_configurable_create_requires_parent_mapping_even_when_child_is_mapped(self):
+        parent_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+            sku="PARENT-1",
+        )
+        child_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="CHILD-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=parent_product,
+            variation=child_product,
+        )
+        remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent_product,
+        )
+        category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="cat-1",
+            name="Category 1",
+            is_leaf=True,
+        )
+        product_type = baker.make(
+            MiraklProductType,
+            category=category,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            remote_id="cat-1",
+        )
+        baker.make(
+            MiraklProductCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=child_product,
+            remote_id="cat-1",
+        )
+        title_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="title_field",
+            local_instance=None,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+        )
+        baker.make(
+            MiraklPropertyApplicability,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            property=title_property,
+            view=self.view,
+        )
+        baker.make(
+            MiraklProductTypeItem,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=product_type,
+            remote_property=title_property,
+            required=False,
+        )
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=parent_product,
+            language=self.multi_tenant_company.language,
+            sales_channel=None,
+            name="Parent Name",
+        )
+
+        with self.assertRaisesMessage(
+            MissingMappingError,
+            "Map configurable parent product PARENT-1 to a Mirakl category or product type before pushing.",
+        ):
+            MiraklProductPayloadBuilder(
+                remote_product=remote_product,
+                sales_channel_view=self.view,
+                action=SalesChannelFeedItem.ACTION_CREATE,
+            ).build()
+
+    def test_configurable_create_factory_preflight_requires_parent_mapping_even_when_child_is_mapped(self):
+        parent_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+            sku="PARENT-1",
+        )
+        child_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="CHILD-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=parent_product,
+            variation=child_product,
+        )
+        category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="cat-1",
+            name="Category 1",
+            is_leaf=True,
+        )
+        baker.make(
+            MiraklProductType,
+            category=category,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            remote_id="cat-1",
+        )
+        baker.make(
+            MiraklProductCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=child_product,
+            remote_id="cat-1",
+        )
+
+        factory = MiraklProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=parent_product,
+            view=self.view,
+        )
+
+        with self.assertRaisesMessage(
+            MissingMappingError,
+            "Map configurable parent product PARENT-1 to a Mirakl category or product type before pushing.",
+        ):
+            factory.preflight_process()
+
+    def test_configurable_create_factory_preflight_requires_template_before_pushing(self):
+        parent_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+            sku="PARENT-1",
+        )
+        child_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="CHILD-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=parent_product,
+            variation=child_product,
+        )
+        parent_rule = self._assign_product_rule(
+            product=parent_product,
+            sales_channel=self.sales_channel,
+        )
+        child_rule = self._assign_product_rule(
+            product=child_product,
+            sales_channel=self.sales_channel,
+        )
+        parent_category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="parent-cat",
+            name="Parent Category",
+            is_leaf=True,
+        )
+        child_category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="child-cat",
+            name="Child Category",
+            is_leaf=True,
+        )
+        baker.make(
+            MiraklProductType,
+            category=parent_category,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent_rule,
+            remote_id="parent-cat",
+            template=None,
+        )
+        baker.make(
+            MiraklProductType,
+            category=child_category,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=child_rule,
+            remote_id="child-cat",
+            template=None,
+        )
+        baker.make(
+            MiraklProductCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=child_product,
+            remote_id="child-cat",
+        )
+
+        factory = MiraklProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=parent_product,
+            view=self.view,
+        )
+
+        with self.assertRaisesMessage(
+            PreFlightCheckError,
+            "Upload a CSV template for Mirakl product type 'parent-cat' before pushing configurable parent product PARENT-1.",
+        ):
+            factory.preflight_process()
 
     def test_optional_configurable_sku_representation_stays_empty_for_standalone_product(self):
         local_property = baker.make(
@@ -972,6 +1411,43 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             product_property=product_property,
             language=self.multi_tenant_company.language,
             value_text="Machine wash cold",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["details_and_care"], "Machine wash cold")
+
+    def test_description_field_mapped_to_select_uses_select_label_without_mirakl_option_mapping(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="details_and_care",
+            local_property=local_property,
+            required=True,
+            remote_type=Property.TYPES.SELECT,
+        )
+        remote_property.original_type = Property.TYPES.DESCRIPTION
+        remote_property.type = Property.TYPES.SELECT
+        remote_property.save(update_fields=["original_type", "type"])
+
+        select_value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=select_value,
+            language=self.multi_tenant_company.language,
+            value="Machine wash cold",
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_property,
+            value_select=select_value,
         )
 
         _, rows = builder.build()

@@ -13,7 +13,7 @@ class MiraklProductFeedFactory:
 
     def __init__(self, *, feed: MiraklSalesChannelFeed) -> None:
         self.feed = feed
-        self.sales_channel = feed.sales_channel
+        self.sales_channel = feed.sales_channel.get_real_instance()
 
     def run(self) -> MiraklSalesChannelFeed | None:
         feed = self._claim_feed_for_processing(feed=self.feed)
@@ -29,8 +29,8 @@ class MiraklProductFeedFactory:
             self._render_feed_file(feed=feed)
             self._submit_feed_if_possible(feed=feed)
             return feed
-        except Exception:
-            self._reset_feed_to_ready(feed=feed)
+        except Exception as exc:
+            self._reset_feed_to_ready(feed=feed, error_message=str(exc))
             raise
 
     def _claim_feed_for_processing(self, *, feed: MiraklSalesChannelFeed) -> MiraklSalesChannelFeed | None:
@@ -46,7 +46,8 @@ class MiraklProductFeedFactory:
                 locked_feed.save(update_fields=["status", "updated_at"])
                 return None
             locked_feed.status = MiraklSalesChannelFeed.STATUS_PROCESSING
-            locked_feed.save(update_fields=["status", "updated_at"])
+            locked_feed.error_message = ""
+            locked_feed.save(update_fields=["status", "error_message", "updated_at"])
             return locked_feed
 
     def _has_pending_feed_for_group(self, *, feed: MiraklSalesChannelFeed) -> bool:
@@ -54,7 +55,7 @@ class MiraklProductFeedFactory:
             sales_channel_id=feed.sales_channel_id,
             product_type_id=feed.product_type_id,
             sales_channel_view_id=feed.sales_channel_view_id,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status__in=[
                 MiraklSalesChannelFeed.STATUS_PENDING,
                 MiraklSalesChannelFeed.STATUS_SUBMITTED,
@@ -97,15 +98,17 @@ class MiraklProductFeedFactory:
             return
         MiraklProductFeedSubmitFactory(feed=feed).run()
 
-    def _reset_feed_to_ready(self, *, feed: MiraklSalesChannelFeed) -> None:
+    def _reset_feed_to_ready(self, *, feed: MiraklSalesChannelFeed, error_message: str = "") -> None:
         MiraklSalesChannelFeed.objects.filter(
             id=feed.id,
             status=MiraklSalesChannelFeed.STATUS_PROCESSING,
         ).update(
             status=MiraklSalesChannelFeed.STATUS_READY_TO_RENDER,
+            error_message=error_message,
             updated_at=timezone.now(),
         )
         feed.status = MiraklSalesChannelFeed.STATUS_READY_TO_RENDER
+        feed.error_message = error_message
 
 
 MiraklProductFeedBuildFactory = MiraklProductFeedFactory

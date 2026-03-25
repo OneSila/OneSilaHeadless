@@ -24,6 +24,7 @@ class MiraklPropertyQuerySet(_MappingQuerySetMixin, PolymorphicQuerySet, MultiTe
                         representation_type__in=[
                             MiraklProperty.REPRESENTATION_PROPERTY,
                             MiraklProperty.REPRESENTATION_CONDITION,
+                            MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
                             MiraklProperty.REPRESENTATION_DEFAULT_VALUE,
                         ]
                     ),
@@ -67,6 +68,7 @@ class MiraklPropertySelectValueQuerySet(_MappingQuerySetMixin, PolymorphicQueryS
             representation_type__in=[
                 MiraklProperty.REPRESENTATION_PROPERTY,
                 MiraklProperty.REPRESENTATION_CONDITION,
+                MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
                 MiraklProperty.REPRESENTATION_PRODUCT_ACTIVE,
                 MiraklProperty.REPRESENTATION_ALLOW_BACKORDER,
             ],

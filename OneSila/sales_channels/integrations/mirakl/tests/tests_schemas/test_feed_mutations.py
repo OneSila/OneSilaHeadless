@@ -52,14 +52,14 @@ class MiraklFeedMutationTests(
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status=MiraklSalesChannelFeed.STATUS_SUCCESS,
         )
         resynced_feed = baker.make(
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
         )
         factory_cls.return_value.run.return_value = resynced_feed

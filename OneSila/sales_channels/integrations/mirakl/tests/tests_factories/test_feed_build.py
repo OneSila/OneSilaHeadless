@@ -43,7 +43,7 @@ class MiraklProductFeedBuildFactoryTests(DisableMiraklConnectionMixin, TestCase)
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_READY_TO_RENDER,
             product_type=self.product_type,
@@ -77,7 +77,7 @@ class MiraklProductFeedBuildFactoryTests(DisableMiraklConnectionMixin, TestCase)
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            type=MiraklSalesChannelFeed.TYPE_PRODUCT,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
             stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
             status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
             product_type=self.product_type,
@@ -109,6 +109,7 @@ class MiraklProductFeedBuildFactoryTests(DisableMiraklConnectionMixin, TestCase)
 
         ready_feed.refresh_from_db()
         self.assertEqual(ready_feed.status, MiraklSalesChannelFeed.STATUS_READY_TO_RENDER)
+        self.assertEqual(ready_feed.error_message, "boom")
 
     @patch("sales_channels.integrations.mirakl.factories.feeds.build.MiraklProductFeedFileFactory.run")
     def test_run_resets_feed_to_ready_when_sales_channel_is_disconnected(self, render_mock):
