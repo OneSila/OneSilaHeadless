@@ -143,6 +143,8 @@ class MiraklIntegrationQueryTests(
             ContentFile(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"),
             save=True,
         )
+        self.expected_subtype_logo_png_name = self.mirakl_subtype_public_type.logo_png.name.rsplit("/", 1)[-1]
+        self.expected_subtype_logo_svg_name = self.mirakl_subtype_public_type.logo_svg.name.rsplit("/", 1)[-1]
 
     def test_integrations_query_exposes_mirakl_type_connection_state_and_proxy_id(self):
         response = self.strawberry_test_client(query=INTEGRATIONS_QUERY)
@@ -154,8 +156,8 @@ class MiraklIntegrationQueryTests(
         self.assertEqual(node["proxyId"], to_base64(MiraklSalesChannelType, self.sales_channel.pk))
         self.assertTrue(node["iconSvgUrl"].startswith("http"))
         self.assertTrue(node["logoPngUrl"].startswith("http"))
-        self.assertTrue(node["iconSvgUrl"].endswith("tesco-public.svg"))
-        self.assertTrue(node["logoPngUrl"].endswith("tesco-public.png"))
+        self.assertTrue(node["iconSvgUrl"].endswith(self.expected_subtype_logo_svg_name))
+        self.assertTrue(node["logoPngUrl"].endswith(self.expected_subtype_logo_png_name))
 
     def test_sales_channels_query_exposes_mirakl_proxy_id_and_imports(self):
         import_process = baker.make(
@@ -174,8 +176,8 @@ class MiraklIntegrationQueryTests(
         self.assertEqual(node["proxyId"], to_base64(MiraklSalesChannelType, self.sales_channel.pk))
         self.assertTrue(node["iconSvg"].startswith("http"))
         self.assertTrue(node["logoPng"].startswith("http"))
-        self.assertTrue(node["iconSvg"].endswith("tesco-public.svg"))
-        self.assertTrue(node["logoPng"].endswith("tesco-public.png"))
+        self.assertTrue(node["iconSvg"].endswith(self.expected_subtype_logo_svg_name))
+        self.assertTrue(node["logoPng"].endswith(self.expected_subtype_logo_png_name))
         self.assertEqual(len(node["miraklImports"]), 1)
         self.assertEqual(node["miraklImports"][0]["id"], self.to_global_id(import_process))
         self.assertEqual(node["miraklImports"][0]["type"], MiraklSalesChannelImport.TYPE_SCHEMA)

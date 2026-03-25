@@ -37,7 +37,6 @@ class MiraklProductFeedFactory:
         with transaction.atomic():
             locked_feed = (
                 MiraklSalesChannelFeed.objects.select_for_update()
-                .select_related("sales_channel", "product_type", "sales_channel_view")
                 .get(id=feed.id)
             )
             if locked_feed.status != MiraklSalesChannelFeed.STATUS_READY_TO_RENDER:

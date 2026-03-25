@@ -141,6 +141,39 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             MiraklProperty.REPRESENTATION_PROPERTY,
         )
 
+    def test_detect_representation_type_uses_roles_mapping(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        expected_types = {
+            "CATEGORY": MiraklProperty.REPRESENTATION_PRODUCT_CATEGORY,
+            "DESCRIPTION": MiraklProperty.REPRESENTATION_PRODUCT_DESCRIPTION,
+            "MAIN_IMAGE": MiraklProperty.REPRESENTATION_THUMBNAIL_IMAGE,
+            "SHOP_SKU": MiraklProperty.REPRESENTATION_PRODUCT_SKU,
+            "TITLE": MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+            "UNIQUE_IDENTIFIER": MiraklProperty.REPRESENTATION_PRODUCT_EAN,
+            "VARIANT_GROUP_CODE": MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
+        }
+
+        for role_type, expected_representation_type in expected_types.items():
+            with self.subTest(role_type=role_type):
+                self.assertEqual(
+                    factory._detect_representation_type(
+                        item={
+                            "code": f"custom_{role_type.lower()}",
+                            "label": f"Custom {role_type.title()}",
+                            "type": "TEXT",
+                            "type_parameters": [],
+                            "roles": [{"type": role_type}],
+                        },
+                        values_list_code="",
+                        inline_values=[],
+                    ),
+                    expected_representation_type,
+                )
+
     def test_apply_public_definition_sets_language(self):
         factory = MiraklFullSchemaSyncFactory(
             sales_channel=self.sales_channel,
@@ -494,6 +527,92 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
 
         self.import_process.refresh_from_db()
         self.assertGreaterEqual(summary["properties"], 4)
+
+    def test_run_import_uses_roles_for_representation_type_detection(self):
+        payloads = {
+            "/api/documents": {
+                "document_types": [],
+            },
+            "/api/offers/states": {
+                "offer_states": [],
+            },
+            "/api/hierarchies": {
+                "hierarchies": [
+                    {"code": "CHILD", "label": "Child", "level": 1, "parent_code": ""},
+                ],
+            },
+            "/api/products/attributes": {
+                "attributes": [
+                    {
+                        "code": "content_block",
+                        "label": "Content Block",
+                        "hierarchy_code": "CHILD",
+                        "required": False,
+                        "variant": False,
+                        "type": "TEXT",
+                        "channels": [{"code": "WEB"}],
+                        "roles": [{"type": "DESCRIPTION"}],
+                    },
+                    {
+                        "code": "hero_asset",
+                        "label": "Hero Asset",
+                        "hierarchy_code": "CHILD",
+                        "required": False,
+                        "variant": False,
+                        "type": "MEDIA",
+                        "type_parameters": [{"name": "TYPE", "value": "IMAGE"}],
+                        "channels": [{"code": "WEB"}],
+                        "roles": [{"type": "MAIN_IMAGE"}],
+                    },
+                    {
+                        "code": "catalog_group",
+                        "label": "Catalog Group",
+                        "hierarchy_code": "CHILD",
+                        "required": False,
+                        "variant": True,
+                        "type": "TEXT",
+                        "channels": [{"code": "WEB"}],
+                        "roles": [{"type": "VARIANT_GROUP_CODE"}],
+                    },
+                ],
+            },
+            "/api/values_lists": {
+                "values_lists": [],
+            },
+        }
+
+        def mirakl_get_side_effect(*, path, params=None, timeout=None):
+            return payloads[path]
+
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        with patch.object(factory, "mirakl_get", side_effect=mirakl_get_side_effect):
+            factory.run()
+
+        self.assertEqual(
+            MiraklProperty.objects.get(
+                sales_channel=self.sales_channel,
+                code="content_block",
+            ).representation_type,
+            MiraklProperty.REPRESENTATION_PRODUCT_DESCRIPTION,
+        )
+        self.assertEqual(
+            MiraklProperty.objects.get(
+                sales_channel=self.sales_channel,
+                code="hero_asset",
+            ).representation_type,
+            MiraklProperty.REPRESENTATION_THUMBNAIL_IMAGE,
+        )
+        self.assertEqual(
+            MiraklProperty.objects.get(
+                sales_channel=self.sales_channel,
+                code="catalog_group",
+            ).representation_type,
+            MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
+        )
 
 class MiraklSchemaImportProcessorTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):

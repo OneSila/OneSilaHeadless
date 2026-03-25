@@ -272,6 +272,9 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
 
     def _mark_items_success(self, *, feed: MiraklSalesChannelFeed, remote_id: str) -> None:
         for item in MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related("remote_product"):
+            remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
+            if remote_product is None:
+                continue
             if self._item_has_rejecting_issues(item=item):
                 message = self._get_item_issue_message(
                     item=item,
@@ -280,59 +283,68 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 item.status = SalesChannelFeedItem.STATUS_FAILED
                 item.error_message = message
                 item.save(update_fields=["status", "error_message"])
-                item.remote_product.refresh_status(
-                    override_status=item.remote_product.STATUS_APPROVAL_REJECTED,
+                remote_product.refresh_status(
+                    override_status=remote_product.STATUS_APPROVAL_REJECTED,
                 )
-                item.remote_product.add_log(
+                remote_product.add_log(
                     action="mirakl_product_feed",
                     response=message,
                     payload=item.payload_data,
                     identifier=f"mirakl-product-feed-{remote_id}",
-                    remote_product=item.remote_product,
+                    remote_product=remote_product,
                 )
                 continue
 
             item.status = SalesChannelFeedItem.STATUS_SUCCESS
             item.error_message = ""
             item.save(update_fields=["status", "error_message"])
-            item.remote_product.refresh_status(
-                override_status=item.remote_product.STATUS_COMPLETED,
+            remote_product.refresh_status(
+                override_status=remote_product.STATUS_COMPLETED,
             )
-            item.remote_product.add_log(
+            remote_product.add_log(
                 action="mirakl_product_feed",
                 response="Mirakl product import completed.",
                 payload=item.payload_data,
                 identifier=f"mirakl-product-feed-{remote_id}",
-                remote_product=item.remote_product,
+                remote_product=remote_product,
             )
 
     def _mark_items_failed(self, *, feed: MiraklSalesChannelFeed, remote_id: str, message: str) -> None:
         for item in MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related("remote_product"):
+            remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
+            if remote_product is None:
+                continue
             if self._item_has_rejecting_issues(item=item):
                 item_message = self._get_item_issue_message(item=item, default=message)
-                override_status = item.remote_product.STATUS_APPROVAL_REJECTED
+                override_status = remote_product.STATUS_APPROVAL_REJECTED
             else:
                 item_message = message
-                override_status = item.remote_product.STATUS_PENDING_APPROVAL
+                override_status = remote_product.STATUS_PENDING_APPROVAL
 
             item.status = SalesChannelFeedItem.STATUS_FAILED
             item.error_message = item_message
             item.save(update_fields=["status", "error_message"])
-            item.remote_product.refresh_status(override_status=override_status)
-            item.remote_product.add_log(
+            remote_product.refresh_status(override_status=override_status)
+            remote_product.add_log(
                 action="mirakl_product_feed",
                 response=item_message,
                 payload=item.payload_data,
                 identifier=f"mirakl-product-feed-{remote_id}",
-                remote_product=item.remote_product,
+                remote_product=remote_product,
             )
 
     def _item_has_rejecting_issues(self, *, item: MiraklSalesChannelFeedItem) -> bool:
-        return item.remote_product.issues.exclude(severity="WARNING").exists()
+        remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
+        if remote_product is None:
+            return False
+        return remote_product.issues.exclude(severity="WARNING").exists()
 
     def _get_item_issue_message(self, *, item: MiraklSalesChannelFeedItem, default: str) -> str:
+        remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
+        if remote_product is None:
+            return default
         issue = (
-            item.remote_product.issues.exclude(severity="WARNING")
+            remote_product.issues.exclude(severity="WARNING")
             .exclude(message__isnull=True)
             .exclude(message="")
             .order_by("id")
@@ -341,6 +353,15 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
         if issue is None:
             return default
         return str(issue.message or default)
+
+    def _resolve_mirakl_product(self, *, remote_product):
+        from sales_channels.integrations.mirakl.models import MiraklProduct
+
+        resolved = remote_product
+        get_real_instance = getattr(resolved, "get_real_instance", None)
+        if callable(get_real_instance):
+            resolved = get_real_instance()
+        return resolved if isinstance(resolved, MiraklProduct) else None
 
     def _is_enabled(self, payload) -> bool:
         if not isinstance(payload, dict):

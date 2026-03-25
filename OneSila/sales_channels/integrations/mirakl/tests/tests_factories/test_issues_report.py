@@ -63,6 +63,7 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_sku="ILFD4043XS+5029+1479-58",
+            syncing_current_percentage=100,
         )
         self.feed = baker.make(
             MiraklSalesChannelFeed,

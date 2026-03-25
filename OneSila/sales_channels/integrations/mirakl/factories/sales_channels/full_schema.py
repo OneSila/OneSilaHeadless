@@ -758,6 +758,9 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             value_count = len(inline_values) or (1 if values_list_code in self._value_list_single_defaults else 0)
             if value_count == 1:
                 return MiraklProperty.REPRESENTATION_DEFAULT_VALUE
+        role_representation_type = self._resolve_role_representation_type(item=item)
+        if role_representation_type:
+            return role_representation_type
         if any(token in code for token in {"product_title", "product_name"}) or code == "name":
             return MiraklProperty.REPRESENTATION_PRODUCT_TITLE
         if "subtitle" in code:
@@ -797,6 +800,27 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         if code == "active":
             return MiraklProperty.REPRESENTATION_PRODUCT_ACTIVE
         return MiraklProperty.REPRESENTATION_PROPERTY
+
+    def _resolve_role_representation_type(self, *, item: dict[str, Any]) -> str:
+        role_representation_types = {
+            "CATEGORY": MiraklProperty.REPRESENTATION_PRODUCT_CATEGORY,
+            "DESCRIPTION": MiraklProperty.REPRESENTATION_PRODUCT_DESCRIPTION,
+            "MAIN_IMAGE": MiraklProperty.REPRESENTATION_THUMBNAIL_IMAGE,
+            "SHOP_SKU": MiraklProperty.REPRESENTATION_PRODUCT_SKU,
+            "TITLE": MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+            "UNIQUE_IDENTIFIER": MiraklProperty.REPRESENTATION_PRODUCT_EAN,
+            "VARIANT_GROUP_CODE": MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
+        }
+        for role in self._normalize_records(
+            self._ensure_json_value(item.get("roles"), default=[]),
+        ):
+            role_type = self._clean_string(role.get("type")).upper()
+            if not role_type:
+                continue
+            representation_type = role_representation_types.get(role_type)
+            if representation_type:
+                return representation_type
+        return ""
 
     def _detect_default_value(
         self,

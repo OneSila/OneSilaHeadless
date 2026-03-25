@@ -87,10 +87,10 @@ def sales_channels__tasks__refresh_mirakl_product_issues_full__cronjob():
 
 
 @db_task()
-def sales_channels__tasks__sync_mirakl_product_feeds(*, sales_channel_id: int | None = None, force: bool = False):
+def sales_channels__tasks__sync_mirakl_product_feeds(*, sales_channel_id: int | None = None):
     from sales_channels.integrations.mirakl.flows import process_mirakl_gathering_product_feeds
 
-    return process_mirakl_gathering_product_feeds(sales_channel_id=sales_channel_id, force=force)
+    return process_mirakl_gathering_product_feeds(sales_channel_id=sales_channel_id)
 
 
 @db_task()

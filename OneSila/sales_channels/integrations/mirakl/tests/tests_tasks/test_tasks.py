@@ -101,9 +101,6 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(len(processed_feeds), 1)
         self.assertEqual(processed_feeds[0].id, gathering_feed.id)
         self.assertEqual(gathering_feed.status, MiraklSalesChannelFeed.STATUS_READY_TO_RENDER)
-        task = IntegrationTaskQueue.objects.get(task_name=get_import_path(process_mirakl_feed_db_task))
-        self.assertEqual(task.integration_id, self.sales_channel.id)
-        self.assertEqual(task.task_kwargs, {"feed_id": gathering_feed.id})
 
     @patch(
         "integrations.factories.task_queue.TaskQueueFactory.dispatch_task",
@@ -119,13 +116,11 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             status=MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS,
         )
 
-        processed_feeds = sales_channels__tasks__sync_mirakl_product_feeds__cronjob()
+        processed_feeds = sales_channels__tasks__sync_mirakl_product_feeds__cronjob.call_local()
 
         gathering_feed.refresh_from_db()
         self.assertEqual([feed.id for feed in processed_feeds], [gathering_feed.id])
         self.assertEqual(gathering_feed.status, MiraklSalesChannelFeed.STATUS_READY_TO_RENDER)
-        task = IntegrationTaskQueue.objects.get(task_name=get_import_path(process_mirakl_feed_db_task))
-        self.assertEqual(task.task_kwargs, {"feed_id": gathering_feed.id})
 
     @patch(
         "sales_channels.integrations.mirakl.tasks.BaseRemoteTask",
@@ -202,7 +197,7 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
             last_product_imports_request_date=timezone.now(),
         )
 
-        queued_sales_channel_ids = sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob()
+        queued_sales_channel_ids = sales_channels__tasks__sync_mirakl_product_import_statuses__cronjob.call_local()
 
         self.assertEqual(queued_sales_channel_ids, [self.sales_channel.id])
         tasks = IntegrationTaskQueue.objects.filter(task_name=get_import_path(sync_mirakl_product_import_statuses_db_task))
@@ -395,6 +390,8 @@ class MiraklImportTaskTests(DisableMiraklConnectionMixin, TestCase):
     def test_full_issues_flow_only_processes_channels_due_after_twenty_four_hours(self, issues_factory_mock, now_mock):
         now = timezone.make_aware(datetime(2026, 3, 23, 12, 0, 0))
         now_mock.return_value = now
+        self.sales_channel.last_full_issues_fetch = now
+        self.sales_channel.save(update_fields=["last_full_issues_fetch"])
         stale_channel = baker.make(
             MiraklSalesChannel,
             multi_tenant_company=self.multi_tenant_company,

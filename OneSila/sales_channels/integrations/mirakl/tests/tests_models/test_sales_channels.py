@@ -18,7 +18,7 @@ class MiraklSalesChannelModelTests(DisableMiraklConnectionMixin, TestCase):
             sub_type=DEFAULT_MIRAKL_SUB_TYPE,
         )
 
-        self.assertEqual(sales_channel.sub_type, "debenhams")
+        self.assertEqual(sales_channel.sub_type, "debenhamsuk-prod")
 
     def test_save_keeps_default_sub_type_when_hostname_has_no_match(self):
         sales_channel = baker.make(
