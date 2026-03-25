@@ -105,6 +105,7 @@ class RemoteOrderFilter(SearchFilterMixin):
 @filter(RemoteProduct)
 class RemoteProductFilter(SearchFilterMixin):
     id: auto
+    local_instance: Optional[lazy['ProductFilter', "products.schema.types.filters"]]
 
     @custom_filter
     def has_sync_requests(

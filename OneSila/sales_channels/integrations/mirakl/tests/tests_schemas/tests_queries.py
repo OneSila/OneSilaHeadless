@@ -159,6 +159,18 @@ query ($view: GlobalID, $isRejected: Boolean!) {
 }
 """
 
+MIRAKL_PRODUCT_ISSUES_FILTER_BY_REMOTE_PRODUCT_LOCAL_INSTANCE_QUERY = """
+query ($localInstance: GlobalID!) {
+  miraklProductIssues(filters: {remoteProduct: {localInstance: {id: {exact: $localInstance}}}}) {
+    edges {
+      node {
+        id
+      }
+    }
+  }
+}
+"""
+
 MIRAKL_PRODUCT_ISSUE_NODE_QUERY = """
 query ($id: GlobalID!) {
   miraklProductIssue(id: $id) {
@@ -577,6 +589,58 @@ class MiraklQueryTests(
             to_base64("MiraklRemoteProductType", remote_product.id),
         )
         self.assertEqual(node["views"][0]["remoteId"], "BE")
+
+    def test_mirakl_product_issues_can_filter_by_remote_product_local_instance(self):
+        matching_product = self._create_local_product(
+            sku="LOCAL-SKU-REMOTE-1",
+            name="Local Product Remote 1",
+        )
+        other_product = self._create_local_product(
+            sku="LOCAL-SKU-REMOTE-2",
+            name="Local Product Remote 2",
+        )
+        matching_remote_product = baker.make(
+            MiraklProduct,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=matching_product,
+            remote_sku="shopSkuRemote1",
+        )
+        other_remote_product = baker.make(
+            MiraklProduct,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=other_product,
+            remote_sku="shopSkuRemote2",
+        )
+        matching_issue = baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=matching_remote_product,
+            main_code="MCM-04012",
+            code="2",
+            severity="ERROR",
+            is_rejected=True,
+        )
+        baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=other_remote_product,
+            main_code="MCM-05000",
+            code="MCM-05000",
+            severity="WARNING",
+            is_rejected=False,
+        )
+
+        response = self.strawberry_test_client(
+            query=MIRAKL_PRODUCT_ISSUES_FILTER_BY_REMOTE_PRODUCT_LOCAL_INSTANCE_QUERY,
+            variables={"localInstance": self.to_global_id(matching_product)},
+        )
+
+        self.assertIsNone(response.errors)
+        edges = response.data["miraklProductIssues"]["edges"]
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["node"]["id"], self.to_global_id(matching_issue))
 
     def test_mirakl_feeds_query_exposes_mirakl_specific_fields(self):
         product_type = baker.make(

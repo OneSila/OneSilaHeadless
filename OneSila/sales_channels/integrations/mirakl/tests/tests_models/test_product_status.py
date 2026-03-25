@@ -95,6 +95,56 @@ class MiraklProductStatusTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
 
+    def test_configurable_parent_uses_variation_rejecting_issues(self):
+        parent_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+            sku="CONFIG-1",
+        )
+        variation_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="CONFIG-1-RED",
+        )
+        baker.make(
+            "products.ConfigurableVariation",
+            parent=parent_product,
+            variation=variation_product,
+        )
+        parent_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent_product,
+            remote_sku="CONFIG-1",
+            syncing_current_percentage=100,
+        )
+        child_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=variation_product,
+            remote_parent_product=parent_remote_product,
+            remote_sku="CONFIG-1-RED",
+            is_variation=True,
+            syncing_current_percentage=100,
+        )
+        baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=child_remote_product,
+            code="1001",
+            main_code="1001",
+            severity="ERROR",
+        )
+
+        parent_remote_product.refresh_status(commit=True)
+        parent_remote_product.refresh_from_db()
+
+        self.assertEqual(parent_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
     def test_warning_only_issue_keeps_successful_product_completed(self):
         self._make_feed_item(status=MiraklSalesChannelFeedItem.STATUS_SUCCESS)
         baker.make(

@@ -18,7 +18,7 @@ class MiraklProduct(RemoteProduct):
             return self.STATUS_FAILED
         if self.syncing_current_percentage != 100:
             return self.STATUS_PROCESSING
-        if self._has_rejecting_issues():
+        if self._has_rejecting_issues() or self._has_variation_rejecting_issues():
             return self.STATUS_APPROVAL_REJECTED
         if latest_feed_item is None:
             return self.STATUS_COMPLETED
@@ -30,6 +30,23 @@ class MiraklProduct(RemoteProduct):
         if not self.pk:
             return False
         return self.issues.exclude(severity="WARNING").exists()
+
+    def _has_variation_rejecting_issues(self) -> bool:
+        local_product = getattr(self, "local_instance", None)
+        is_configurable = getattr(local_product, "is_configurable", None)
+        if not self.pk or local_product is None or not callable(is_configurable) or not is_configurable():
+            return False
+
+        variations = local_product.get_configurable_variations(active_only=False)
+        return type(self).objects.filter(
+            sales_channel=self.sales_channel,
+            remote_parent_product=self,
+            local_instance__in=variations,
+        ).filter(
+            issues__isnull=False,
+        ).exclude(
+            issues__severity="WARNING",
+        ).exists()
 
     def _get_latest_feed_item(self):
         if not self.pk:
