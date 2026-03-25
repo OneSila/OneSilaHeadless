@@ -29,6 +29,8 @@ from sales_channels.integrations.shopify.schema import ShopifySalesChannelMutati
     ShopifySalesChannelsSubscription
 from sales_channels.integrations.shein.schema import SheinSalesChannelMutation, SheinSalesChannelsQuery, \
     SheinSalesChannelsSubscription
+from sales_channels.integrations.mirakl.schema import MiraklSalesChannelMutation, MiraklSalesChannelsQuery, \
+    MiraklSalesChannelsSubscription
 from sales_channels.integrations.woocommerce.schema import WoocommerceSalesChannelMutation, WoocommerceSalesChannelsQuery, \
     WoocommerceSalesChannelsSubscription
 from sales_channels.integrations.amazon.schema import AmazonSalesChannelMutation, AmazonSalesChannelsQuery, \
@@ -58,6 +60,7 @@ class Query(
         MagentoSalesChannelsQuery,
         ShopifySalesChannelsQuery,
         SheinSalesChannelsQuery,
+        MiraklSalesChannelsQuery,
         WoocommerceSalesChannelsQuery,
         EbaySalesChannelsQuery,
         ProductsQuery,
@@ -82,6 +85,7 @@ class Mutation(
         MultiTenantMutation,
         ShopifySalesChannelMutation,
         SheinSalesChannelMutation,
+        MiraklSalesChannelMutation,
         WoocommerceSalesChannelMutation,
         EbaySalesChannelMutation,
         ProductsInspectorMutation,
@@ -114,6 +118,7 @@ class Subscription(
         TaxSubscription,
         ShopifySalesChannelsSubscription,
         SheinSalesChannelsSubscription,
+        MiraklSalesChannelsSubscription,
         WoocommerceSalesChannelsSubscription,
         EbaySalesChannelsSubscription,
 ):

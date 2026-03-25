@@ -22,6 +22,7 @@ from .schema import schema
 from django.conf.urls.static import static
 from webhooks.views import test_receiver
 from sales_channels.views import sales_channel_content_template_preview
+from integrations.views import PublicIntegrationTypeDirectListView
 
 
 urlpatterns = [
@@ -45,6 +46,7 @@ urlpatterns = [
         name='sales_channel_template_product',
     ),
     path('sales_channels/', include('sales_channels.urls')),
+    path('direct/integrations/types/', PublicIntegrationTypeDirectListView.as_view(), name='direct_public_integration_types'),
     path('direct/integrations/shopify/', include('sales_channels.integrations.shopify.urls')),
     path('direct/integrations/amazon/', include('sales_channels.integrations.amazon.urls')),
     path('direct/integrations/ebay/', include('sales_channels.integrations.ebay.urls')),

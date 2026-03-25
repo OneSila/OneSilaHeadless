@@ -122,6 +122,10 @@ class DeleteMutation(GetMultiTenantCompanyMixin, BulkDjangoDeleteMutation):
     """
     @multi_tenant_owner_protection()
     def delete(self, info: Info, instance: models.Model | Iterable[models.Model]):
+        if not isinstance(instance, Iterable):
+            get_real_instance = getattr(instance, "get_real_instance", None)
+            if callable(get_real_instance):
+                instance = get_real_instance()
         return super().delete(info=info, instance=instance)
 
 

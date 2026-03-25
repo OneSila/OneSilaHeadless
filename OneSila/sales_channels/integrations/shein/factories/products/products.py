@@ -2125,7 +2125,6 @@ class SheinProductBaseFactory(
             info = response_data.get("info")
 
             is_ok_code = code in ("0", 0)
-            is_ok_msg = msg == "OK"
 
             if isinstance(info, dict) and info.get("success") is False:
                 lines: list[str] = []
@@ -2148,10 +2147,10 @@ class SheinProductBaseFactory(
                 combined = "\n".join(dict.fromkeys(lines)) if lines else "Shein pre-validation failed."
                 raise SheinPreValidationError(combined)
 
-            if info is None and not is_ok_msg:
-                raise SheinResponseException(msg or "Shein API returned an error response.")
-
-            if not is_ok_code and not is_ok_msg:
+            # Successful publish/edit responses can still include warnings in msg/filtered_result.
+            # Treat code=0 together with info.success != False as success and continue persisting
+            # the returned SPU/SKC/SKU identifiers.
+            if not is_ok_code:
                 raise SheinResponseException(msg or f"Shein API returned error code {code}.")
 
 
@@ -2185,6 +2184,60 @@ class SheinProductBaseFactory(
             remote_product=self.remote_instance,
         )
 
+    def _extract_publish_response_identifiers(self, *, response_data: Any) -> dict[str, str]:
+        if not isinstance(response_data, dict):
+            return {}
+
+        info = response_data.get("info") if isinstance(response_data.get("info"), dict) else response_data
+        if not isinstance(info, dict):
+            return {}
+
+        spu_name = str(info.get("spu_name") or info.get("spuName") or "").strip()
+        skc_list = info.get("skc_list") or info.get("skcList") or []
+
+        skc_name = ""
+        sku_code = ""
+        if isinstance(skc_list, list) and skc_list:
+            first_skc = skc_list[0] if isinstance(skc_list[0], dict) else {}
+            skc_name = str(first_skc.get("skc_name") or first_skc.get("skcName") or "").strip()
+            sku_list = first_skc.get("sku_list") or first_skc.get("skuList") or []
+            if isinstance(sku_list, list) and sku_list:
+                first_sku = sku_list[0] if isinstance(sku_list[0], dict) else {}
+                sku_code = str(first_sku.get("sku_code") or first_sku.get("skuCode") or "").strip()
+
+        return {
+            "spu_name": spu_name,
+            "skc_name": skc_name,
+            "sku_code": sku_code,
+        }
+
+    def _persist_publish_response_identifiers(self, *, response_data: Any) -> None:
+        if not self.remote_instance:
+            return
+
+        identifiers = self._extract_publish_response_identifiers(response_data=response_data)
+        if not identifiers:
+            return
+
+        update_fields: set[str] = set()
+        spu_name = identifiers.get("spu_name", "")
+        skc_name = identifiers.get("skc_name", "")
+        sku_code = identifiers.get("sku_code", "")
+
+        if spu_name:
+            self.remote_instance.remote_id = spu_name
+            setattr(self.remote_instance, "spu_name", spu_name)
+            update_fields.update({"remote_id", "spu_name"})
+        if skc_name:
+            setattr(self.remote_instance, "skc_name", skc_name)
+            update_fields.add("skc_name")
+        if sku_code:
+            setattr(self.remote_instance, "sku_code", sku_code)
+            update_fields.add("sku_code")
+
+        if update_fields:
+            self.remote_instance.save(update_fields=list(update_fields))
+
     def _update_or_create_remote_variations(self, *, response_data: Any) -> None:
         if not self.local_instance.is_configurable():
             return
@@ -2195,8 +2248,13 @@ class SheinProductBaseFactory(
         if not isinstance(info, dict):
             return
 
-        spu_name = str(info.get("spu_name") or getattr(self.remote_instance, "spu_name", "") or "").strip()
-        skc_list = info.get("skc_list") or []
+        spu_name = str(
+            info.get("spu_name")
+            or info.get("spuName")
+            or getattr(self.remote_instance, "spu_name", "")
+            or ""
+        ).strip()
+        skc_list = info.get("skc_list") or info.get("skcList") or []
         if not skc_list:
             return
 
@@ -2205,8 +2263,8 @@ class SheinProductBaseFactory(
         for skc in skc_list:
             if not isinstance(skc, dict):
                 continue
-            skc_name = str(skc.get("skc_name") or "").strip()
-            for sku_entry in skc.get("sku_list") or []:
+            skc_name = str(skc.get("skc_name") or skc.get("skcName") or "").strip()
+            for sku_entry in (skc.get("sku_list") or skc.get("skuList") or []):
                 if not isinstance(sku_entry, dict):
                     continue
 
@@ -2446,7 +2504,7 @@ class SheinProductUpdateFactory(SheinProductBaseFactory, RemoteProductUpdateFact
         return self.perform_remote_action()
 
     def set_remote_id(self, response_data):
-        pass
+        self._persist_publish_response_identifiers(response_data=response_data)
 
 
 class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFactory):
@@ -2482,40 +2540,7 @@ class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFact
         return self.perform_remote_action()
 
     def set_remote_id(self, response_data):
-        if not self.remote_instance or not isinstance(response_data, dict):
-            return
-
-        info = response_data.get("info")
-        if not isinstance(info, dict):
-            return
-
-        spu_name = (info.get("spu_name") or "").strip()
-        skc_list = info.get("skc_list") or []
-
-        skc_name: str = ""
-        sku_code: str = ""
-        if isinstance(skc_list, list) and skc_list:
-            first_skc = skc_list[0] if isinstance(skc_list[0], dict) else {}
-            skc_name = str(first_skc.get("skc_name") or "").strip()
-            sku_list = first_skc.get("sku_list") or []
-            if isinstance(sku_list, list) and sku_list:
-                first_sku = sku_list[0] if isinstance(sku_list[0], dict) else {}
-                sku_code = str(first_sku.get("sku_code") or "").strip()
-
-        update_fields: set[str] = set()
-        if spu_name:
-            self.remote_instance.remote_id = spu_name
-            setattr(self.remote_instance, "spu_name", spu_name)
-            update_fields.update({"remote_id", "spu_name"})
-        if skc_name:
-            setattr(self.remote_instance, "skc_name", skc_name)
-            update_fields.add("skc_name")
-        if sku_code:
-            setattr(self.remote_instance, "sku_code", sku_code)
-            update_fields.add("sku_code")
-
-        if update_fields:
-            self.remote_instance.save(update_fields=list(update_fields))
+        self._persist_publish_response_identifiers(response_data=response_data)
 
         # Default newly-published products to pending approval until document-state fetch/webhook updates it.
         self.remote_instance.status = self.remote_instance.STATUS_PENDING_APPROVAL

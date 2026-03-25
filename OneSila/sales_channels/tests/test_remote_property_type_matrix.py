@@ -31,6 +31,19 @@ from sales_channels.integrations.ebay.models import EbaySalesChannel, EbaySalesC
 from sales_channels.integrations.ebay.models.properties import EbayProperty, EbayPropertySelectValue
 from sales_channels.integrations.magento2.factories.mixins import MagentoRemoteValueMixin
 from sales_channels.integrations.magento2.models import MagentoProperty, MagentoSalesChannel
+from sales_channels.integrations.mirakl.factories.feeds.product_payloads import MiraklProductPayloadBuilder
+from sales_channels.integrations.mirakl.models import (
+    MiraklCategory,
+    MiraklProduct,
+    MiraklProductCategory,
+    MiraklProductType,
+    MiraklProductTypeItem,
+    MiraklProperty,
+    MiraklPropertyApplicability,
+    MiraklPropertySelectValue,
+    MiraklSalesChannel,
+    MiraklSalesChannelView,
+)
 from sales_channels.integrations.shein.factories.properties.properties import SheinProductPropertyValueMixin
 from sales_channels.integrations.shein.models import SheinSalesChannel
 from sales_channels.integrations.shein.models.properties import (
@@ -152,6 +165,20 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             EbaySalesChannelView,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.ebay_channel,
+        )
+
+        self.mirakl_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="mirakl.matrix.example.com",
+            shop_id=123,
+            api_key="secret-token",
+        )
+        self.mirakl_view = baker.make(
+            MiraklSalesChannelView,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            remote_id="mirakl-default-view",
         )
 
         self.shein_channel = baker.make(
@@ -412,6 +439,31 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             no_text_value=no_text_value,
         )
 
+    def _build_mirakl_property(
+        self,
+        *,
+        local_property,
+        original_type,
+        target_type,
+        allows_unmapped,
+        yes_text_value=None,
+        no_text_value=None,
+    ):
+        suffix = self._next_suffix()
+        return baker.prepare(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            local_instance=local_property,
+            code=f"matrix_mirakl_{suffix}",
+            name=f"matrix_mirakl_name_{suffix}",
+            original_type=original_type,
+            type=target_type,
+            allows_unmapped_values=allows_unmapped,
+            yes_text_value=yes_text_value,
+            no_text_value=no_text_value,
+        )
+
     def _build_shein_property(
         self,
         *,
@@ -485,7 +537,7 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         remote_property.type = target_type
         remote_property.allows_unmapped_values = allows_unmapped
 
-    def _create_select_value_mappings(self, *, target_type, select_values, amazon_property, ebay_property, shein_property):
+    def _create_select_value_mappings(self, *, target_type, select_values, amazon_property, ebay_property, mirakl_property, shein_property):
         if target_type not in (Property.TYPES.SELECT, Property.TYPES.MULTISELECT):
             return
 
@@ -520,14 +572,25 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 value=f"shein-{idx}",
                 value_en=f"Shein Option {idx}",
             )
+            baker.make(
+                MiraklPropertySelectValue,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.mirakl_channel,
+                remote_property=mirakl_property,
+                local_instance=select_value,
+                code=f"mirakl-{idx}",
+                value=f"Mirakl Option {idx}",
+            )
 
-    def _create_boolean_select_mappings(self, *, amazon_property, ebay_property, shein_property):
+    def _create_boolean_select_mappings(self, *, amazon_property, ebay_property, mirakl_property, shein_property):
         suffix = self._next_suffix()
 
         amazon_true = f"amazon-bool-true-{suffix}"
         amazon_false = f"amazon-bool-false-{suffix}"
         ebay_true = f"ebay-bool-true-{suffix}"
         ebay_false = f"ebay-bool-false-{suffix}"
+        mirakl_true = f"mirakl-bool-true-{suffix}"
+        mirakl_false = f"mirakl-bool-false-{suffix}"
         shein_true = str(900000 + (suffix * 10) + 1)
         shein_false = str(900000 + (suffix * 10) + 2)
 
@@ -578,6 +641,27 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         )
 
         baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            remote_property=mirakl_property,
+            local_instance=None,
+            code=mirakl_true,
+            value="Mirakl Boolean True",
+            bool_value=True,
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            remote_property=mirakl_property,
+            local_instance=None,
+            code=mirakl_false,
+            value="Mirakl Boolean False",
+            bool_value=False,
+        )
+
+        baker.make(
             SheinPropertySelectValue,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.shein_channel,
@@ -604,11 +688,13 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             True: {
                 "amazon": amazon_true,
                 "ebay": ebay_true,
+                "mirakl": mirakl_true,
                 "shein": shein_true,
             },
             False: {
                 "amazon": amazon_false,
                 "ebay": ebay_false,
+                "mirakl": mirakl_false,
                 "shein": shein_false,
             },
         }
@@ -655,6 +741,65 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             remote_property=ebay_property,
         )
         expected = {"type": "str"}
+        self.assertIsInstance(remote_value, str, self._format_payload_debug(remote_value, expected))
+        if expected_value is not None:
+            self.assertEqual(remote_value, expected_value, self._format_payload_debug(remote_value, expected))
+
+    def _assert_mirakl_payload(self, *, product_property, mirakl_property, expected_value=None):
+        category_remote_id = f"matrix-mirakl-category-{self._next_suffix()}"
+        category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            remote_id=category_remote_id,
+            name="Matrix Mirakl Category",
+            is_leaf=True,
+        )
+        product_type = baker.make(
+            MiraklProductType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            remote_id=category_remote_id,
+            category=category,
+        )
+        baker.make(
+            MiraklProductCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            product=product_property.product,
+            remote_id=category_remote_id,
+        )
+        baker.make(
+            MiraklPropertyApplicability,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            property=mirakl_property,
+            view=self.mirakl_view,
+        )
+        baker.make(
+            MiraklProductTypeItem,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            product_type=product_type,
+            remote_property=mirakl_property,
+            required=False,
+        )
+        remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.mirakl_channel,
+            local_instance=product_property.product,
+        )
+
+        _, rows = MiraklProductPayloadBuilder(
+            remote_product=remote_product,
+            sales_channel_view=self.mirakl_view,
+        ).build()
+
+        self.assertEqual(len(rows), 1)
+        remote_value = rows[0].get(mirakl_property.code)
+        expected = {"type": "str", "contains_key": mirakl_property.code}
+        self.assertIn(mirakl_property.code, rows[0], self._format_payload_debug(rows[0], expected))
         self.assertIsInstance(remote_value, str, self._format_payload_debug(remote_value, expected))
         if expected_value is not None:
             self.assertEqual(remote_value, expected_value, self._format_payload_debug(remote_value, expected))
@@ -738,10 +883,12 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         no_text_value=None,
         expected_amazon_value=None,
         expected_ebay_value=None,
+        expected_mirakl_value=None,
         expected_shein_value=None,
         expected_shein_attribute_value_id=None,
         amazon_accepted=None,
         ebay_accepted=None,
+        mirakl_accepted=None,
         shein_accepted=None,
         magento_accepted=None,
         woo_accepted=None,
@@ -753,6 +900,8 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             amazon_accepted = True
         if ebay_accepted is None:
             ebay_accepted = True
+        if mirakl_accepted is None:
+            mirakl_accepted = ebay_accepted
         if shein_accepted is None:
             shein_accepted = True
         if magento_accepted is None:
@@ -770,6 +919,12 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
 
         original_type = _original_type_from_key(original_key=original_key)
         allows_unmapped = _allows_unmapped_from_key(original_key=original_key)
+        if (
+            expected_mirakl_value is None
+            and expected_ebay_value is not None
+            and target_type not in (Property.TYPES.SELECT, Property.TYPES.MULTISELECT)
+        ):
+            expected_mirakl_value = str(expected_ebay_value)
 
         amazon_property = self._build_amazon_property(
             local_property=local_property,
@@ -780,6 +935,14 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             no_text_value=no_text_value,
         )
         ebay_property = self._build_ebay_property(
+            local_property=local_property,
+            original_type=original_type,
+            target_type=target_type,
+            allows_unmapped=allows_unmapped,
+            yes_text_value=yes_text_value,
+            no_text_value=no_text_value,
+        )
+        mirakl_property = self._build_mirakl_property(
             local_property=local_property,
             original_type=original_type,
             target_type=target_type,
@@ -809,6 +972,12 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             allows_unmapped=allows_unmapped,
         )
         self._persist_remote_property_for_payload_asserts(
+            remote_property=mirakl_property,
+            original_type=original_type,
+            target_type=target_type,
+            allows_unmapped=allows_unmapped,
+        )
+        self._persist_remote_property_for_payload_asserts(
             remote_property=shein_property,
             original_type=original_type,
             target_type=target_type,
@@ -820,6 +989,7 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             select_values=select_values,
             amazon_property=amazon_property,
             ebay_property=ebay_property,
+            mirakl_property=mirakl_property,
             shein_property=shein_property,
         )
 
@@ -831,6 +1001,7 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             mapped_values = self._create_boolean_select_mappings(
                 amazon_property=amazon_property,
                 ebay_property=ebay_property,
+                mirakl_property=mirakl_property,
                 shein_property=shein_property,
             )
             desired_bool = True if value_override is None else bool(value_override)
@@ -839,6 +1010,8 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 expected_amazon_value = expected_values["amazon"]
             if expected_ebay_value is None:
                 expected_ebay_value = expected_values["ebay"]
+            if expected_mirakl_value is None:
+                expected_mirakl_value = expected_values["mirakl"]
             if expected_shein_value is None:
                 expected_shein_value = expected_values["shein"]
 
@@ -856,6 +1029,14 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 product_property=product_property,
                 ebay_property=ebay_property,
                 expected_value=expected_ebay_value,
+            ),
+        )
+        self._assert_payload_acceptance(
+            accepted=mirakl_accepted,
+            assertion_callable=lambda: self._assert_mirakl_payload(
+                product_property=product_property,
+                mirakl_property=mirakl_property,
+                expected_value=expected_mirakl_value,
             ),
         )
         self._assert_payload_acceptance(
@@ -1749,5 +1930,6 @@ class RemotePropertyTypeMultiselectCustomValuesNotAllowedMatrixTestCase(BaseRemo
             target_type=Property.TYPES.SELECT,
             expected_amazon_value="amazon-1",
             expected_ebay_value="ebay-1",
+            expected_mirakl_value="mirakl-1",
             expected_shein_attribute_value_id=2001,
         )

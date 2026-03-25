@@ -1,9 +1,21 @@
 from unittest.mock import patch
 
+from django.conf import settings
+
 from sales_channels import signals as sc_signals
 from sales_channels.integrations.magento2 import factories as magento_factories
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
+from sales_channels.integrations.mirakl.models import MiraklSalesChannel
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+
+
+_ORIGINAL_MIRAKL_CONNECT = MiraklSalesChannel.connect
+
+
+def _patched_mirakl_connect(self, *args, **kwargs):
+    if getattr(settings, "TESTING", False):
+        return self.connected
+    return _ORIGINAL_MIRAKL_CONNECT(self, *args, **kwargs)
 
 
 class TaskQueueDispatchPatchMixin:
@@ -17,7 +29,19 @@ class TaskQueueDispatchPatchMixin:
         self.addCleanup(self._task_queue_dispatch_patcher.stop)
 
 
-class DisableMagentoAndWooConnectionsMixin:
+class DisableMiraklConnectionMixin:
+    def setUp(self, *, _unused=None):
+        super().setUp()
+        self._mirakl_connect_patcher = patch.object(
+            MiraklSalesChannel,
+            "connect",
+            new=_patched_mirakl_connect,
+        )
+        self._mirakl_connect_patcher.start()
+        self.addCleanup(self._mirakl_connect_patcher.stop)
+
+
+class DisableMagentoAndWooConnectionsMixin(DisableMiraklConnectionMixin):
     def setUp(self, *, _unused=None):
         super().setUp()
         self._sales_channel_created_patcher = patch.object(

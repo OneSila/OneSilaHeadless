@@ -20,6 +20,7 @@ from sales_prices.signals import price_changed
 from .integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelImport
 from .integrations.ebay.models import EbaySalesChannel, EbaySalesChannelImport
 from .integrations.magento2.models import MagentoProduct
+from .integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
 from .integrations.shein.models import SheinSalesChannel
 from .integrations.shein.models.imports import SheinSalesChannelImport
 from .models import RemoteProduct, SalesChannelImport
@@ -196,6 +197,8 @@ def sales_channels__gpt_feed_sync_on_enable(sender, instance, **kwargs):
 @receiver(post_update, sender=SalesChannelImport)
 @receiver(post_update, sender=AmazonSalesChannelImport)
 @receiver(post_update, sender=EbaySalesChannelImport)
+@receiver(post_update, sender=MiraklSalesChannelImport)
+@receiver(post_update, sender=SheinSalesChannelImport)
 def import_process_post_update_fist_import_complete_receiver(sender, instance: SalesChannelImport, **kwargs):
 
     sales_channel = instance.sales_channel
@@ -224,6 +227,7 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
 @receiver(post_create, sender=SalesChannelImport)
 @receiver(post_create, sender=AmazonSalesChannelImport)
 @receiver(post_create, sender=EbaySalesChannelImport)
+@receiver(post_create, sender=MiraklSalesChannelImport)
 @receiver(post_create, sender=SheinSalesChannelImport)
 def import_process_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     """
@@ -240,6 +244,7 @@ def import_process_post_create_receiver(sender, instance: SalesChannelImport, **
     from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
     from sales_channels.integrations.amazon.tasks import amazon_import_db_task
     from sales_channels.integrations.ebay.tasks import ebay_import_db_task
+    from sales_channels.integrations.mirakl.tasks import mirakl_import_db_task
     from sales_channels.integrations.shein.tasks import shein_import_db_task
 
     # NOTE: Magento does not trigger after creation.  The import flow will first set
@@ -268,6 +273,15 @@ def import_process_post_create_receiver(sender, instance: SalesChannelImport, **
                 sales_channel=channel,
             )
         )
+    elif isinstance(sales_channel, MiraklSalesChannel):
+        if instance.status in [MiraklSalesChannelImport.STATUS_NEW, MiraklSalesChannelImport.STATUS_PENDING]:
+            refresh_subscription_receiver(sales_channel)
+            transaction.on_commit(
+                lambda import_process=instance, channel=sales_channel: mirakl_import_db_task(
+                    import_process=import_process,
+                    sales_channel=channel,
+                )
+            )
 
     else:
         logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_create.")
@@ -276,6 +290,7 @@ def import_process_post_create_receiver(sender, instance: SalesChannelImport, **
 @receiver(post_update, sender=SalesChannelImport)
 @receiver(post_update, sender=AmazonSalesChannelImport)
 @receiver(post_update, sender=EbaySalesChannelImport)
+@receiver(post_update, sender=MiraklSalesChannelImport)
 @trigger_signal_for_dirty_fields('status')
 def import_process_post_update_receiver(sender, instance: SalesChannelImport, **kwargs):
     """
@@ -294,6 +309,7 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
     from sales_channels.integrations.amazon.tasks import amazon_import_db_task
     from sales_channels.integrations.ebay.models import EbaySalesChannel
     from sales_channels.integrations.ebay.tasks import ebay_import_db_task
+    from sales_channels.integrations.mirakl.tasks import mirakl_import_db_task
     from sales_channels.integrations.shein.tasks import shein_import_db_task
     from sales_channels.integrations.shein.models.imports import SheinSalesChannelImport
     from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
@@ -311,6 +327,13 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
             amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
         elif isinstance(sales_channel, EbaySalesChannel):
             ebay_import_db_task(import_process=instance, sales_channel=sales_channel)
+        elif isinstance(sales_channel, MiraklSalesChannel):
+            transaction.on_commit(
+                lambda import_process=instance, channel=sales_channel: mirakl_import_db_task(
+                    import_process=import_process,
+                    sales_channel=channel,
+                )
+            )
         elif isinstance(sales_channel, SheinSalesChannelImport):
             transaction.on_commit(
                 lambda import_process=instance, channel=sales_channel: shein_import_db_task(

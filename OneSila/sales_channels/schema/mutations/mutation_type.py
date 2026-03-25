@@ -30,12 +30,58 @@ from sales_channels.content_templates import (
     build_content_template_context,
     render_sales_channel_content_template,
 )
-from sales_channels.models import SalesChannel, SalesChannelGptFeed, SalesChannelViewAssign
+from sales_channels.models import SalesChannel, SalesChannelGptFeed, SalesChannelImport, SalesChannelViewAssign
 
 
 @type(name='Mutation')
 class SalesChannelsMutation:
-    create_sales_import_process: SalesChannelImportType = create(SalesChannelImportInput)
+    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
+    def create_sales_import_process(
+        self,
+        data: SalesChannelImportInput,
+        info: Info,
+    ) -> SalesChannelImportType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        sales_channel = SalesChannel.objects.get(
+            id=data.sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        ).get_real_instance()
+
+        import_name = str(getattr(data, "name", "") or "").strip()
+        import_status = getattr(data, "status", SalesChannelImport.STATUS_NEW)
+
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
+
+        if isinstance(sales_channel, MiraklSalesChannel):
+            normalized_name = import_name.lower()
+            import_type = (
+                MiraklSalesChannelImport.TYPE_PRODUCTS
+                if normalized_name == MiraklSalesChannelImport.TYPE_PRODUCTS
+                else MiraklSalesChannelImport.TYPE_SCHEMA
+            )
+            return MiraklSalesChannelImport.objects.create(
+                multi_tenant_company=multi_tenant_company,
+                sales_channel=sales_channel,
+                name=import_name,
+                status=import_status,
+                create_only=getattr(data, "create_only", False),
+                update_only=getattr(data, "update_only", False),
+                override_only=getattr(data, "override_only", False),
+                skip_broken_records=getattr(data, "skip_broken_records", False),
+                type=import_type,
+            )
+
+        return SalesChannelImport.objects.create(
+            multi_tenant_company=multi_tenant_company,
+            sales_channel=sales_channel,
+            name=import_name,
+            status=import_status,
+            create_only=getattr(data, "create_only", False),
+            update_only=getattr(data, "update_only", False),
+            override_only=getattr(data, "override_only", False),
+            skip_broken_records=getattr(data, "skip_broken_records", False),
+        )
+
     create_sales_import_processes: List[SalesChannelImportType] = create(SalesChannelImportInput)
     update_sales_import_process: SalesChannelImportType = update(SalesChannelImportPartialInput)
     delete_sales_import_process: SalesChannelImportType = delete()
@@ -286,6 +332,8 @@ class SalesChannelsMutation:
         from sales_channels.integrations.amazon.tasks import amazon_map_perfect_match_select_values_db_task
         from sales_channels.integrations.ebay.models import EbaySalesChannel
         from sales_channels.integrations.ebay.tasks import ebay_map_perfect_match_select_values_db_task
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+        from sales_channels.integrations.mirakl.tasks import mirakl_map_perfect_match_select_values_db_task
         from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.shein.tasks import shein_map_perfect_match_select_values_db_task
 
@@ -313,6 +361,10 @@ class SalesChannelsMutation:
             shein_map_perfect_match_select_values_db_task(sales_channel_id=resolved_channel.id)
             return True
 
+        if isinstance(resolved_channel, MiraklSalesChannel):
+            mirakl_map_perfect_match_select_values_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
         raise ValidationError("Unsupported sales channel integration.")
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
@@ -326,6 +378,8 @@ class SalesChannelsMutation:
         from sales_channels.integrations.amazon.tasks import amazon_map_perfect_match_properties_db_task
         from sales_channels.integrations.ebay.models import EbaySalesChannel
         from sales_channels.integrations.ebay.tasks import ebay_map_perfect_match_properties_db_task
+        from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+        from sales_channels.integrations.mirakl.tasks import mirakl_map_perfect_match_properties_db_task
         from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.shein.tasks import shein_map_perfect_match_properties_db_task
 
@@ -351,6 +405,10 @@ class SalesChannelsMutation:
 
         if isinstance(resolved_channel, SheinSalesChannel):
             shein_map_perfect_match_properties_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
+        if isinstance(resolved_channel, MiraklSalesChannel):
+            mirakl_map_perfect_match_properties_db_task(sales_channel_id=resolved_channel.id)
             return True
 
         raise ValidationError("Unsupported sales channel integration.")

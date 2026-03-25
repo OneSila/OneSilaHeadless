@@ -19,7 +19,9 @@ from properties.models import (
 from sales_prices.models import SalesPrice
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.integrations.amazon.models import AmazonProduct, AmazonSalesChannelView
+from sales_channels.integrations.mirakl.models import MiraklSalesChannel
 from sales_channels.models import SalesChannelViewAssign
+from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
 RESYNC_SALES_CHANNEL_VIEW_ASSIGNS_MUTATION = """
@@ -53,6 +55,20 @@ CHECK_TEMPLATE_MUTATION = """
           validationIssue
         }
       }
+    }
+"""
+
+
+MAP_SALES_CHANNEL_PERFECT_MATCH_SELECT_VALUES_MUTATION = """
+    mutation($salesChannel: SalesChannelPartialInput!) {
+      mapSalesChannelPerfectMatchSelectValues(salesChannel: $salesChannel)
+    }
+"""
+
+
+MAP_SALES_CHANNEL_PERFECT_MATCH_PROPERTIES_MUTATION = """
+    mutation($salesChannel: SalesChannelPartialInput!) {
+      mapSalesChannelPerfectMatchProperties(salesChannel: $salesChannel)
     }
 """
 
@@ -270,3 +286,40 @@ class ResyncSalesChannelAssignsMutationTestCase(TransactionTestCaseMixin, Transa
         _, kwargs = send_mock.call_args
         self.assertEqual(kwargs["instance"].id, self.remote_product.id)
         self.assertEqual(kwargs["view"].id, self.view.id)
+
+
+class PerfectMatchMappingMutationTestCase(
+    DisableMiraklConnectionMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = MiraklSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="mirakl.example.com",
+            shop_id=123,
+            api_key="secret",
+        )
+
+    @patch("sales_channels.integrations.mirakl.tasks.mirakl_map_perfect_match_select_values_db_task")
+    def test_map_sales_channel_perfect_match_select_values_supports_mirakl(self, task_mock):
+        response = self.strawberry_test_client(
+            query=MAP_SALES_CHANNEL_PERFECT_MATCH_SELECT_VALUES_MUTATION,
+            variables={"salesChannel": {"id": self.to_global_id(self.sales_channel)}},
+        )
+
+        self.assertIsNone(response.errors)
+        self.assertTrue(response.data["mapSalesChannelPerfectMatchSelectValues"])
+        task_mock.assert_called_once_with(sales_channel_id=self.sales_channel.id)
+
+    @patch("sales_channels.integrations.mirakl.tasks.mirakl_map_perfect_match_properties_db_task")
+    def test_map_sales_channel_perfect_match_properties_supports_mirakl(self, task_mock):
+        response = self.strawberry_test_client(
+            query=MAP_SALES_CHANNEL_PERFECT_MATCH_PROPERTIES_MUTATION,
+            variables={"salesChannel": {"id": self.to_global_id(self.sales_channel)}},
+        )
+
+        self.assertIsNone(response.errors)
+        self.assertTrue(response.data["mapSalesChannelPerfectMatchProperties"])
+        task_mock.assert_called_once_with(sales_channel_id=self.sales_channel.id)
