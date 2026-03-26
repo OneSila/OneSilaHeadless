@@ -22,6 +22,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelFeed,
     MiraklSalesChannelFeedItem,
     MiraklSalesChannelImport,
+    MiraklSalesChannelImportExportFile,
     MiraklSalesChannelView,
 )
 from sales_channels.integrations.mirakl.schema.types.filters import (
@@ -43,6 +44,7 @@ from sales_channels.integrations.mirakl.schema.types.filters import (
     MiraklSalesChannelFeedFilter,
     MiraklSalesChannelFeedItemFilter,
     MiraklSalesChannelImportFilter,
+    MiraklSalesChannelImportExportFileFilter,
     MiraklSalesChannelViewFilter,
 )
 from sales_channels.integrations.mirakl.schema.types.ordering import (
@@ -61,6 +63,7 @@ from sales_channels.integrations.mirakl.schema.types.ordering import (
     MiraklRemoteCurrencyOrder,
     MiraklRemoteLanguageOrder,
     MiraklSalesChannelImportOrder,
+    MiraklSalesChannelImportExportFileOrder,
     MiraklSalesChannelFeedItemOrder,
     MiraklSalesChannelFeedOrder,
     MiraklSalesChannelOrder,
@@ -398,6 +401,7 @@ class MiraklEanCodeType(relay.Node, GetQuerysetMultiTenantMixin):
 )
 class MiraklSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated["MiraklSalesChannelType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+    export_files: List[Annotated["MiraklSalesChannelImportExportFileType", lazy("sales_channels.integrations.mirakl.schema.types.types")]]
 
     @field()
     def import_id(self, info) -> str:
@@ -408,3 +412,18 @@ class MiraklSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.schema.types.types import SalesChannelImportType
 
         return to_base64(SalesChannelImportType, self.pk)
+
+
+@type(
+    MiraklSalesChannelImportExportFile,
+    filters=MiraklSalesChannelImportExportFileFilter,
+    order=MiraklSalesChannelImportExportFileOrder,
+    pagination=True,
+    fields="__all__",
+)
+class MiraklSalesChannelImportExportFileType(relay.Node, GetQuerysetMultiTenantMixin):
+    import_process: Annotated["MiraklSalesChannelImportType", lazy("sales_channels.integrations.mirakl.schema.types.types")]
+
+    @field()
+    def file_url(self, info) -> Optional[str]:
+        return getattr(self, "file_url", None)

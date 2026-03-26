@@ -1,32 +1,28 @@
-from __future__ import annotations
-
-from decimal import Decimal
+from io import BytesIO
 from unittest.mock import patch
 
-from currencies.models import PublicCurrency
-from core.tests import TestCase
+from django.core.files.base import ContentFile
 from model_bakery import baker
-from media.models import MediaProductThrough
+from openpyxl import Workbook
+
+from core.tests import TestCase
 from products.models import ConfigurableVariation, Product
 from properties.models import (
+    ProductProperty,
     Property,
     PropertySelectValue,
-    PropertySelectValueTranslation,
-    PropertyTranslation,
 )
-from sales_prices.models import SalesPrice
-from sales_channels.integrations.mirakl.factories.imports.products.client import MiraklProductsImportClient
 from sales_channels.integrations.mirakl.factories.imports.products import MiraklProductsImportProcessor
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
     MiraklPrice,
     MiraklProduct,
     MiraklProductCategory,
-    MiraklProductContent,
     MiraklProperty,
     MiraklPropertySelectValue,
     MiraklSalesChannel,
     MiraklSalesChannelImport,
+    MiraklSalesChannelImportExportFile,
     MiraklSalesChannelView,
 )
 from sales_channels.models import SalesChannelViewAssign
@@ -44,228 +40,302 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             api_key="secret-token",
             active=True,
         )
+        self.view = baker.make(
+            MiraklSalesChannelView,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="UK",
+            name="United Kingdom",
+            url="https://shop.example.com",
+        )
         self.import_process = baker.make(
             MiraklSalesChannelImport,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             type=MiraklSalesChannelImport.TYPE_PRODUCTS,
-            update_only=False,
             skip_broken_records=True,
         )
-        self.view = baker.make(
-            MiraklSalesChannelView,
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_id="INIT",
-            name="INIT",
-        )
-        self.category = baker.make(
-            MiraklCategory,
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_id="toys-dress_up_and_role_play",
-            name="Dress Up & Role Play",
-            is_leaf=True,
-        )
-        self.brand_property = Property.objects.filter(
-            multi_tenant_company=self.multi_tenant_company,
-            internal_name="brand",
-        ).first()
-        if self.brand_property is None:
-            self.brand_property = baker.make(
-                Property,
-                multi_tenant_company=self.multi_tenant_company,
-                internal_name="brand",
-                type=Property.TYPES.SELECT,
+
+    def _build_workbook_bytes(self, *, codes, rows, error_rows=None):
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append([f"Label {index}" for index in range(1, len(codes) + 1)])
+        worksheet.append(codes)
+        for row in rows:
+            worksheet.append(row)
+
+        if error_rows:
+            error_worksheet = workbook.create_sheet(title="Error Details")
+            error_worksheet.append(
+                [
+                    "line-number",
+                    "provider-unique-identifier",
+                    "channels",
+                    "attribute-label",
+                    "attribute-codes",
+                    "error-code",
+                    "error-message",
+                ]
             )
-            PropertyTranslation.objects.create(
-                multi_tenant_company=self.multi_tenant_company,
-                property=self.brand_property,
-                language=self.multi_tenant_company.language,
-                name="Brand",
-            )
-        self.brand_option = baker.make(
-            PropertySelectValue,
+            for error_row in error_rows:
+                error_worksheet.append(error_row)
+
+        stream = BytesIO()
+        workbook.save(stream)
+        workbook.close()
+        return stream.getvalue()
+
+    def _create_export_file(self, *, codes, rows, error_rows=None):
+        export_file = baker.make(
+            MiraklSalesChannelImportExportFile,
             multi_tenant_company=self.multi_tenant_company,
-            property=self.brand_property,
+            import_process=self.import_process,
         )
-        PropertySelectValueTranslation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            propertyselectvalue=self.brand_option,
-            language=self.multi_tenant_company.language,
-            value="I Love Fancy Dress",
+        export_file.file.save(
+            "mirakl-import.xlsx",
+            ContentFile(self._build_workbook_bytes(codes=codes, rows=rows, error_rows=error_rows)),
+            save=True,
         )
-        self.remote_brand = baker.make(
+        return export_file
+
+    def _create_basic_properties(self):
+        baker.make(
             MiraklProperty,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            code="brand",
-            type=Property.TYPES.SELECT,
-            local_instance=self.brand_property,
+            code="shop_sku",
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_SKU,
         )
         baker.make(
-            MiraklPropertySelectValue,
+            MiraklProperty,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            remote_property=self.remote_brand,
-            code="ILFD",
-            value="I Love Fancy Dress",
-            local_instance=self.brand_option,
+            code="product_title",
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
         )
-        PublicCurrency.objects.get_or_create(
-            iso_code="GBP",
-            defaults={"name": "Pound Sterling", "symbol": "GBP"},
+        baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="product_category",
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_CATEGORY,
         )
 
-    def _build_offer(
-        self,
-        *,
-        shop_sku: str,
-        product_sku: str,
-        title: str = "U.S Army Jumpsuit Costume",
-        reference: str = "5055988633820",
-    ) -> dict:
-        return {
-            "active": True,
-            "all_prices": [
-                {
-                    "price": 15.99,
-                    "unit_origin_price": 15.99,
-                    "unit_discount_price": None,
-                    "channel_code": None,
-                    "volume_prices": [
-                        {
-                            "price": 15.99,
-                            "quantity_threshold": 1,
-                            "unit_origin_price": 15.99,
-                            "unit_discount_price": None,
-                        }
-                    ],
-                }
+    @patch.object(MiraklProductsImportProcessor, "mirakl_paginated_get")
+    def test_run_import_uses_of21_fallbacks_and_creates_category_assign(self, mirakl_paginated_get_mock):
+        self._create_basic_properties()
+        baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CAT-1",
+            name="Category",
+            is_leaf=True,
+        )
+        self._create_export_file(
+            codes=["shop_sku", "product_title", "product_category"],
+            rows=[["SELLER-1", "", ""]],
+        )
+        mirakl_paginated_get_mock.return_value = [
+            {
+                "shop_sku": "SELLER-1",
+                "product_sku": "REMOTE-1",
+                "product_title": "Offer Title",
+                "description": "Offer description",
+                "internal_description": "Short description",
+                "category_code": "CAT-1",
+                "currency_iso_code": "GBP",
+                "price": 12.5,
+                "active": True,
+                "channels": ["UK"],
+            }
+        ]
+
+        MiraklProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        ).run()
+
+        product = Product.objects.get(multi_tenant_company=self.multi_tenant_company, sku="SELLER-1")
+        remote_product = MiraklProduct.objects.get(local_instance=product, sales_channel=self.sales_channel)
+        self.assertEqual(product.name, "Offer Title")
+        self.assertEqual(remote_product.remote_sku, "REMOTE-1")
+        self.assertTrue(
+            MiraklProductCategory.objects.filter(
+                product=product,
+                sales_channel=self.sales_channel,
+                remote_id="CAT-1",
+            ).exists()
+        )
+        self.assertTrue(
+            SalesChannelViewAssign.objects.filter(
+                product=product,
+                sales_channel_view=self.view,
+                remote_product=remote_product,
+            ).exists()
+        )
+        self.assertTrue(
+            MiraklPrice.objects.filter(
+                remote_product=remote_product,
+                sales_channel=self.sales_channel,
+            ).exists()
+        )
+
+    @patch.object(MiraklProductsImportProcessor, "mirakl_paginated_get")
+    def test_run_import_prefers_of21_category_code_over_file_category_label(self, mirakl_paginated_get_mock):
+        self._create_basic_properties()
+        baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CAT-OF21",
+            name="Dress Up & Role Play",
+            is_leaf=True,
+        )
+        self._create_export_file(
+            codes=["shop_sku", "product_title", "product_category"],
+            rows=[["SELLER-2", "Fancy Dress Item", "Toys/Dress Up & Role Play"]],
+        )
+        mirakl_paginated_get_mock.return_value = [
+            {
+                "shop_sku": "SELLER-2",
+                "product_sku": "REMOTE-2",
+                "product_title": "Fancy Dress Item",
+                "category_code": "CAT-OF21",
+                "channels": ["UK"],
+                "active": True,
+            }
+        ]
+
+        MiraklProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        ).run()
+
+        product = Product.objects.get(multi_tenant_company=self.multi_tenant_company, sku="SELLER-2")
+        self.assertTrue(
+            MiraklProductCategory.objects.filter(
+                product=product,
+                sales_channel=self.sales_channel,
+                remote_id="CAT-OF21",
+            ).exists()
+        )
+
+    @patch.object(MiraklProductsImportProcessor, "mirakl_paginated_get")
+    def test_run_import_builds_configurable_parent_and_variation_remote_links(self, mirakl_paginated_get_mock):
+        self._create_basic_properties()
+        baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="parent_sku",
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
+        )
+        baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CAT-2",
+            name="Category 2",
+            is_leaf=True,
+        )
+        self._create_export_file(
+            codes=["shop_sku", "parent_sku", "product_title", "product_category"],
+            rows=[["SELLER-CHILD", "PARENT-1", "Variant Title", "CAT-2"]],
+        )
+        mirakl_paginated_get_mock.return_value = [
+            {
+                "shop_sku": "SELLER-CHILD",
+                "product_sku": "REMOTE-CHILD",
+                "product_title": "Variant Title",
+                "category_code": "CAT-2",
+                "channels": ["UK"],
+                "active": True,
+            }
+        ]
+
+        MiraklProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        ).run()
+
+        parent = Product.objects.get(multi_tenant_company=self.multi_tenant_company, sku="PARENT-1")
+        child = Product.objects.get(multi_tenant_company=self.multi_tenant_company, sku="SELLER-CHILD")
+        parent_remote = MiraklProduct.objects.get(local_instance=parent, sales_channel=self.sales_channel)
+        child_remote = MiraklProduct.objects.get(local_instance=child, sales_channel=self.sales_channel)
+
+        self.assertTrue(parent.is_configurable())
+        self.assertTrue(child.is_simple())
+        self.assertTrue(
+            ConfigurableVariation.objects.filter(parent=parent, variation=child).exists()
+        )
+        self.assertEqual(parent_remote.remote_sku, "PARENT-1")
+        self.assertEqual(child_remote.remote_sku, "REMOTE-CHILD")
+        self.assertEqual(child_remote.remote_parent_product_id, parent_remote.id)
+        self.assertTrue(
+            SalesChannelViewAssign.objects.filter(
+                product=parent,
+                sales_channel_view=self.view,
+                remote_product=parent_remote,
+            ).exists()
+        )
+        self.assertFalse(
+            SalesChannelViewAssign.objects.filter(
+                product=child,
+                sales_channel_view=self.view,
+            ).exists()
+        )
+        self.assertTrue(
+            MiraklProductCategory.objects.filter(
+                product=parent,
+                sales_channel=self.sales_channel,
+                remote_id="CAT-2",
+            ).exists()
+        )
+        self.assertTrue(
+            MiraklProductCategory.objects.filter(
+                product=child,
+                sales_channel=self.sales_channel,
+                remote_id="CAT-2",
+            ).exists()
+        )
+
+    @patch.object(MiraklProductsImportProcessor, "mirakl_paginated_get")
+    def test_run_import_creates_issues_from_error_details_sheet(self, mirakl_paginated_get_mock):
+        self._create_basic_properties()
+        baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CAT-3",
+            name="Category 3",
+            is_leaf=True,
+        )
+        self._create_export_file(
+            codes=["shop_sku", "product_title", "product_category"],
+            rows=[["SELLER-3", "Offer 3", "CAT-3"]],
+            error_rows=[
+                [
+                    3,
+                    "SELLER-3",
+                    "UK",
+                    "",
+                    "",
+                    "VARIANT_DESCRIPTION_MISMATCH : Description is different across variants",
+                    "Auto Validation Failed: Descriptions must be identical for grouped products",
+                ]
             ],
-            "allow_quote_requests": False,
-            "applicable_pricing": {
-                "price": 15.99,
-                "unit_origin_price": 15.99,
-                "unit_discount_price": None,
-                "channel_code": None,
-                "volume_prices": [
-                    {
-                        "price": 15.99,
-                        "quantity_threshold": 1,
-                        "unit_origin_price": 15.99,
-                        "unit_discount_price": None,
-                    }
-                ],
-            },
-            "category_code": "toys-dress_up_and_role_play",
-            "category_label": "Dress Up & Role Play",
-            "channels": ["INIT"],
-            "currency_iso_code": "GBP",
-            "description": None,
-            "fulfillment": {"center": {"code": "DEFAULT"}},
-            "internal_description": "Back office copy",
-            "leadtime_to_ship": 3,
-            "logistic_class": {"code": "INIT", "label": "Default logistic family"},
-            "min_shipping_price": 0.0,
-            "min_shipping_price_additional": 0.0,
-            "min_shipping_type": "ukstandard",
-            "min_shipping_zone": "GB",
-            "msrp": 21.99,
-            "offer_additional_fields": [],
-            "offer_id": 18117596,
-            "price": 15.99,
-            "price_additional_info": None,
-            "product_brand": "I Love Fancy Dress",
-            "product_description": "Mirakl imported description",
-            "product_references": [{"reference": reference, "reference_type": "EAN"}],
-            "product_sku": product_sku,
-            "product_title": title,
-            "quantity": 30,
-            "shipping_deadline": "2026-03-20T23:59:59.999Z",
-            "shop_sku": shop_sku,
-            "state_code": "11",
-            "total_price": 15.99,
-            "warehouses": None,
-        }
-
-    def _build_p11_product(
-        self,
-        *,
-        reference: str,
-        product_sku: str,
-        title: str = "U.S Army Jumpsuit Costume",
-        description: str = "P11 product description",
-        brand: str = "I Love Fancy Dress",
-    ) -> dict:
-        return {
-            "category_code": "toys-dress_up_and_role_play",
-            "category_label": "Dress Up & Role Play",
-            "product_brand": brand,
-            "product_description": description,
-            "product_media": {
-                "media_url": "https://cdn.example.com/mirakl-image.jpg",
-                "type": "LARGE",
-            },
-            "product_references": [{"reference": reference, "reference_type": "EAN"}],
-            "product_sku": product_sku,
-            "product_title": title,
-            "offers": [],
-            "total_count": 1,
-        }
-
-    def _build_p31_product(self, *, reference: str, product_sku: str) -> dict:
-        return {
-            "category_code": "toys-dress_up_and_role_play",
-            "category_label": "Dress Up & Role Play",
-            "product_id": "P31-123",
-            "product_id_type": "EAN",
-            "product_sku": product_sku,
-            "product_title": "U.S Army Jumpsuit Costume",
-            "product_references": [{"reference": reference, "reference_type": "EAN"}],
-        }
-
-    @patch("sales_channels.integrations.mirakl.factories.imports.products.processor.time.sleep")
-    @patch(
-        "imports_exports.factories.media.ImportImageInstance.download_image_from_url"
-    )
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_offers_page"
-    )
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_by_references"
-    )
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_offers_by_references"
-    )
-    def test_run_imports_of21_offer_prices_and_p31_remote_id(
-        self,
-        get_products_offers_by_references_mock,
-        get_products_by_references_mock,
-        get_offers_page_mock,
-        download_image_from_url_mock,
-        _sleep_mock,
-    ):
-        offer = self._build_offer(shop_sku="ILFD7157XL", product_sku="M5055988633820")
-        offer["product_description"] = ""
-        get_offers_page_mock.return_value = {
-            "offers": [offer],
-            "total_count": 1,
-        }
-        get_products_offers_by_references_mock.return_value = [
-            self._build_p11_product(
-                reference="5055988633820",
-                product_sku="M5055988633820",
-                description="P11 enriched description",
-            )
+        )
+        mirakl_paginated_get_mock.return_value = [
+            {
+                "shop_sku": "SELLER-3",
+                "product_sku": "REMOTE-3",
+                "product_title": "Offer 3",
+                "category_code": "CAT-3",
+                "channels": ["UK"],
+                "active": True,
+            }
         ]
-        get_products_by_references_mock.return_value = [
-            self._build_p31_product(
-                reference="5055988633820",
-                product_sku="M5055988633820",
-            )
-        ]
-        download_image_from_url_mock.return_value = None
 
         MiraklProductsImportProcessor(
             import_process=self.import_process,
@@ -274,102 +344,13 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
 
         remote_product = MiraklProduct.objects.get(
             sales_channel=self.sales_channel,
-            remote_sku="M5055988633820",
+            remote_sku="REMOTE-3",
         )
-        local_price = SalesPrice.objects.get(
-            product=remote_product.local_instance,
-            currency__iso_code="GBP",
-        )
-        content = MiraklProductContent.objects.get(remote_product=remote_product)
-        remote_price = MiraklPrice.objects.get(remote_product=remote_product)
-
-        self.assertEqual(remote_product.remote_id, "P31-123")
-        self.assertEqual(remote_product.local_instance.sku, "ILFD7157XL")
-        self.assertEqual(local_price.price, Decimal("15.99"))
-        self.assertEqual(local_price.rrp, Decimal("21.99"))
+        issue = remote_product.issues.get()
+        self.assertEqual(issue.code, "VARIANT_DESCRIPTION_MISMATCH")
+        self.assertEqual(issue.severity, "ERROR")
         self.assertEqual(
-            content.content_data[self.multi_tenant_company.language]["short_description"],
-            "Back office copy",
+            issue.raw_data["source"],
+            MiraklProductsImportProcessor.ISSUE_SOURCE_ERROR_DETAILS,
         )
-        self.assertEqual(
-            content.content_data[self.multi_tenant_company.language]["description"],
-            "P11 enriched description",
-        )
-        self.assertEqual(remote_price.price_data["GBP"]["discount_price"], 15.99)
-        self.assertEqual(remote_price.price_data["GBP"]["price"], 21.99)
-        get_products_offers_by_references_mock.assert_called_once_with(
-            product_references=[("EAN", "5055988633820")],
-        )
-        get_products_by_references_mock.assert_called_once_with(
-            product_references=[("EAN", "5055988633820")],
-        )
-        self.assertTrue(
-            SalesChannelViewAssign.objects.filter(
-                sales_channel=self.sales_channel,
-                sales_channel_view=self.view,
-                remote_product=remote_product,
-                product=remote_product.local_instance,
-            ).exists()
-        )
-
-    @patch("sales_channels.integrations.mirakl.factories.imports.products.processor.time.sleep")
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_by_references"
-    )
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_offers_page"
-    )
-    @patch(
-        "sales_channels.integrations.mirakl.factories.imports.products.client.MiraklProductsImportClient.get_products_offers_by_references"
-    )
-    def test_p31_not_found_does_not_mark_import_broken(
-        self,
-        get_products_offers_by_references_mock,
-        get_offers_page_mock,
-        get_products_by_references_mock,
-        _sleep_mock,
-    ):
-        get_offers_page_mock.return_value = {
-            "offers": [self._build_offer(shop_sku="ILFD4538XXL", product_sku="M5060347859551")],
-            "total_count": 1,
-        }
-        get_products_offers_by_references_mock.return_value = []
-        get_products_by_references_mock.return_value = []
-
-        MiraklProductsImportProcessor(
-            import_process=self.import_process,
-            sales_channel=self.sales_channel,
-        ).run()
-
-        self.import_process.refresh_from_db()
-        self.assertEqual(self.import_process.status, MiraklSalesChannelImport.STATUS_SUCCESS)
-        self.assertEqual(self.import_process.broken_records, [])
-
-
-class MiraklProductsImportClientTests(DisableMiraklConnectionMixin, TestCase):
-    def setUp(self):
-        super().setUp()
-        self.sales_channel = baker.make(
-            MiraklSalesChannel,
-            multi_tenant_company=self.multi_tenant_company,
-            hostname="https://mirakl.example.com",
-            shop_id=123,
-            api_key="secret-token",
-            active=True,
-        )
-
-    def test_get_products_by_references_batches_requests_by_100(self):
-        client = MiraklProductsImportClient(sales_channel=self.sales_channel)
-        product_references = [("EAN", f"code-{index}") for index in range(205)]
-
-        with patch.object(client, "mirakl_get", return_value={"products": []}) as mirakl_get_mock:
-            client.get_products_by_references(product_references=product_references)
-
-        self.assertEqual(mirakl_get_mock.call_count, 3)
-        first_batch = mirakl_get_mock.call_args_list[0].kwargs["params"]["product_references"].split(",")
-        second_batch = mirakl_get_mock.call_args_list[1].kwargs["params"]["product_references"].split(",")
-        third_batch = mirakl_get_mock.call_args_list[2].kwargs["params"]["product_references"].split(",")
-
-        self.assertEqual(len(first_batch), 100)
-        self.assertEqual(len(second_batch), 100)
-        self.assertEqual(len(third_batch), 5)
+        self.assertEqual(list(issue.views.values_list("remote_id", flat=True)), ["UK"])

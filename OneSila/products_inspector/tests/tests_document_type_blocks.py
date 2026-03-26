@@ -389,8 +389,9 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
             remote_document_type.save()
 
         mock_refresh.assert_called_once_with(
-            product_ids=set(),
+            product_ids={product.id},
             multi_tenant_company_id=self.multi_tenant_company.id,
+            run_async=True,
         )
 
     def test_required_document_accepts_default_or_channel_document(self):

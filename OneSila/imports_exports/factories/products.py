@@ -414,20 +414,16 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'properties'):
 
             for property in self.properties:
-                try:
-                    property_instance = property.get('property', None)
-                    product_property_import_instance = ImportProductPropertyInstance(
-                        property,
-                        self.import_process,
-                        property=property_instance,
-                        product=self.instance)
+                property_instance = property.get('property', None)
+                product_property_import_instance = ImportProductPropertyInstance(
+                    property,
+                    self.import_process,
+                    property=property_instance,
+                    product=self.instance)
 
-                    product_property_import_instance.language = self.language
-                    product_property_import_instance.process()
-                    product_property_ids.append(product_property_import_instance.instance.id)
-                except Exception as e:
-                    # @TODO: Come hare later and remove this except
-                    pass
+                product_property_import_instance.language = self.language
+                product_property_import_instance.process()
+                product_property_ids.append(product_property_import_instance.instance.id)
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
 

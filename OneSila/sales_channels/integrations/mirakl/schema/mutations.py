@@ -24,6 +24,8 @@ from sales_channels.integrations.mirakl.schema.types.input import (
     MiraklRemoteCurrencyPartialInput,
     MiraklRemoteLanguagePartialInput,
     MiraklSalesChannelImportInput,
+    MiraklSalesChannelImportExportFileInput,
+    MiraklSalesChannelImportExportFilePartialInput,
     MiraklSalesChannelImportPartialInput,
     MiraklSalesChannelInput,
     MiraklSalesChannelPartialInput,
@@ -42,6 +44,7 @@ from sales_channels.integrations.mirakl.schema.types.types import (
     MiraklSalesChannelType,
     MiraklSalesChannelFeedType,
     MiraklSalesChannelImportType,
+    MiraklSalesChannelImportExportFileType,
     MiraklSalesChannelViewType,
 )
 from sales_channels.signals import refresh_website_pull_models
@@ -68,6 +71,7 @@ class MiraklSalesChannelMutation:
     update_mirakl_product_type_item: MiraklProductTypeItemType = update(MiraklProductTypeItemPartialInput)
     create_mirakl_import_process: MiraklSalesChannelImportType = create(MiraklSalesChannelImportInput)
     update_mirakl_import_process: MiraklSalesChannelImportType = update(MiraklSalesChannelImportPartialInput)
+    create_mirakl_import_export_file: MiraklSalesChannelImportExportFileType = create(MiraklSalesChannelImportExportFileInput)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def validate_mirakl_credentials(

@@ -19,6 +19,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelFeed,
     MiraklSalesChannelFeedItem,
     MiraklSalesChannelImport,
+    MiraklSalesChannelImportExportFile,
     MiraklSalesChannelView,
 )
 
@@ -129,5 +130,11 @@ class MiraklEanCodeOrder:
 
 @order(MiraklSalesChannelImport)
 class MiraklSalesChannelImportOrder:
+    id: auto
+    created_at: auto
+
+
+@order(MiraklSalesChannelImportExportFile)
+class MiraklSalesChannelImportExportFileOrder:
     id: auto
     created_at: auto

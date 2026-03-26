@@ -1,76 +1,43 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from django.utils.text import slugify
 
+from media.models import Image
 from products.models import Product
 from properties.models import Property
+from sales_channels.exceptions import MiraklImportMissingProductSkuError
 from sales_channels.integrations.mirakl.models import (
+    MiraklCategory,
     MiraklProductType,
     MiraklProperty,
     MiraklPropertySelectValue,
 )
 
 
+@dataclass(slots=True)
+class MiraklMappedRow:
+    shop_sku: str
+    remote_sku: str
+    category_code: str
+    rule: Any | None
+    is_configurable: bool
+    parent_sku: str
+    parent_payload: dict[str, Any] | None
+    child_payload: dict[str, Any]
+    view_codes: list[str]
+    offer_data: dict[str, Any]
+
+
 class MiraklReverseProductMapper:
-    RESERVED_FIELD_CODES = {
-        "active",
-        "all_prices",
-        "allow_quote_requests",
-        "applicable_pricing",
-        "available_end_date",
-        "available_start_date",
-        "category_code",
-        "category_label",
-        "channels",
-        "currency_iso_code",
-        "date_created",
-        "deleted",
-        "description",
-        "discount",
-        "favorite_rank",
-        "fulfillment",
-        "inactivity_reasons",
-        "internal_description",
-        "is_professional",
-        "last_updated",
-        "leadtime_to_ship",
-        "logistic_class",
-        "max_order_quantity",
-        "min_order_quantity",
-        "min_shipping_price",
-        "min_shipping_price_additional",
-        "min_shipping_type",
-        "min_shipping_zone",
-        "msrp",
-        "offer_additional_fields",
-        "offer_id",
-        "offers",
-        "package_quantity",
-        "price",
-        "price_additional_info",
-        "product_brand",
-        "product_description",
-        "product_id",
-        "product_id_type",
-        "product_media",
-        "product_medias",
-        "product_references",
-        "product_sku",
-        "product_tax_code",
-        "product_title",
-        "quantity",
-        "retail_prices",
-        "shipping_deadline",
-        "shop_id",
-        "shop_name",
-        "shop_sku",
-        "state_code",
-        "total_price",
-        "total_count",
-        "warehouses",
-        "measurement",
+    PROPERTY_REPRESENTATIONS = {
+        MiraklProperty.REPRESENTATION_PROPERTY,
+        MiraklProperty.REPRESENTATION_UNIT,
+        MiraklProperty.REPRESENTATION_DEFAULT_VALUE,
+        MiraklProperty.REPRESENTATION_CONDITION,
+        MiraklProperty.REPRESENTATION_LOGISTIC_CLASS,
     }
 
     def __init__(self, *, sales_channel) -> None:
@@ -81,572 +48,591 @@ class MiraklReverseProductMapper:
             item.code: item
             for item in MiraklProperty.objects.filter(sales_channel=sales_channel).select_related("local_instance")
         }
-        self._select_value_lookup = self._build_select_value_lookup()
-        self._brand_property = self._resolve_brand_property()
-        self._brand_value_lookup = self._build_brand_value_lookup()
-
-    def build(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], object | None]:
-        offer = dict(payload.get("offer") or {})
-        p11_product = dict(payload.get("p11_product") or {})
-        p31_product = dict(payload.get("p31_product") or {})
-        merged_fields = self._merge_fields(
-            offer=offer,
-            p11_product=p11_product,
-            p31_product=p31_product,
-        )
-
-        sku = self._first_non_empty(
-            offer.get("shop_sku"),
-            merged_fields.get("shop_sku"),
-        )
-        if not sku:
-            raise ValueError("Mirakl OF21 payload is missing shop_sku.")
-
-        remote_sku = self._first_non_empty(
-            offer.get("product_sku"),
-            merged_fields.get("product_sku"),
-        )
-        remote_id = self._first_non_empty(
-            p31_product.get("product_id"),
-            merged_fields.get("product_id"),
-        )
-        title = self._first_non_empty(
-            offer.get("product_title"),
-            merged_fields.get("product_title"),
-            sku,
-        )
-        description = self._first_non_empty(
-            offer.get("product_description"),
-            merged_fields.get("product_description"),
-            "",
-        )
-        short_description = self._first_non_empty(
-            offer.get("internal_description"),
-            merged_fields.get("internal_description"),
-            "",
-        )
-        subtitle = self._first_non_empty(
-            merged_fields.get("product_subtitle"),
-            "",
-        )
-        bullet_points = self._collect_bullet_points(merged_fields=merged_fields)
-        references = self._extract_references(
-            offer=offer,
-            p11_product=p11_product,
-            p31_product=p31_product,
-        )
-        ean_code = self._extract_ean_code(references=references)
-        price_entries, sales_pricelist_items = self._build_price_entries(offer=offer)
-        images, documents = self._build_media_entries(product_data=p11_product or p31_product)
-        active = self._resolve_active(offer=offer)
-
-        structured: dict[str, Any] = {
-            "sku": sku,
-            "name": title,
-            "type": Product.SIMPLE,
-            "active": active,
-            "__mirakl_offer_id": self._first_non_empty(offer.get("offer_id")),
-            "__mirakl_remote_id": remote_id,
-            "__mirakl_remote_sku": remote_sku,
-            "translations": [
-                {
-                    "language": self.default_language,
-                    "sales_channel": self.sales_channel,
-                    "name": title,
-                    "subtitle": subtitle,
-                    "description": description,
-                    "short_description": short_description,
-                    "url_key": slugify(title) or slugify(sku),
-                    "bullet_points": bullet_points,
-                }
-            ],
-        }
-        if ean_code:
-            structured["ean_code"] = ean_code
-        if price_entries:
-            structured["prices"] = price_entries
-        if sales_pricelist_items:
-            structured["sales_pricelist_items"] = sales_pricelist_items
-        if images:
-            structured["images"] = images
-        if documents:
-            structured["documents"] = documents
-
-        brand_property_entry = self._build_brand_property_entry(merged_fields=merged_fields)
-        properties = []
-        if brand_property_entry is not None:
-            properties.append(brand_property_entry)
-        properties.extend(self._build_property_entries(merged_fields=merged_fields))
-        properties.extend(
-            self._build_offer_metadata_properties(
-                merged_fields=merged_fields,
-                skip_codes={"product_brand"} if brand_property_entry is not None else None,
+        self._leaf_categories = list(
+            MiraklCategory.objects.filter(
+                sales_channel=sales_channel,
+                is_leaf=True,
             )
         )
-        if properties:
-            structured["properties"] = properties
-
-        product_rule = self._resolve_product_rule(merged_fields=merged_fields)
-        structured_log = {
-            "remote_payload": {
-                "offer": offer,
-                "p11_product": p11_product,
-                "p31_product": p31_product,
-                "merged_fields": merged_fields,
-            },
-            "resolved_payload": {
-                **structured,
-                "__mirakl_remote_id": remote_id,
-                "__mirakl_remote_sku": remote_sku,
-            },
+        self._leaf_category_by_remote_id = {
+            str(item.remote_id or "").strip(): item
+            for item in self._leaf_categories
+            if str(item.remote_id or "").strip()
         }
-        return structured, structured_log, product_rule
+        self._leaf_category_remote_id_by_name = {}
+        for item in self._leaf_categories:
+            normalized_name = self._normalize_lookup_token(value=item.name)
+            if normalized_name and normalized_name not in self._leaf_category_remote_id_by_name:
+                self._leaf_category_remote_id_by_name[normalized_name] = str(item.remote_id or "").strip()
+        self._product_types = list(
+            MiraklProductType.objects.filter(sales_channel=sales_channel).select_related("local_instance", "category")
+        )
+        self._product_type_by_remote_id = {
+            str(item.remote_id or "").strip(): item
+            for item in self._product_types
+            if str(item.remote_id or "").strip()
+        }
+        self._product_type_by_name = {}
+        for item in self._product_types:
+            normalized_name = self._normalize_lookup_token(value=item.name)
+            if normalized_name and normalized_name not in self._product_type_by_name:
+                self._product_type_by_name[normalized_name] = item
+        self._select_value_lookup = self._build_select_value_lookup()
 
-    def _merge_fields(
+    def build(
         self,
         *,
-        offer: dict[str, Any],
-        p11_product: dict[str, Any],
-        p31_product: dict[str, Any],
-    ) -> dict[str, Any]:
-        merged = dict(offer)
-        for source in (p11_product, p31_product):
-            for key, value in source.items():
-                if key not in merged or merged.get(key) in (None, "", [], {}):
-                    merged[key] = value
-        return merged
+        row_fields: dict[str, str],
+        offer_data: dict[str, Any] | None = None,
+    ) -> MiraklMappedRow:
+        offer_data = dict(offer_data or {})
 
-    def _extract_references(
+        shop_sku = self._resolve_required_product_sku(row_fields=row_fields)
+        parent_sku = self._resolve_optional_representation(
+            row_fields=row_fields,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
+        )
+        is_configurable = bool(parent_sku and parent_sku != shop_sku)
+        if not is_configurable:
+            parent_sku = shop_sku
+
+        name = (
+            self._resolve_representation_value(
+                row_fields=row_fields,
+                representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+                offer_data=offer_data,
+            )
+            or shop_sku
+        )
+        subtitle = self._resolve_representation_value(
+            row_fields=row_fields,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_SUBTITLE,
+            offer_data=offer_data,
+        )
+        description = self._resolve_representation_value(
+            row_fields=row_fields,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_DESCRIPTION,
+            offer_data=offer_data,
+        )
+        short_description = self._resolve_representation_value(
+            row_fields=row_fields,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_SHORT_DESCRIPTION,
+            offer_data=offer_data,
+        )
+        bullet_points = self._collect_bullet_points(row_fields=row_fields)
+        ean_code = self._resolve_representation_value(
+            row_fields=row_fields,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_EAN,
+            offer_data=offer_data,
+        )
+        raw_category_value = self._resolve_optional_representation(
+            row_fields=row_fields,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_CATEGORY,
+        )
+        category_code = self._resolve_category_code(
+            raw_category_value=raw_category_value,
+            offer_data=offer_data,
+        )
+        currency = str(offer_data.get("currency") or "").strip()
+        price = self._resolve_numeric_representation(
+            row_fields=row_fields,
+            representation_type=MiraklProperty.REPRESENTATION_PRICE,
+            offer_data=offer_data,
+        )
+        rrp = offer_data.get("rrp")
+        child_images, parent_images = self._build_images(row_fields=row_fields)
+        properties = self._build_property_entries(
+            row_fields=row_fields,
+            offer_data=offer_data,
+        )
+        rule = self._resolve_product_rule(
+            category_code=category_code,
+            raw_category_value=raw_category_value,
+        )
+        translations = [
+            {
+                "language": self.default_language,
+                "sales_channel": self.sales_channel,
+                "name": name,
+                "subtitle": subtitle,
+                "description": description,
+                "short_description": short_description,
+                "url_key": slugify(name) or slugify(parent_sku),
+                "bullet_points": bullet_points,
+            }
+        ]
+        child_payload: dict[str, Any] = {
+            "sku": shop_sku,
+            "name": name,
+            "type": Product.SIMPLE,
+            "translations": translations,
+        }
+        if properties:
+            child_payload["properties"] = properties
+        if child_images:
+            child_payload["images"] = child_images
+        if ean_code:
+            child_payload["ean_code"] = ean_code
+        if currency and (price is not None or rrp is not None):
+            child_payload["prices"] = [{"currency": currency, "price": price, "rrp": rrp}]
+
+        parent_payload = None
+        if is_configurable:
+            parent_payload = {
+                "sku": parent_sku,
+                "name": name,
+                "type": Product.CONFIGURABLE,
+                "translations": translations,
+            }
+            if parent_images:
+                parent_payload["images"] = parent_images
+        else:
+            parent_images = []
+
+        return MiraklMappedRow(
+            shop_sku=shop_sku,
+            remote_sku=str(offer_data.get("remote_sku") or "").strip(),
+            category_code=category_code,
+            rule=rule,
+            is_configurable=is_configurable,
+            parent_sku=parent_sku,
+            parent_payload=parent_payload,
+            child_payload=child_payload,
+            view_codes=self._normalize_view_codes(offer_data=offer_data),
+            offer_data=offer_data,
+        )
+
+    def _resolve_required_product_sku(self, *, row_fields: dict[str, str]) -> str:
+        value = self._resolve_optional_representation(
+            row_fields=row_fields,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_SKU,
+        )
+        if value:
+            return value
+        raise MiraklImportMissingProductSkuError("Mirakl import row is missing product_sku.")
+
+    def _resolve_optional_representation(
         self,
         *,
-        offer: dict[str, Any],
-        p11_product: dict[str, Any],
-        p31_product: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        references = offer.get("product_references") or []
-        if not isinstance(references, list) or not references:
-            references = p11_product.get("product_references") or []
-        if not isinstance(references, list) or not references:
-            references = p31_product.get("product_references") or []
-        if not isinstance(references, list):
-            return []
-        return [reference for reference in references if isinstance(reference, dict)]
-
-    def _build_property_entries(self, *, merged_fields: dict[str, Any]) -> list[dict[str, Any]]:
-        results: list[dict[str, Any]] = []
-        for code, raw_value in merged_fields.items():
-            if code in self.RESERVED_FIELD_CODES:
+        row_fields: dict[str, str],
+        representation_type: str,
+    ) -> str:
+        for code, raw_value in row_fields.items():
+            remote_property = self._property_by_code.get(code)
+            if remote_property is None:
                 continue
-            if raw_value in (None, "", [], {}):
+            if remote_property.representation_type != representation_type:
+                continue
+            value = str(raw_value or "").strip()
+            if value:
+                return value
+        return ""
+
+    def _resolve_representation_value(
+        self,
+        *,
+        row_fields: dict[str, str],
+        representation_type: str,
+        offer_data: dict[str, Any],
+    ) -> str:
+        value = self._resolve_optional_representation(
+            row_fields=row_fields,
+            representation_type=representation_type,
+        )
+        if value:
+            return value
+        fallback = self._get_offer_representation_fallback(
+            representation_type=representation_type,
+            offer_data=offer_data,
+        )
+        return str(fallback or "").strip()
+
+    def _resolve_boolean_representation(
+        self,
+        *,
+        row_fields: dict[str, str],
+        representation_type: str,
+        offer_data: dict[str, Any],
+        default: bool,
+    ) -> bool:
+        value = self._resolve_representation_value(
+            row_fields=row_fields,
+            representation_type=representation_type,
+            offer_data=offer_data,
+        )
+        if value == "":
+            fallback = offer_data.get("active")
+            if fallback in (None, ""):
+                return default
+            return self._coerce_boolean(value=fallback)
+        return self._coerce_boolean(value=value)
+
+    def _resolve_numeric_representation(
+        self,
+        *,
+        row_fields: dict[str, str],
+        representation_type: str,
+        offer_data: dict[str, Any],
+    ) -> Any:
+        value = self._resolve_representation_value(
+            row_fields=row_fields,
+            representation_type=representation_type,
+            offer_data=offer_data,
+        )
+        if value == "":
+            return None
+        return value
+
+    def _resolve_category_code(
+        self,
+        *,
+        raw_category_value: str,
+        offer_data: dict[str, Any],
+    ) -> str:
+        offer_category_code = str(offer_data.get("category_code") or "").strip()
+        if offer_category_code:
+            return offer_category_code
+
+        normalized_candidates = self._build_lookup_candidates(value=raw_category_value)
+        direct_remote_id = str(raw_category_value or "").strip()
+        if direct_remote_id in self._leaf_category_by_remote_id:
+            return direct_remote_id
+
+        for candidate in normalized_candidates:
+            remote_id = self._leaf_category_remote_id_by_name.get(candidate)
+            if remote_id:
+                return remote_id
+
+        for candidate in normalized_candidates:
+            product_type = self._product_type_by_name.get(candidate)
+            if product_type is None:
+                continue
+            product_type_category = getattr(product_type, "category", None)
+            product_type_category_remote_id = str(getattr(product_type_category, "remote_id", "") or "").strip()
+            if product_type_category_remote_id:
+                return product_type_category_remote_id
+
+        return ""
+
+    def _get_offer_representation_fallback(
+        self,
+        *,
+        representation_type: str,
+        offer_data: dict[str, Any],
+    ) -> Any:
+        fallback_map = {
+            MiraklProperty.REPRESENTATION_PRODUCT_TITLE: offer_data.get("product_name"),
+            MiraklProperty.REPRESENTATION_PRODUCT_DESCRIPTION: offer_data.get("product_description"),
+            MiraklProperty.REPRESENTATION_PRODUCT_SHORT_DESCRIPTION: offer_data.get("product_short_description"),
+            MiraklProperty.REPRESENTATION_PRODUCT_CATEGORY: offer_data.get("category_code"),
+            MiraklProperty.REPRESENTATION_PRICE: offer_data.get("price"),
+            MiraklProperty.REPRESENTATION_DISCOUNTED_PRICE: offer_data.get("price"),
+            MiraklProperty.REPRESENTATION_CONDITION: offer_data.get("condition"),
+            MiraklProperty.REPRESENTATION_LOGISTIC_CLASS: offer_data.get("logistic_class"),
+        }
+        return fallback_map.get(representation_type, "")
+
+    def _collect_bullet_points(self, *, row_fields: dict[str, str]) -> list[str]:
+        bullets: list[str] = []
+        for code, raw_value in row_fields.items():
+            if not raw_value:
+                continue
+            remote_property = self._property_by_code.get(code)
+            if remote_property is None:
+                continue
+            if remote_property.representation_type != MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT:
+                continue
+            bullets.append(str(raw_value).strip())
+        return [value for value in bullets if value]
+
+    def _build_images(self, *, row_fields: dict[str, str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        child_images: list[dict[str, Any]] = []
+        parent_images: list[dict[str, Any]] = []
+        child_seen: set[tuple[str, str]] = set()
+        parent_seen: set[str] = set()
+
+        child_sort_order = 0
+        parent_sort_order = 0
+
+        for code, raw_value in row_fields.items():
+            url = str(raw_value or "").strip()
+            if not url:
                 continue
 
             remote_property = self._property_by_code.get(code)
             if remote_property is None:
-                property_type = self._infer_property_type(raw_value=raw_value)
-                results.append(
-                    {
-                        "property_data": {
-                            "internal_name": code,
-                            "name": code.replace("_", " ").replace("-", " ").title(),
-                            "type": property_type,
-                            "is_public_information": True,
-                            "add_to_filters": False,
-                        },
-                        "value": self._normalize_property_value(raw_value=raw_value, property_type=property_type),
-                    }
-                )
                 continue
 
-            property_type = (
-                remote_property.local_instance.type
-                if remote_property.local_instance_id
-                else remote_property.type or self._infer_property_type(raw_value=raw_value)
-            )
-            normalized_value = self._normalize_property_value(raw_value=raw_value, property_type=property_type)
-            entry: dict[str, Any] = {"value": normalized_value}
-            if remote_property.local_instance_id:
-                entry["property"] = remote_property.local_instance
-            else:
-                entry["property_data"] = {
-                    "internal_name": remote_property.code,
-                    "name": remote_property.name or remote_property.code.replace("_", " ").replace("-", " ").title(),
-                    "type": property_type,
-                    "is_public_information": True,
-                    "add_to_filters": False,
-                }
-            if property_type in {Property.TYPES.SELECT, Property.TYPES.MULTISELECT}:
-                mapped_value, value_is_id = self._map_select_value(
-                    remote_property=remote_property,
-                    normalized_value=normalized_value,
-                    property_type=property_type,
+            representation_type = remote_property.representation_type
+            if representation_type not in {
+                MiraklProperty.REPRESENTATION_THUMBNAIL_IMAGE,
+                MiraklProperty.REPRESENTATION_IMAGE,
+                MiraklProperty.REPRESENTATION_SWATCH_IMAGE,
+            }:
+                continue
+
+            image_type = Image.COLOR_SHOT if representation_type == MiraklProperty.REPRESENTATION_SWATCH_IMAGE else Image.PACK_SHOT
+            child_key = (url, image_type)
+            if child_key not in child_seen:
+                child_seen.add(child_key)
+                child_images.append(
+                    {
+                        "image_url": url,
+                        "type": image_type,
+                        "is_main_image": representation_type == MiraklProperty.REPRESENTATION_THUMBNAIL_IMAGE,
+                        "sort_order": child_sort_order,
+                    }
                 )
-                entry["value"] = mapped_value
-                if value_is_id:
-                    entry["value_is_id"] = True
-            results.append(entry)
+                child_sort_order += 1
+
+            if representation_type == MiraklProperty.REPRESENTATION_SWATCH_IMAGE:
+                continue
+
+            if url in parent_seen:
+                continue
+
+            parent_seen.add(url)
+            parent_images.append(
+                {
+                    "image_url": url,
+                    "type": Image.PACK_SHOT,
+                    "is_main_image": representation_type == MiraklProperty.REPRESENTATION_THUMBNAIL_IMAGE,
+                    "sort_order": parent_sort_order,
+                }
+            )
+            parent_sort_order += 1
+
+        return child_images, parent_images
+
+    def _build_property_entries(
+        self,
+        *,
+        row_fields: dict[str, str],
+        offer_data: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        results: list[dict[str, Any]] = []
+
+        for code, raw_value in row_fields.items():
+            remote_property = self._property_by_code.get(code)
+            if remote_property is None:
+                continue
+
+            if remote_property.representation_type not in self.PROPERTY_REPRESENTATIONS:
+                continue
+
+            local_property = getattr(remote_property, "local_instance", None)
+            if local_property is None:
+                continue
+
+            effective_value = str(raw_value or "").strip()
+            if not effective_value:
+                effective_value = self._get_property_offer_fallback(
+                    code=code,
+                    remote_property=remote_property,
+                    offer_data=offer_data,
+                )
+            if not effective_value:
+                effective_value = str(getattr(remote_property, "default_value", "") or "").strip()
+            if not effective_value:
+                continue
+
+            entry = self._build_property_entry(
+                local_property=local_property,
+                remote_property=remote_property,
+                value=effective_value,
+            )
+            if entry is not None:
+                results.append(entry)
+
         return results
 
-    def _build_select_value_lookup(self) -> dict[tuple[int, str], MiraklPropertySelectValue]:
-        lookup: dict[tuple[int, str], MiraklPropertySelectValue] = {}
-        queryset = MiraklPropertySelectValue.objects.filter(sales_channel=self.sales_channel).select_related("local_instance", "remote_property")
-        for item in queryset:
-            for candidate in {item.code, item.value}:
-                normalized = str(candidate or "").strip().lower()
-                if normalized:
-                    lookup[(item.remote_property_id, normalized)] = item
-        return lookup
+    def _build_property_entry(
+        self,
+        *,
+        local_property: Property,
+        remote_property: MiraklProperty,
+        value: Any,
+    ) -> dict[str, Any] | None:
+        property_type = local_property.type
+        entry: dict[str, Any] = {"property": local_property}
 
-    def _resolve_brand_property(self) -> Property | None:
-        return Property.objects.filter(
-            multi_tenant_company=self.company,
-            internal_name="brand",
-        ).first()
-
-    def _build_brand_value_lookup(self) -> dict[str, MiraklPropertySelectValue]:
-        if self._brand_property is None:
-            return {}
-
-        lookup: dict[str, MiraklPropertySelectValue] = {}
-        queryset = (
-            MiraklPropertySelectValue.objects.filter(
-                sales_channel=self.sales_channel,
-                remote_property__local_instance=self._brand_property,
-                local_instance__isnull=False,
+        if property_type == Property.TYPES.SELECT:
+            mapped_entry = self._map_select_value(
+                remote_property=remote_property,
+                value=value,
+                multiple=False,
             )
-            .select_related("local_instance")
-            .order_by("id")
+            if mapped_entry is None:
+                return None
+            entry.update(mapped_entry)
+            return entry
+
+        if property_type == Property.TYPES.MULTISELECT:
+            mapped_entry = self._map_select_value(
+                remote_property=remote_property,
+                value=value,
+                multiple=True,
+            )
+            if mapped_entry is None:
+                return None
+            entry.update(mapped_entry)
+            return entry
+
+        entry["value"] = self._normalize_scalar_value(
+            value=value,
+            property_type=property_type,
         )
-        for item in queryset:
-            normalized = str(item.value or "").strip().lower()
-            if normalized and normalized not in lookup:
-                lookup[normalized] = item
-        return lookup
-
-    def _build_brand_property_entry(self, *, merged_fields: dict[str, Any]) -> dict[str, Any] | None:
-        if self._brand_property is None:
-            return None
-
-        brand_value = str(merged_fields.get("product_brand") or "").strip()
-        if not brand_value:
-            return None
-
-        mapped_value = self._brand_value_lookup.get(brand_value.lower())
-        if mapped_value is None or not mapped_value.local_instance_id:
-            return None
-
-        return {
-            "property": self._brand_property,
-            "value": mapped_value.local_instance_id,
-            "value_is_id": True,
-        }
+        return entry
 
     def _map_select_value(
         self,
         *,
         remote_property: MiraklProperty,
-        normalized_value: Any,
-        property_type: str,
-    ) -> tuple[Any, bool]:
-        if property_type == Property.TYPES.SELECT:
-            lookup_key = (remote_property.id, str(normalized_value or "").strip().lower())
-            mapped = self._select_value_lookup.get(lookup_key)
-            if mapped is not None and mapped.local_instance_id:
-                return mapped.local_instance_id, True
-            return normalized_value, False
+        value: Any,
+        multiple: bool,
+    ) -> dict[str, Any] | None:
+        if not self._requires_remote_select_mapping(remote_property=remote_property):
+            normalized = self._normalize_scalar_value(
+                value=value,
+                property_type=Property.TYPES.MULTISELECT if multiple else Property.TYPES.SELECT,
+            )
+            return {"value": normalized}
 
-        mapped_ids: list[int] = []
-        fallback_values: list[str] = []
-        values = normalized_value if isinstance(normalized_value, list) else [normalized_value]
-        for value in values:
-            lookup_key = (remote_property.id, str(value or "").strip().lower())
-            mapped = self._select_value_lookup.get(lookup_key)
-            if mapped is not None and mapped.local_instance_id:
-                mapped_ids.append(mapped.local_instance_id)
-            elif value not in (None, ""):
-                fallback_values.append(str(value))
-        if mapped_ids and not fallback_values:
-            return mapped_ids, True
-        return fallback_values or normalized_value, False
+        if multiple:
+            values = self._normalize_multi_value(value=value)
+            mapped_ids: list[int] = []
+            for item in values:
+                mapped = self._select_value_lookup.get((remote_property.id, item.lower()))
+                if mapped is not None and mapped.local_instance_id:
+                    mapped_ids.append(mapped.local_instance_id)
+            if not mapped_ids:
+                return None
+            return {"value": mapped_ids, "value_is_id": True}
 
-    def _infer_property_type(self, *, raw_value: Any) -> str:
-        if isinstance(raw_value, bool):
-            return Property.TYPES.BOOLEAN
-        if isinstance(raw_value, int) and not isinstance(raw_value, bool):
-            return Property.TYPES.INT
-        if isinstance(raw_value, float):
-            return Property.TYPES.FLOAT
-        if isinstance(raw_value, list):
-            return Property.TYPES.MULTISELECT
-        return Property.TYPES.TEXT
+        normalized = str(value or "").strip().lower()
+        if not normalized:
+            return None
+        mapped = self._select_value_lookup.get((remote_property.id, normalized))
+        if mapped is None or not mapped.local_instance_id:
+            return None
+        return {"value": mapped.local_instance_id, "value_is_id": True}
 
-    def _normalize_property_value(self, *, raw_value: Any, property_type: str) -> Any:
-        if property_type == Property.TYPES.MULTISELECT:
-            if isinstance(raw_value, list):
-                return [str(item).strip() for item in raw_value if str(item).strip()]
-            separator = getattr(self.sales_channel, "list_of_multiple_values_separator", None) or ","
-            return [part.strip() for part in str(raw_value).split(separator) if part.strip()]
+    def _requires_remote_select_mapping(self, *, remote_property: MiraklProperty) -> bool:
+        original_type = str(getattr(remote_property, "original_type", "") or "").upper()
+        remote_type = str(getattr(remote_property, "type", "") or "").upper()
+        if original_type in {Property.TYPES.SELECT, Property.TYPES.MULTISELECT}:
+            return True
+        if remote_type in {Property.TYPES.SELECT, Property.TYPES.MULTISELECT}:
+            return True
+        if getattr(remote_property, "value_list_code", ""):
+            return True
+        return MiraklPropertySelectValue.objects.filter(
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
+        ).exists()
+
+    def _normalize_scalar_value(self, *, value: Any, property_type: str) -> Any:
         if property_type == Property.TYPES.BOOLEAN:
-            if isinstance(raw_value, str):
-                return raw_value.strip().lower() in {"true", "1", "yes", "y"}
-            return bool(raw_value)
-        return raw_value
+            return self._coerce_boolean(value=value)
+        if property_type == Property.TYPES.INT:
+            return int(float(str(value).strip()))
+        if property_type == Property.TYPES.FLOAT:
+            return float(str(value).strip())
+        if property_type == Property.TYPES.MULTISELECT:
+            return self._normalize_multi_value(value=value)
+        return value
 
-    def _collect_bullet_points(self, *, merged_fields: dict[str, Any]) -> list[str]:
-        buckets: dict[int, str] = {}
-        for code, value in merged_fields.items():
-            if not value:
-                continue
-            remote_property = self._property_by_code.get(code)
-            if remote_property and remote_property.representation_type == MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT:
-                buckets[self._extract_suffix(value=code)] = str(value).strip()
-                continue
-            normalized = str(code).lower()
-            if "bullet" in normalized:
-                buckets[self._extract_suffix(value=code)] = str(value).strip()
-        return [value for _index, value in sorted(buckets.items()) if value]
+    def _normalize_multi_value(self, *, value: Any) -> list[str]:
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        separator = getattr(self.sales_channel, "list_of_multiple_values_separator", None) or ","
+        raw = str(value or "").strip()
+        if not raw:
+            return []
+        if separator in raw:
+            return [chunk.strip() for chunk in raw.split(separator) if chunk.strip()]
+        return [chunk.strip() for chunk in raw.split(",") if chunk.strip()]
 
-    def _extract_ean_code(self, *, references: list[dict[str, Any]]) -> str:
-        for item in references:
-            reference_type = str(item.get("reference_type") or "").upper()
-            if reference_type == "EAN" or reference_type.startswith("EAN-"):
-                value = str(item.get("reference") or "").strip()
-                if value:
-                    return value
-        return ""
+    def _coerce_boolean(self, *, value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        normalized = str(value or "").strip().lower()
+        return normalized in {"1", "true", "yes", "y"}
 
-    def _build_price_entries(self, *, offer: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        currency = str(offer.get("currency_iso_code") or "").strip()
-        if not currency:
-            return [], []
-
-        price = self._extract_offer_price(offer=offer)
-        rrp = offer.get("msrp")
-        if price in (None, "") and rrp in (None, ""):
-            return [], []
-
-        entry = {
-            "currency": currency,
-            "price": price,
-        }
-        if rrp not in (None, ""):
-            entry["rrp"] = rrp
-
-        sales_pricelist_item = {
-            "salespricelist_data": {
-                "name": f"Mirakl {self.sales_channel.hostname} {currency}",
-                "currency": currency,
-            },
-            "price_auto": rrp if rrp not in (None, "") else price,
-            "discount_auto": price if rrp not in (None, "") and price not in (None, "") else None,
-            "disable_auto_update": True,
-        }
-        return [entry], [sales_pricelist_item]
-
-    def _extract_offer_price(self, *, offer: dict[str, Any]) -> Any:
-        direct_price = offer.get("price")
-        if direct_price not in (None, ""):
-            return direct_price
-
-        applicable_pricing = offer.get("applicable_pricing") or {}
-        if isinstance(applicable_pricing, dict):
-            applicable_price = applicable_pricing.get("price")
-            if applicable_price not in (None, ""):
-                return applicable_price
-
-        all_prices = offer.get("all_prices") or []
-        if isinstance(all_prices, list):
-            for price_row in all_prices:
-                if not isinstance(price_row, dict):
-                    continue
-                price = price_row.get("price")
-                if price not in (None, ""):
-                    return price
-        return None
-
-    def _build_offer_metadata_properties(
+    def _get_property_offer_fallback(
         self,
         *,
-        merged_fields: dict[str, Any],
-        skip_codes: set[str] | None = None,
-    ) -> list[dict[str, Any]]:
-        property_codes = [
-            "allow_quote_requests",
-            "category_code",
-            "category_label",
-            "channels",
-            "currency_iso_code",
-            "date_created",
-            "internal_description",
-            "is_professional",
-            "last_updated",
-            "leadtime_to_ship",
-            "min_shipping_price",
-            "min_shipping_price_additional",
-            "min_shipping_type",
-            "min_shipping_zone",
-            "msrp",
-            "offer_id",
-            "price_additional_info",
-            "product_brand",
-            "product_tax_code",
-            "quantity",
-            "shop_id",
-            "shop_name",
-            "shop_sku",
-            "shipping_deadline",
-            "state_code",
-            "total_price",
-        ]
-        results: list[dict[str, Any]] = []
-        for code in property_codes:
-            if skip_codes and code in skip_codes:
-                continue
-            raw_value = merged_fields.get(code)
-            if raw_value in (None, "", [], {}):
-                continue
-            property_type = self._infer_property_type(raw_value=raw_value)
-            results.append(
-                {
-                    "property_data": {
-                        "internal_name": code,
-                        "name": code.replace("_", " ").title(),
-                        "type": property_type,
-                        "is_public_information": True,
-                        "add_to_filters": False,
-                    },
-                    "value": self._normalize_property_value(raw_value=raw_value, property_type=property_type),
-                }
-            )
+        code: str,
+        remote_property: MiraklProperty,
+        offer_data: dict[str, Any],
+    ) -> str:
+        code_fallbacks = {
+            "product_brand": offer_data.get("brand"),
+            "brand": offer_data.get("brand"),
+            "internal_description": offer_data.get("product_short_description"),
+        }
+        fallback = code_fallbacks.get(str(code or "").strip().lower())
+        if fallback not in (None, ""):
+            return str(fallback).strip()
 
-        fulfillment = merged_fields.get("fulfillment") or {}
-        if isinstance(fulfillment, dict):
-            center = fulfillment.get("center") or {}
-            if isinstance(center, dict):
-                center_code = str(center.get("code") or "").strip()
-                if center_code:
-                    results.append(
-                        {
-                            "property_data": {
-                                "internal_name": "fulfillment_center_code",
-                                "name": "Fulfillment Center Code",
-                                "type": Property.TYPES.TEXT,
-                                "is_public_information": True,
-                                "add_to_filters": False,
-                            },
-                            "value": center_code,
-                        }
-                    )
+        if remote_property.representation_type == MiraklProperty.REPRESENTATION_CONDITION:
+            return str(offer_data.get("condition") or "").strip()
+        if remote_property.representation_type == MiraklProperty.REPRESENTATION_LOGISTIC_CLASS:
+            return str(offer_data.get("logistic_class") or "").strip()
+        return ""
 
-        logistic_class = merged_fields.get("logistic_class") or {}
-        if isinstance(logistic_class, dict):
-            logistic_class_code = str(logistic_class.get("code") or "").strip()
-            if logistic_class_code:
-                results.append(
-                    {
-                        "property_data": {
-                            "internal_name": "logistic_class_code",
-                            "name": "Logistic Class Code",
-                            "type": Property.TYPES.TEXT,
-                            "is_public_information": True,
-                            "add_to_filters": False,
-                        },
-                        "value": logistic_class_code,
-                    }
-                )
-
+    def _normalize_view_codes(self, *, offer_data: dict[str, Any]) -> list[str]:
+        channels = offer_data.get("channels") or []
+        if not isinstance(channels, list):
+            return []
+        results: list[str] = []
+        for item in channels:
+            value = str(item or "").strip()
+            if value and value not in results:
+                results.append(value)
         return results
 
-    def _build_media_entries(self, *, product_data: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        images: list[dict[str, Any]] = []
-        documents: list[dict[str, Any]] = []
-        product_media = self._extract_product_media(product_data=product_data)
-        for index, media in enumerate(product_media):
-            if not isinstance(media, dict):
-                continue
-            url = str(media.get("dam_url") or media.get("media_url") or "").strip()
-            if not url:
-                continue
-            media_type = str(media.get("type") or "").lower()
-            if self._is_image_media(url=url, media_type=media_type):
-                images.append(
-                    {
-                        "image_url": url,
-                        "sort_order": index,
-                        "is_main_image": index == 0,
-                    }
-                )
-            else:
-                documents.append({"document_url": url})
-        return images, documents
+    def _resolve_product_rule(self, *, category_code: str, raw_category_value: str):
+        if category_code:
+            product_type = self._product_type_by_remote_id.get(category_code)
+            if product_type is not None and product_type.local_instance_id:
+                return product_type.local_instance
 
-    def _extract_product_media(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
-        for key in ("product_media", "product_medias", "media", "medias"):
-            media_payload = product_data.get(key)
-            normalized = self._normalize_media_payload(media_payload=media_payload)
-            if normalized:
-                return normalized
-        return []
+        direct_remote_match = self._product_type_by_remote_id.get(str(raw_category_value or "").strip())
+        if direct_remote_match is not None and direct_remote_match.local_instance_id:
+            return direct_remote_match.local_instance
 
-    def _normalize_media_payload(self, *, media_payload: Any) -> list[dict[str, Any]]:
-        if isinstance(media_payload, list):
-            return [item for item in media_payload if isinstance(item, dict)]
+        for candidate in self._build_lookup_candidates(value=raw_category_value):
+            product_type = self._product_type_by_name.get(candidate)
+            if product_type is not None and product_type.local_instance_id:
+                return product_type.local_instance
+        return None
 
-        if not isinstance(media_payload, dict):
+    def _build_lookup_candidates(self, *, value: str) -> list[str]:
+        raw_value = str(value or "").strip()
+        if not raw_value:
             return []
 
-        if media_payload.get("dam_url") or media_payload.get("media_url"):
-            return [media_payload]
+        candidates: list[str] = []
+        for candidate in [raw_value, raw_value.split("/")[-1].strip()]:
+            normalized = self._normalize_lookup_token(value=candidate)
+            if normalized and normalized not in candidates:
+                candidates.append(normalized)
+        return candidates
 
-        for nested_key in ("items", "results", "product_media", "product_medias", "media", "medias"):
-            nested_payload = media_payload.get(nested_key)
-            normalized = self._normalize_media_payload(media_payload=nested_payload)
-            if normalized:
-                return normalized
+    def _normalize_lookup_token(self, *, value: Any) -> str:
+        return str(value or "").strip().lower()
 
-        return []
-
-    def _is_image_media(self, *, url: str, media_type: str) -> bool:
-        if "image" in media_type or media_type in {"small", "large", "thumbnail"}:
-            return True
-
-        lowered_url = url.lower()
-        if any(lowered_url.endswith(extension) for extension in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg")):
-            return True
-
-        if any(lowered_url.endswith(extension) for extension in (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".zip")):
-            return False
-
-        return not media_type
-
-    def _resolve_active(self, *, offer: dict[str, Any]) -> bool:
-        deleted = offer.get("deleted")
-        if deleted in (True, "true", "TRUE", 1, "1"):
-            return False
-        active = offer.get("active")
-        return active in (True, "true", "TRUE", 1, "1", None, "")
-
-    def _resolve_product_rule(self, *, merged_fields: dict[str, Any]):
-        category_code = str(merged_fields.get("category_code") or "").strip()
-        if not category_code:
-            return None
-        product_type = (
-            MiraklProductType.objects.filter(
-                sales_channel=self.sales_channel,
-                remote_id=category_code,
-                local_instance__isnull=False,
-            )
-            .select_related("local_instance")
-            .first()
+    def _build_select_value_lookup(self) -> dict[tuple[int, str], MiraklPropertySelectValue]:
+        lookup: dict[tuple[int, str], MiraklPropertySelectValue] = {}
+        queryset = MiraklPropertySelectValue.objects.filter(sales_channel=self.sales_channel).select_related(
+            "local_instance",
+            "remote_property",
         )
-        return getattr(product_type, "local_instance", None)
-
-    def _extract_suffix(self, *, value: str) -> int:
-        digits = "".join(character for character in str(value or "") if character.isdigit())
-        return int(digits) if digits else 0
-
-    def _first_non_empty(self, *values: Any) -> str:
-        for value in values:
-            if value in (None, ""):
-                continue
-            return str(value).strip()
-        return ""
+        for item in queryset:
+            candidates = [item.value, item.code]
+            for candidate in candidates:
+                normalized = str(candidate or "").strip().lower()
+                if normalized:
+                    lookup[(item.remote_property_id, normalized)] = item
+        return lookup

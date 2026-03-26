@@ -168,6 +168,7 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 field_name="error_report_file",
                 filename_base=f"mirakl-product-errors-{feed.remote_id}",
             )
+            feed.refresh_from_db(fields=["error_report_file"])
         if feed.has_new_product_report and not feed.new_product_report_file:
             self._download_report(
                 feed=feed,
@@ -175,6 +176,7 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 field_name="new_product_report_file",
                 filename_base=f"mirakl-product-success-{feed.remote_id}",
             )
+            feed.refresh_from_db(fields=["new_product_report_file"])
         if feed.has_new_product_report and feed.new_product_report_file:
             self._sync_new_product_report(feed=feed)
         if feed.has_transformed_file and not feed.transformed_file:
@@ -184,6 +186,7 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 field_name="transformed_file",
                 filename_base=f"mirakl-product-transformed-{feed.remote_id}",
             )
+            feed.refresh_from_db(fields=["transformed_file"])
         if feed.has_transformation_error_report and not feed.transformation_error_report_file:
             self._download_report(
                 feed=feed,
@@ -191,6 +194,7 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 field_name="transformation_error_report_file",
                 filename_base=f"mirakl-product-transform-errors-{feed.remote_id}",
             )
+            feed.refresh_from_db(fields=["transformation_error_report_file"])
         if feed.has_transformation_error_report and feed.transformation_error_report_file:
             self._sync_transformation_report_issues(feed=feed)
 

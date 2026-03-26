@@ -21,18 +21,12 @@ class MiraklTransformationErrorReportIssueSyncFactory:
 
     SOURCE_ERROR = "transformation_error_report_error"
     SOURCE_WARNING = "transformation_error_report_warning"
-    FALLBACK_SKU_HEADERS = (
-        "product_sku",
-        "shop_sku",
-        "sku",
-        "product_id",
-        "parent_product_id",
-    )
-    FALLBACK_EAN_HEADERS = ("ean", "product_ean")
 
     def __init__(self, *, feed) -> None:
         self.feed = feed
         self.sales_channel = self._resolve_sales_channel_instance(feed=feed)
+        self.sku_headers = self._get_candidate_sku_headers()
+        self.ean_headers = self._get_candidate_ean_headers()
 
     def run(self) -> int:
         if not self.feed.transformation_error_report_file:
@@ -94,8 +88,6 @@ class MiraklTransformationErrorReportIssueSyncFactory:
 
     def _build_remote_product_lookup(self) -> dict[str, MiraklProduct]:
         lookup: dict[str, MiraklProduct] = {}
-        sku_headers = self._get_candidate_sku_headers()
-        ean_headers = self._get_candidate_ean_headers()
         queryset = MiraklSalesChannelFeedItem.objects.filter(feed=self.feed).select_related("remote_product")
         for item in queryset.iterator():
             remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
@@ -110,8 +102,8 @@ class MiraklTransformationErrorReportIssueSyncFactory:
                     self._normalize_header(value=key): self._stringify(value=value)
                     for key, value in row.items()
                 }
-                lookup_key_candidates.extend(normalized_row.get(header, "") for header in sku_headers)
-                lookup_key_candidates.extend(normalized_row.get(header, "") for header in ean_headers)
+                lookup_key_candidates.extend(normalized_row.get(header, "") for header in self.sku_headers)
+                lookup_key_candidates.extend(normalized_row.get(header, "") for header in self.ean_headers)
 
             for candidate in lookup_key_candidates:
                 normalized_candidate = self._normalize_lookup_value(value=candidate)
@@ -121,32 +113,43 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         return lookup
 
     def _get_candidate_sku_headers(self) -> list[str]:
-        headers = list(
-            self.feed.product_type.items.filter(
-                remote_property__representation_type=MiraklProperty.REPRESENTATION_PRODUCT_SKU,
-            )
-            .select_related("remote_property")
-            .values_list("remote_property__code", flat=True)
-        ) if self.feed.product_type_id else []
-        normalized = [self._normalize_header(value=header) for header in headers if header]
-        for fallback in self.FALLBACK_SKU_HEADERS:
-            if fallback not in normalized:
-                normalized.append(fallback)
-        return normalized
+        return self._get_candidate_headers(
+            representation_types=(
+                MiraklProperty.REPRESENTATION_PRODUCT_SKU,
+                MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
+            ),
+        )
 
     def _get_candidate_ean_headers(self) -> list[str]:
-        headers = list(
-            self.feed.product_type.items.filter(
-                remote_property__representation_type=MiraklProperty.REPRESENTATION_PRODUCT_EAN,
+        return self._get_candidate_headers(
+            representation_types=(MiraklProperty.REPRESENTATION_PRODUCT_EAN,),
+        )
+
+    def _get_candidate_headers(self, *, representation_types: tuple[str, ...]) -> list[str]:
+        headers: list[str] = []
+        if self.feed.product_type_id:
+            headers.extend(
+                self.feed.product_type.items.filter(
+                    remote_property__representation_type__in=representation_types,
+                )
+                .select_related("remote_property")
+                .values_list("remote_property__code", flat=True)
             )
-            .select_related("remote_property")
-            .values_list("remote_property__code", flat=True)
-        ) if self.feed.product_type_id else []
-        normalized = [self._normalize_header(value=header) for header in headers if header]
-        for fallback in self.FALLBACK_EAN_HEADERS:
-            if fallback not in normalized:
-                normalized.append(fallback)
-        return normalized
+
+        headers.extend(
+            MiraklProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                representation_type__in=representation_types,
+            ).values_list("code", flat=True)
+        )
+
+        return list(
+            dict.fromkeys(
+                self._normalize_header(value=header)
+                for header in headers
+                if self._normalize_header(value=header)
+            )
+        )
 
     def _build_row(self, *, headers, normalized_headers: list[str], values) -> dict[str, str]:
         row: dict[str, str] = {}
@@ -165,7 +168,7 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         row: dict[str, str],
         remote_product_lookup: dict[str, MiraklProduct],
     ) -> MiraklProduct | None:
-        for header in self._get_candidate_sku_headers():
+        for header in self.sku_headers:
             candidate = self._normalize_lookup_value(value=row.get(header))
             if not candidate:
                 continue
@@ -176,7 +179,7 @@ class MiraklTransformationErrorReportIssueSyncFactory:
             if matched is not None:
                 return matched
 
-        for header in self._get_candidate_ean_headers():
+        for header in self.ean_headers:
             candidate = self._normalize_lookup_value(value=row.get(header))
             if not candidate:
                 continue

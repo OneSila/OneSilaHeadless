@@ -152,3 +152,79 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
         self.assertEqual(warning_issue.raw_data["source"], "transformation_error_report_warning")
         self.remote_product.refresh_from_db()
         self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
+    def test_run_uses_sales_channel_representation_headers_without_hardcoded_fallbacks(self):
+        custom_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="merchant_reference",
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_SKU,
+        )
+        remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="REMOTE-CUSTOM-1",
+            syncing_current_percentage=100,
+        )
+        feed = baker.make(
+            MiraklSalesChannelFeed,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
+            product_type=self.product_type,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
+            stage=MiraklSalesChannelFeed.STAGE_PRODUCT,
+            status=MiraklSalesChannelFeed.STATUS_PARTIAL,
+        )
+        baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=feed,
+            remote_product=remote_product,
+            sales_channel_view=self.view,
+            payload_data=[
+                {
+                    "merchant_reference": "MERCHANT-REF-1",
+                    "product_category": "Toys/Dress Up & Role Play",
+                }
+            ],
+        )
+
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(
+            [
+                "line number",
+                "errors",
+                "warnings",
+                "merchant_reference",
+            ]
+        )
+        worksheet.append(
+            [
+                3,
+                "1000|The attribute 'main_image' (Main Image) is required",
+                "",
+                "MERCHANT-REF-1",
+            ]
+        )
+        buffer = BytesIO()
+        workbook.save(buffer)
+        workbook.close()
+        feed.transformation_error_report_file.save(
+            "mirakl-transform-errors-custom.xlsx",
+            ContentFile(buffer.getvalue()),
+            save=True,
+        )
+
+        synced_issues = MiraklTransformationErrorReportIssueSyncFactory(feed=feed).run()
+
+        self.assertEqual(synced_issues, 1)
+        self.assertTrue(
+            MiraklProductIssue.objects.filter(
+                remote_product=remote_product,
+                code="1000",
+            ).exists()
+        )
