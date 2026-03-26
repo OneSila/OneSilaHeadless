@@ -140,12 +140,6 @@ class MiraklReverseProductMapper:
             offer_data=offer_data,
         )
         bullet_points = self._collect_bullet_points(row_fields=row_fields)
-        active = self._resolve_boolean_representation(
-            row_fields=row_fields,
-            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_ACTIVE,
-            offer_data=offer_data,
-            default=True,
-        )
         ean_code = self._resolve_representation_value(
             row_fields=row_fields,
             representation_type=MiraklProperty.REPRESENTATION_PRODUCT_EAN,
@@ -191,7 +185,6 @@ class MiraklReverseProductMapper:
             "sku": shop_sku,
             "name": name,
             "type": Product.SIMPLE,
-            "active": active,
             "translations": translations,
         }
         if properties:
@@ -209,7 +202,6 @@ class MiraklReverseProductMapper:
                 "sku": parent_sku,
                 "name": name,
                 "type": Product.CONFIGURABLE,
-                "active": active,
                 "translations": translations,
             }
             if parent_images:
@@ -400,7 +392,6 @@ class MiraklReverseProductMapper:
             MiraklProperty.REPRESENTATION_DISCOUNTED_PRICE: offer_data.get("price"),
             MiraklProperty.REPRESENTATION_CONDITION: offer_data.get("condition"),
             MiraklProperty.REPRESENTATION_LOGISTIC_CLASS: offer_data.get("logistic_class"),
-            MiraklProperty.REPRESENTATION_PRODUCT_ACTIVE: offer_data.get("active"),
         }
         return fallback_map.get(representation_type, "")
 

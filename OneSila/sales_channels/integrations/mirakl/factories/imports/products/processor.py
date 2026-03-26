@@ -75,9 +75,6 @@ class MiraklProductsImportProcessor(
         self._offers_by_shop_sku: dict[str, dict[str, Any]] | None = None
         self._views_cache: list[MiraklSalesChannelView] | None = None
 
-    def _debug(self, *, message: str) -> None:
-        print(f"TEMPORARY DEBUG: {message}")
-
     def prepare_import_process(self):
         super().prepare_import_process()
         self.import_process.status = self.import_process.STATUS_PROCESSING
@@ -95,12 +92,6 @@ class MiraklProductsImportProcessor(
 
     def validate(self):
         export_files = list(self.import_process.export_files.all())
-        self._debug(
-            message=(
-                f"validate start import_id={self.import_process.id} "
-                f"export_files={len(export_files)} sales_channel_id={self.sales_channel.id}"
-            )
-        )
         if not export_files:
             raise MiraklImportMissingFilesError("Mirakl product import requires at least one export file.")
 
@@ -114,22 +105,14 @@ class MiraklProductsImportProcessor(
             raise MiraklImportInvalidFileLayoutError(
                 "Mirakl product import requires at least one Mirakl property mapped as product_sku."
             )
-        self._debug(message=f"validate found product_sku properties count={len(sku_property_ids)}")
 
         property_by_code = {
             item.code: item
             for item in MiraklProperty.objects.filter(sales_channel=self.sales_channel)
         }
-        self._debug(message=f"validate loaded mirakl properties count={len(property_by_code)}")
 
         for export_file in export_files:
             _filename, _labels, codes = self._workbook_parser.get_layout(export_file=export_file)
-            self._debug(
-                message=(
-                    f"validate file={export_file.file.name} codes_count={len(codes)} "
-                    f"codes={codes}"
-                )
-            )
             missing_codes = [code for code in codes if code and code not in property_by_code]
             if missing_codes:
                 raise MiraklImportInvalidFileLayoutError(
@@ -144,7 +127,6 @@ class MiraklProductsImportProcessor(
                 raise MiraklImportInvalidFileLayoutError(
                     f"Mirakl import export file '{export_file.file.name}' does not contain a product_sku column."
                 )
-        self._debug(message="validate completed successfully")
 
     def get_total_instances(self):
         total = 0
@@ -161,45 +143,51 @@ class MiraklProductsImportProcessor(
     def get_products_data(self):
         return []
 
+    def handle_ean_code(self, import_instance: ImportProductInstance):
+        if not hasattr(import_instance, "ean_code") or getattr(import_instance, "remote_instance", None) is None:
+            return
+
+        queryset = MiraklEanCode.objects.filter(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_product=import_instance.remote_instance,
+        ).order_by("id")
+        instances = list(queryset)
+        instance = instances[0] if instances else None
+
+        if instance is None:
+            MiraklEanCode.objects.create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=import_instance.remote_instance,
+                ean_code=import_instance.ean_code,
+            )
+            return
+
+        duplicate_ids = [item.id for item in instances[1:]]
+        if duplicate_ids:
+            MiraklEanCode.objects.filter(id__in=duplicate_ids).delete()
+
+        if instance.ean_code != import_instance.ean_code:
+            instance.ean_code = import_instance.ean_code
+            instance.save(update_fields=["ean_code"])
+
     def import_products_process(self):
-        self._debug(message="import_products_process start")
         self._offers_by_shop_sku = self._load_offers_lookup()
-        self._debug(message=f"offers lookup ready entries={len(self._offers_by_shop_sku)}")
         export_files = list(self.import_process.export_files.all())
         error_details_issues_cleared = False
 
         for export_file in export_files:
-            self._debug(message=f"processing export file={export_file.file.name}")
             imported_remote_products_by_row: dict[int, MiraklProduct] = {}
             imported_remote_products_by_identifier: dict[str, MiraklProduct] = {}
             for row in self._workbook_parser.iter_rows(export_file=export_file):
-                self._debug(
-                    message=(
-                        f"row start file={row.filename} row={row.row_number} "
-                        f"field_keys={list(row.fields.keys())}"
-                    )
-                )
                 try:
                     with transaction.atomic():
                         remote_product = self._process_row(row=row)
                         if remote_product is not None:
-                            self._debug(
-                                message=(
-                                    f"row imported file={row.filename} row={row.row_number} "
-                                    f"remote_product_id={remote_product.id} "
-                                    f"local_sku={getattr(remote_product.local_instance, 'sku', None)} "
-                                    f"remote_sku={remote_product.remote_sku}"
-                                )
-                            )
                             imported_remote_products_by_row[row.row_number] = remote_product
                             imported_remote_products_by_identifier[remote_product.local_instance.sku] = remote_product
                 except Exception as exc:
-                    self._debug(
-                        message=(
-                            f"row failed file={row.filename} row={row.row_number} "
-                            f"error={exc.__class__.__name__}: {exc}"
-                        )
-                    )
                     if not self.import_process.skip_broken_records:
                         raise
                     self._add_broken_record(
@@ -216,7 +204,6 @@ class MiraklProductsImportProcessor(
                     self.update_percentage()
 
             error_rows = list(self._workbook_parser.iter_error_rows(export_file=export_file))
-            self._debug(message=f"error details rows file={export_file.file.name} count={len(error_rows)}")
             if error_rows:
                 if not error_details_issues_cleared:
                     MiraklProductIssue.objects.filter(
@@ -233,23 +220,9 @@ class MiraklProductsImportProcessor(
     def _process_row(self, *, row: MiraklImportRow) -> None:
         offers_lookup = self._offers_by_shop_sku or {}
         row_shop_sku = self._resolve_row_shop_sku(row=row)
-        self._debug(
-            message=(
-                f"row resolve shop_sku row={row.row_number} "
-                f"resolved_shop_sku={row_shop_sku!r} offer_found={row_shop_sku in offers_lookup}"
-            )
-        )
         mapped_row = self._reverse_mapper.build(
             row_fields=row.fields,
             offer_data=offers_lookup.get(row_shop_sku, {}),
-        )
-        self._debug(
-            message=(
-                f"mapped row row={row.row_number} shop_sku={mapped_row.shop_sku!r} "
-                f"parent_sku={mapped_row.parent_sku!r} is_configurable={mapped_row.is_configurable} "
-                f"remote_sku={mapped_row.remote_sku!r} category_code={mapped_row.category_code!r} "
-                f"view_codes={mapped_row.view_codes}"
-            )
         )
 
         if mapped_row.is_configurable:
@@ -270,12 +243,6 @@ class MiraklProductsImportProcessor(
         return ""
 
     def _process_simple_row(self, *, row: MiraklImportRow, mapped_row: MiraklMappedRow) -> MiraklProduct:
-        self._debug(
-            message=(
-                f"process simple row={row.row_number} sku={mapped_row.child_payload.get('sku')} "
-                f"payload_keys={list(mapped_row.child_payload.keys())}"
-            )
-        )
         child_import = self._import_local_product(
             payload=mapped_row.child_payload,
             rule=mapped_row.rule,
@@ -301,12 +268,6 @@ class MiraklProductsImportProcessor(
             remote_product=remote_product,
             view_codes=mapped_row.view_codes,
         )
-        self._debug(
-            message=(
-                f"simple row assigns synced row={row.row_number} "
-                f"product_id={child_import.instance.id} remote_product_id={remote_product.id}"
-            )
-        )
         self._create_import_log(
             import_instance=child_import,
             raw_data={
@@ -319,21 +280,7 @@ class MiraklProductsImportProcessor(
         return remote_product
 
     def _process_configurable_row(self, *, row: MiraklImportRow, mapped_row: MiraklMappedRow) -> MiraklProduct:
-        self._debug(
-            message=(
-                f"process configurable row={row.row_number} child_sku={mapped_row.shop_sku!r} "
-                f"parent_sku={mapped_row.parent_sku!r}"
-            )
-        )
         parent_product = self._get_existing_product(sku=mapped_row.parent_sku)
-        self._debug(
-            message=(
-                f"existing parent lookup row={row.row_number} "
-                f"found={parent_product is not None} "
-                f"parent_product_id={getattr(parent_product, 'id', None)} "
-                f"parent_type={getattr(parent_product, 'type', None)}"
-            )
-        )
         if parent_product is not None and parent_product.is_not_configurable():
             raise MiraklImportConfigurableConflictError(
                 f"Mirakl configurable SKU '{mapped_row.parent_sku}' already exists as a non-configurable product."
@@ -392,13 +339,6 @@ class MiraklProductsImportProcessor(
             remote_product=parent_remote,
             view_codes=mapped_row.view_codes,
         )
-        self._debug(
-            message=(
-                f"configurable row assigns synced row={row.row_number} "
-                f"parent_product_id={parent_import.instance.id} parent_remote_id={parent_remote.id} "
-                f"child_product_id={child_import.instance.id} child_remote_id={child_remote.id}"
-            )
-        )
         self._sync_configurator(parent_remote=parent_remote, rule=mapped_row.rule)
         self._create_import_log(
             import_instance=child_import,
@@ -417,12 +357,6 @@ class MiraklProductsImportProcessor(
     def _import_local_product(self, *, payload: dict[str, Any], rule, instance=None) -> ImportProductInstance:
         if not payload or not payload.get("sku"):
             raise MiraklImportInvalidRowError("Mirakl import payload is missing a SKU.")
-        self._debug(
-            message=(
-                f"import local product sku={payload.get('sku')!r} instance_id={getattr(instance, 'id', None)} "
-                f"rule_id={getattr(rule, 'id', None)} payload_keys={list(payload.keys())}"
-            )
-        )
 
         import_instance = ImportProductInstance(
             payload,
@@ -437,13 +371,6 @@ class MiraklProductsImportProcessor(
         import_instance.override_only = self.import_process.override_only
         import_instance.language = self.language
         import_instance.process()
-        self._debug(
-            message=(
-                f"import local product done sku={payload.get('sku')!r} "
-                f"created_instance_id={getattr(import_instance.instance, 'id', None)} "
-                f"type={getattr(import_instance.instance, 'type', None)}"
-            )
-        )
         return import_instance
 
     def _upsert_remote_product(
@@ -456,13 +383,6 @@ class MiraklProductsImportProcessor(
         mapped_row: MiraklMappedRow,
         row: MiraklImportRow,
     ) -> MiraklProduct:
-        self._debug(
-            message=(
-                f"upsert remote start local_product_id={local_product.id} sku={local_product.sku!r} "
-                f"remote_sku={remote_sku!r} is_variation={is_variation} "
-                f"parent_remote_id={getattr(parent_remote, 'id', None)}"
-            )
-        )
         queryset = MiraklProduct.objects.filter(
             sales_channel=self.sales_channel,
             local_instance=local_product,
@@ -524,44 +444,21 @@ class MiraklProductsImportProcessor(
 
         if remote_product.pk is None:
             remote_product.save()
-            self._debug(
-                message=(
-                    f"upsert remote created remote_product_id={remote_product.id} "
-                    f"local_product_id={local_product.id} status={remote_product.status}"
-                )
-            )
             return remote_product
 
         if updates:
             remote_product.save(update_fields=updates)
-        self._debug(
-            message=(
-                f"upsert remote finished remote_product_id={remote_product.id} "
-                f"updated_fields={updates} status={remote_product.status}"
-            )
-        )
         return remote_product
 
     def _sync_configurable_relation(self, *, parent_product: Product, child_product: Product) -> None:
-        relation, created = ConfigurableVariation.objects.get_or_create(
+        ConfigurableVariation.objects.get_or_create(
             parent=parent_product,
             variation=child_product,
             multi_tenant_company=self.multi_tenant_company,
         )
-        self._debug(
-            message=(
-                f"sync configurable relation parent_id={parent_product.id} child_id={child_product.id} "
-                f"relation_id={relation.id} created={created}"
-            )
-        )
 
     def _detach_variation_links(self, *, product: Product) -> None:
-        self._debug(
-            message=(
-                f"skip detaching configurable relations for product_id={product.id} sku={product.sku!r} "
-                f"because configurable links are global and not sales-channel scoped"
-            )
-        )
+        return
 
     def _sync_configurator(self, *, parent_remote: MiraklProduct, rule) -> None:
         if rule is None or parent_remote.local_instance is None:
@@ -582,13 +479,6 @@ class MiraklProductsImportProcessor(
 
     def _sync_assigns(self, *, product: Product, remote_product: MiraklProduct, view_codes: list[str]) -> None:
         views = self._get_target_views(view_codes=view_codes)
-        self._debug(
-            message=(
-                f"sync assigns start product_id={product.id} sku={product.sku!r} "
-                f"remote_product_id={remote_product.id} view_codes={view_codes} "
-                f"resolved_views={[str(view.remote_id or '') for view in views]}"
-            )
-        )
         for view in views:
             assign, _ = SalesChannelViewAssign.objects.get_or_create(
                 product=product,
@@ -597,22 +487,9 @@ class MiraklProductsImportProcessor(
                 sales_channel=self.sales_channel,
                 defaults={"remote_product": remote_product},
             )
-            self._debug(
-                message=(
-                    f"sync assigns got assign assign_id={assign.id} "
-                    f"view_id={view.id} view_code={view.remote_id!r} "
-                    f"remote_product_id={assign.remote_product_id}"
-                )
-            )
             if assign.remote_product_id != remote_product.id:
                 assign.remote_product = remote_product
                 assign.save(update_fields=["remote_product"])
-                self._debug(
-                    message=(
-                        f"sync assigns updated remote_product assign_id={assign.id} "
-                        f"new_remote_product_id={remote_product.id}"
-                    )
-                )
 
     def _remove_assigns_for_product(self, *, product: Product, view_codes: list[str]) -> None:
         views = self._get_target_views(view_codes=view_codes)
@@ -651,12 +528,10 @@ class MiraklProductsImportProcessor(
             ) from exc
 
     def _load_offers_lookup(self) -> dict[str, dict[str, Any]]:
-        self._debug(message="loading OF21 offers")
         offers = self.mirakl_paginated_get(
             path="/api/offers",
             results_key="offers",
         )
-        self._debug(message=f"OF21 fetched offers count={len(offers)}")
         lookup: dict[str, dict[str, Any]] = {}
 
         for offer in offers:
@@ -690,14 +565,11 @@ class MiraklProductsImportProcessor(
                 ),
                 "product_short_description": self._first_non_empty(offer.get("internal_description")),
                 "logistic_class": self._first_non_empty((offer.get("logistic_class") or {}).get("code")),
-                "active": offer.get("active"),
                 "category_code": self._first_non_empty(offer.get("category_code")),
                 "channels": offer.get("channels") or [],
                 "currency": self._first_non_empty(offer.get("currency_iso_code")),
                 "raw_offer": offer,
             }
-        preview_keys = list(lookup.keys())[:10]
-        self._debug(message=f"OF21 lookup built count={len(lookup)} preview_shop_skus={preview_keys}")
 
         return lookup
 
@@ -706,23 +578,9 @@ class MiraklProductsImportProcessor(
             self._views_cache = list(
                 MiraklSalesChannelView.objects.filter(sales_channel=self.sales_channel).order_by("id")
             )
-            self._debug(
-                message=(
-                    f"loaded sales channel views count={len(self._views_cache)} "
-                    f"view_codes={[str(view.remote_id or '') for view in self._views_cache]}"
-                )
-            )
         if not view_codes:
-            self._debug(message="no specific view codes provided, using all sales channel views")
             return self._views_cache
         filtered = [view for view in self._views_cache if str(view.remote_id or "").strip() in view_codes]
-        self._debug(
-            message=(
-                f"filtered target views requested={view_codes} "
-                f"matched={[str(view.remote_id or '') for view in filtered]} "
-                f"fallback_to_all={not bool(filtered)}"
-            )
-        )
         return filtered or self._views_cache
 
     def _product_has_channel_images(self, *, product: Product) -> bool:
