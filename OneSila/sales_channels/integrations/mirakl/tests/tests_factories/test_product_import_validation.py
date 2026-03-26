@@ -70,6 +70,13 @@ class MiraklProductsImportValidationTests(DisableMiraklConnectionMixin, TestCase
             processor.validate()
 
     def test_validate_rejects_non_xlsx_files(self):
+        baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="shop_sku",
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_SKU,
+        )
         self._create_export_file(filename="export.csv", content=b"not-an-xlsx")
         processor = MiraklProductsImportProcessor(
             import_process=self.import_process,

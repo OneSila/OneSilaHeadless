@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 from model_bakery import baker
 
@@ -144,7 +143,11 @@ class MiraklNewProductReportSyncFactoryTests(DisableMiraklConnectionMixin, TestC
             params={"product_references": "EAN|5056863153495"},
         )
         self.assertTrue(
-            IntegrationLog.objects.filter(identifier=MiraklNewProductReportSyncFactory.LOG_FIX_IDENTIFIER).exists()
+            IntegrationLog.objects.filter(
+                remote_product=self.remote_product,
+                identifier=MiraklNewProductReportSyncFactory.LOG_FIX_IDENTIFIER,
+                status=IntegrationLog.STATUS_SUCCESS,
+            ).exists()
         )
 
     @patch.object(MiraklNewProductReportSyncFactory, "mirakl_get")
@@ -175,11 +178,9 @@ class MiraklNewProductReportSyncFactoryTests(DisableMiraklConnectionMixin, TestC
                 ean_code="5056863153495",
             ).exists()
         )
-        sales_channel_type = ContentType.objects.get_for_model(self.sales_channel)
         self.assertTrue(
             IntegrationLog.objects.filter(
-                content_type=sales_channel_type,
-                object_id=self.sales_channel.id,
+                remote_product=self.remote_product,
                 identifier=MiraklNewProductReportSyncFactory.LOG_IDENTIFIER,
                 status=IntegrationLog.STATUS_FAILED,
                 user_error=True,

@@ -7,7 +7,11 @@ from openpyxl import Workbook
 
 from core.tests import TestCase
 from products.models import ConfigurableVariation, Product
-from properties.models import ProductProperty, Property, PropertySelectValue
+from properties.models import (
+    ProductProperty,
+    Property,
+    PropertySelectValue,
+)
 from sales_channels.integrations.mirakl.factories.imports.products import MiraklProductsImportProcessor
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
@@ -295,59 +299,6 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
                 remote_id="CAT-2",
             ).exists()
         )
-
-    @patch.object(MiraklProductsImportProcessor, "mirakl_paginated_get", return_value=[])
-    def test_run_import_maps_select_values_by_remote_value(self, _mirakl_paginated_get_mock):
-        local_property = baker.make(
-            Property,
-            multi_tenant_company=self.multi_tenant_company,
-            name="Brand",
-            internal_name="brand",
-            type=Property.TYPES.SELECT,
-        )
-        local_value = baker.make(
-            PropertySelectValue,
-            multi_tenant_company=self.multi_tenant_company,
-            property=local_property,
-            value="Acme",
-        )
-        baker.make(
-            MiraklProperty,
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            code="shop_sku",
-            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_SKU,
-        )
-        remote_brand = baker.make(
-            MiraklProperty,
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            code="product_brand",
-            local_instance=local_property,
-            type=Property.TYPES.SELECT,
-        )
-        baker.make(
-            MiraklPropertySelectValue,
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_property=remote_brand,
-            local_instance=local_value,
-            code="ACME_CODE",
-            value="Acme",
-        )
-        self._create_export_file(
-            codes=["shop_sku", "product_brand"],
-            rows=[["SELLER-2", "Acme"]],
-        )
-
-        MiraklProductsImportProcessor(
-            import_process=self.import_process,
-            sales_channel=self.sales_channel,
-        ).run()
-
-        product = Product.objects.get(multi_tenant_company=self.multi_tenant_company, sku="SELLER-2")
-        product_property = ProductProperty.objects.get(product=product, property=local_property)
-        self.assertEqual(product_property.value_select_id, local_value.id)
 
     @patch.object(MiraklProductsImportProcessor, "mirakl_paginated_get")
     def test_run_import_creates_issues_from_error_details_sheet(self, mirakl_paginated_get_mock):

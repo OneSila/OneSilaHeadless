@@ -26,9 +26,11 @@ class MiraklNewProductReportSyncFactory(GetMiraklAPIMixin):
     def __init__(self, *, feed) -> None:
         self.feed = feed
         self.sales_channel = self._resolve_sales_channel_instance(feed=feed)
-        self.reference_headers = self._get_reference_headers()
+        self.reference_headers: list[str] | None = None
 
     def run(self) -> int:
+        if self.reference_headers is None:
+            self.reference_headers = self._get_reference_headers()
         rows = self._load_rows()
         if not rows:
             return 0
@@ -44,6 +46,7 @@ class MiraklNewProductReportSyncFactory(GetMiraklAPIMixin):
 
         unresolved_messages: list[str] = []
         synced_remote_product_ids: set[int] = set()
+        synced_remote_products: list[MiraklProduct] = []
         for reference, reference_rows in rows_by_reference.items():
             remote_product = self._resolve_remote_product(
                 reference=reference,
@@ -79,17 +82,24 @@ class MiraklNewProductReportSyncFactory(GetMiraklAPIMixin):
                 reference=reference,
             )
             synced_remote_product_ids.add(remote_product.id)
+            if remote_product not in synced_remote_products:
+                synced_remote_products.append(remote_product)
 
         if unresolved_messages:
             self._log_lookup_failure(
                 unresolved_messages=unresolved_messages,
                 references=list(rows_by_reference.keys()),
+                remote_products=self._collect_log_remote_products(
+                    references=list(rows_by_reference.keys()),
+                    remote_product_lookup=remote_product_lookup,
+                ),
             )
             raise MiraklNewProductReportLookupError("\n".join(unresolved_messages))
 
         self._log_lookup_success(
             references=list(rows_by_reference.keys()),
             synced_count=len(synced_remote_product_ids),
+            remote_products=synced_remote_products,
         )
         return len(synced_remote_product_ids)
 
@@ -366,30 +376,62 @@ class MiraklNewProductReportSyncFactory(GetMiraklAPIMixin):
             return ""
         return str(value).strip()
 
-    def _log_lookup_failure(self, *, unresolved_messages: list[str], references: list[str]) -> None:
-        message = "\n".join(unresolved_messages)
-        self.sales_channel.add_user_error(
-            action=IntegrationLog.ACTION_UPDATE,
-            response=message,
-            payload={
-                "feed_id": self.feed.id,
-                "feed_remote_id": self.feed.remote_id,
-                "references": references,
-            },
-            error_traceback="",
-            identifier=self.LOG_IDENTIFIER,
-            fixing_identifier=self.LOG_FIX_IDENTIFIER,
-        )
+    def _collect_log_remote_products(
+        self,
+        *,
+        references: list[str],
+        remote_product_lookup: dict[str, MiraklProduct],
+    ) -> list[MiraklProduct]:
+        remote_products: list[MiraklProduct] = []
+        for reference in references:
+            remote_product = self._resolve_remote_product(
+                reference=reference,
+                remote_product_lookup=remote_product_lookup,
+            )
+            if remote_product is not None and remote_product not in remote_products:
+                remote_products.append(remote_product)
+        return remote_products
 
-    def _log_lookup_success(self, *, references: list[str], synced_count: int) -> None:
-        self.sales_channel.add_log(
-            action=IntegrationLog.ACTION_UPDATE,
-            response="Mirakl added-products report synced.",
-            payload={
-                "feed_id": self.feed.id,
-                "feed_remote_id": self.feed.remote_id,
-                "references": references,
-                "synced_count": synced_count,
-            },
-            identifier=self.LOG_FIX_IDENTIFIER,
-        )
+    def _log_lookup_failure(
+        self,
+        *,
+        unresolved_messages: list[str],
+        references: list[str],
+        remote_products: list[MiraklProduct],
+    ) -> None:
+        message = "\n".join(unresolved_messages)
+        for remote_product in remote_products:
+            remote_product.add_user_error(
+                action=IntegrationLog.ACTION_UPDATE,
+                response=message,
+                payload={
+                    "feed_id": self.feed.id,
+                    "feed_remote_id": self.feed.remote_id,
+                    "references": references,
+                },
+                error_traceback="",
+                identifier=self.LOG_IDENTIFIER,
+                fixing_identifier=self.LOG_FIX_IDENTIFIER,
+                remote_product=remote_product,
+            )
+
+    def _log_lookup_success(
+        self,
+        *,
+        references: list[str],
+        synced_count: int,
+        remote_products: list[MiraklProduct],
+    ) -> None:
+        for remote_product in remote_products:
+            remote_product.add_log(
+                action=IntegrationLog.ACTION_UPDATE,
+                response="Mirakl added-products report synced.",
+                payload={
+                    "feed_id": self.feed.id,
+                    "feed_remote_id": self.feed.remote_id,
+                    "references": references,
+                    "synced_count": synced_count,
+                },
+                identifier=self.LOG_FIX_IDENTIFIER,
+                remote_product=remote_product,
+            )

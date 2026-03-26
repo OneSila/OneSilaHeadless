@@ -79,9 +79,6 @@ class MiraklReverseProductMapper:
                 self._product_type_by_name[normalized_name] = item
         self._select_value_lookup = self._build_select_value_lookup()
 
-    def _debug(self, *, message: str) -> None:
-        print(f"TEMPORARY DEBUG: {message}")
-
     def build(
         self,
         *,
@@ -89,17 +86,6 @@ class MiraklReverseProductMapper:
         offer_data: dict[str, Any] | None = None,
     ) -> MiraklMappedRow:
         offer_data = dict(offer_data or {})
-        populated_fields = {
-            code: value
-            for code, value in row_fields.items()
-            if str(value or "").strip()
-        }
-        self._debug(
-            message=(
-                f"mapper build start populated_fields={populated_fields} "
-                f"offer_keys={list(offer_data.keys())}"
-            )
-        )
 
         shop_sku = self._resolve_required_product_sku(row_fields=row_fields)
         parent_sku = self._resolve_optional_representation(
@@ -109,12 +95,6 @@ class MiraklReverseProductMapper:
         is_configurable = bool(parent_sku and parent_sku != shop_sku)
         if not is_configurable:
             parent_sku = shop_sku
-        self._debug(
-            message=(
-                f"mapper sku resolution shop_sku={shop_sku!r} "
-                f"parent_sku={parent_sku!r} is_configurable={is_configurable}"
-            )
-        )
 
         name = (
             self._resolve_representation_value(
@@ -209,16 +189,6 @@ class MiraklReverseProductMapper:
         else:
             parent_images = []
 
-        self._debug(
-            message=(
-                f"mapper result shop_sku={shop_sku!r} remote_sku={str(offer_data.get('remote_sku') or '').strip()!r} "
-                f"category_code={category_code!r} rule_id={getattr(rule, 'id', None)} "
-                f"properties_count={len(child_payload.get('properties', []))} "
-                f"child_images_count={len(child_images)} parent_images_count={len(parent_images)} "
-                f"view_codes={self._normalize_view_codes(offer_data=offer_data)}"
-            )
-        )
-
         return MiraklMappedRow(
             shop_sku=shop_sku,
             remote_sku=str(offer_data.get("remote_sku") or "").strip(),
@@ -270,24 +240,11 @@ class MiraklReverseProductMapper:
             representation_type=representation_type,
         )
         if value:
-            self._debug(
-                message=(
-                    f"representation resolved from row representation_type={representation_type} "
-                    f"value={value!r}"
-                )
-            )
             return value
         fallback = self._get_offer_representation_fallback(
             representation_type=representation_type,
             offer_data=offer_data,
         )
-        if fallback not in (None, ""):
-            self._debug(
-                message=(
-                    f"representation fallback used representation_type={representation_type} "
-                    f"value={str(fallback).strip()!r}"
-                )
-            )
         return str(fallback or "").strip()
 
     def _resolve_boolean_representation(
@@ -334,29 +291,16 @@ class MiraklReverseProductMapper:
     ) -> str:
         offer_category_code = str(offer_data.get("category_code") or "").strip()
         if offer_category_code:
-            self._debug(
-                message=(
-                    f"category resolved from OF21 category_code={offer_category_code!r} "
-                    f"raw_file_value={raw_category_value!r}"
-                )
-            )
             return offer_category_code
 
         normalized_candidates = self._build_lookup_candidates(value=raw_category_value)
         direct_remote_id = str(raw_category_value or "").strip()
         if direct_remote_id in self._leaf_category_by_remote_id:
-            self._debug(message=f"category resolved from direct remote_id value={direct_remote_id!r}")
             return direct_remote_id
 
         for candidate in normalized_candidates:
             remote_id = self._leaf_category_remote_id_by_name.get(candidate)
             if remote_id:
-                self._debug(
-                    message=(
-                        f"category resolved from category name raw_value={raw_category_value!r} "
-                        f"normalized_candidate={candidate!r} remote_id={remote_id!r}"
-                    )
-                )
                 return remote_id
 
         for candidate in normalized_candidates:
@@ -366,15 +310,8 @@ class MiraklReverseProductMapper:
             product_type_category = getattr(product_type, "category", None)
             product_type_category_remote_id = str(getattr(product_type_category, "remote_id", "") or "").strip()
             if product_type_category_remote_id:
-                self._debug(
-                    message=(
-                        f"category resolved from product type name raw_value={raw_category_value!r} "
-                        f"normalized_candidate={candidate!r} remote_id={product_type_category_remote_id!r}"
-                    )
-                )
                 return product_type_category_remote_id
 
-        self._debug(message=f"category unresolved raw_value={raw_category_value!r}")
         return ""
 
     def _get_offer_representation_fallback(
@@ -498,13 +435,6 @@ class MiraklReverseProductMapper:
                 effective_value = str(getattr(remote_property, "default_value", "") or "").strip()
             if not effective_value:
                 continue
-            self._debug(
-                message=(
-                    f"property candidate code={code!r} remote_property_id={remote_property.id} "
-                    f"remote_representation={remote_property.representation_type!r} "
-                    f"local_property_id={local_property.id} effective_value={effective_value!r}"
-                )
-            )
 
             entry = self._build_property_entry(
                 local_property=local_property,
@@ -513,19 +443,6 @@ class MiraklReverseProductMapper:
             )
             if entry is not None:
                 results.append(entry)
-                self._debug(
-                    message=(
-                        f"property mapped code={code!r} local_property_id={local_property.id} "
-                        f"entry_keys={list(entry.keys())}"
-                    )
-                )
-            else:
-                self._debug(
-                    message=(
-                        f"property skipped after mapping code={code!r} "
-                        f"local_property_id={local_property.id}"
-                    )
-                )
 
         return results
 
@@ -579,12 +496,6 @@ class MiraklReverseProductMapper:
                 value=value,
                 property_type=Property.TYPES.MULTISELECT if multiple else Property.TYPES.SELECT,
             )
-            self._debug(
-                message=(
-                    f"select passthrough remote_property_id={remote_property.id} "
-                    f"multiple={multiple} value={normalized!r}"
-                )
-            )
             return {"value": normalized}
 
         if multiple:
@@ -594,19 +505,6 @@ class MiraklReverseProductMapper:
                 mapped = self._select_value_lookup.get((remote_property.id, item.lower()))
                 if mapped is not None and mapped.local_instance_id:
                     mapped_ids.append(mapped.local_instance_id)
-                    self._debug(
-                        message=(
-                            f"multiselect mapped remote_property_id={remote_property.id} "
-                            f"input_value={item!r} local_instance_id={mapped.local_instance_id}"
-                        )
-                    )
-                else:
-                    self._debug(
-                        message=(
-                            f"multiselect missing mapping remote_property_id={remote_property.id} "
-                            f"input_value={item!r}"
-                        )
-                    )
             if not mapped_ids:
                 return None
             return {"value": mapped_ids, "value_is_id": True}
@@ -616,19 +514,7 @@ class MiraklReverseProductMapper:
             return None
         mapped = self._select_value_lookup.get((remote_property.id, normalized))
         if mapped is None or not mapped.local_instance_id:
-            self._debug(
-                message=(
-                    f"select missing mapping remote_property_id={remote_property.id} "
-                    f"input_value={normalized!r}"
-                )
-            )
             return None
-        self._debug(
-            message=(
-                f"select mapped remote_property_id={remote_property.id} "
-                f"input_value={normalized!r} local_instance_id={mapped.local_instance_id}"
-            )
-        )
         return {"value": mapped.local_instance_id, "value_is_id": True}
 
     def _requires_remote_select_mapping(self, *, remote_property: MiraklProperty) -> bool:
@@ -710,41 +596,16 @@ class MiraklReverseProductMapper:
         if category_code:
             product_type = self._product_type_by_remote_id.get(category_code)
             if product_type is not None and product_type.local_instance_id:
-                self._debug(
-                    message=(
-                        f"rule resolved from category_code={category_code!r} "
-                        f"rule_id={product_type.local_instance_id}"
-                    )
-                )
                 return product_type.local_instance
 
         direct_remote_match = self._product_type_by_remote_id.get(str(raw_category_value or "").strip())
         if direct_remote_match is not None and direct_remote_match.local_instance_id:
-            self._debug(
-                message=(
-                    f"rule resolved from raw category remote_id={raw_category_value!r} "
-                    f"rule_id={direct_remote_match.local_instance_id}"
-                )
-            )
             return direct_remote_match.local_instance
 
         for candidate in self._build_lookup_candidates(value=raw_category_value):
             product_type = self._product_type_by_name.get(candidate)
             if product_type is not None and product_type.local_instance_id:
-                self._debug(
-                    message=(
-                        f"rule resolved from category name raw_value={raw_category_value!r} "
-                        f"normalized_candidate={candidate!r} rule_id={product_type.local_instance_id}"
-                    )
-                )
                 return product_type.local_instance
-
-        self._debug(
-            message=(
-                f"rule unresolved category_code={category_code!r} "
-                f"raw_category_value={raw_category_value!r}"
-            )
-        )
         return None
 
     def _build_lookup_candidates(self, *, value: str) -> list[str]:
