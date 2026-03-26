@@ -31,6 +31,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelFeed,
     MiraklSalesChannelFeedItem,
     MiraklSalesChannelImport,
+    MiraklSalesChannelImportExportFile,
     MiraklSalesChannelView,
 )
 from sales_channels.schema.types.filter_mixins import DependentMappedLocallyFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin
@@ -269,3 +270,10 @@ class MiraklEanCodeFilter(SearchFilterMixin):
 @filter(MiraklSalesChannelImport)
 class MiraklSalesChannelImportFilter(SalesChannelImportFilter):
     type: auto
+
+
+@filter(MiraklSalesChannelImportExportFile)
+class MiraklSalesChannelImportExportFileFilter(SearchFilterMixin):
+    id: auto
+    import_process: Optional[MiraklSalesChannelImportFilter]
+    file: auto

@@ -37,6 +37,48 @@ class MiraklPayloadValidationError(PreFlightCheckError):
     pass
 
 
+class MiraklImportMissingFilesError(PreFlightCheckError):
+    """Raised when a Mirakl product import is started without any export files."""
+
+    pass
+
+
+class MiraklImportInvalidFileTypeError(PreFlightCheckError):
+    """Raised when a Mirakl import export file is not an .xlsx workbook."""
+
+    pass
+
+
+class MiraklImportInvalidFileLayoutError(PreFlightCheckError):
+    """Raised when a Mirakl import export file does not match the expected workbook layout."""
+
+    pass
+
+
+class MiraklImportMissingProductSkuError(PreFlightCheckError):
+    """Raised when an XLSX row does not provide the required Mirakl product_sku field."""
+
+    pass
+
+
+class MiraklImportConfigurableConflictError(PreFlightCheckError):
+    """Raised when a configurable SKU resolves to an incompatible existing local product."""
+
+    pass
+
+
+class MiraklImportInvalidRowError(PreFlightCheckError):
+    """Raised when an XLSX row cannot be normalized into a valid Mirakl import payload."""
+
+    pass
+
+
+class MiraklNewProductReportLookupError(Exception):
+    """Raised when a Mirakl added-products report cannot be resolved back to remote product details."""
+
+    pass
+
+
 class VariationAlreadyExistsOnWebsite(Exception):
     """Raised when attempting to create a variation that already exists as a
     standalone product on the remote sales channel."""

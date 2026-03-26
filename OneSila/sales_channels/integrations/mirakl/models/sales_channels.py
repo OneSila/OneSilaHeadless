@@ -12,6 +12,7 @@ from sales_channels.integrations.mirakl.sub_type_constants import (
 )
 from sales_channels.exceptions import (
     InspectorMissingInformationError,
+    MiraklNewProductReportLookupError,
     MiraklPayloadValidationError,
     MissingMappingError,
     PreFlightCheckError,
@@ -98,6 +99,7 @@ class MiraklSalesChannel(SalesChannel):
         verbose_name_plural = "Mirakl Sales Channels"
         user_exceptions = (
             InspectorMissingInformationError,
+            MiraklNewProductReportLookupError,
             MiraklPayloadValidationError,
             MissingMappingError,
             PreFlightCheckError,

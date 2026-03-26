@@ -24,6 +24,8 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannel,
     MiraklSalesChannelFeed,
     MiraklSalesChannelFeedItem,
+    MiraklSalesChannelImport,
+    MiraklSalesChannelImportExportFile,
     MiraklSalesChannelView,
 )
 from sales_channels.tests.helpers import DisableMiraklConnectionMixin
@@ -210,6 +212,23 @@ query ($status: String!, $importStatus: String!) {
           id
           sku
           name
+        }
+      }
+    }
+  }
+}
+"""
+
+MIRAKL_IMPORT_EXPORT_FILES_QUERY = """
+query {
+  miraklImportExportFiles {
+    edges {
+      node {
+        id
+        fileUrl
+        importProcess {
+          id
+          type
         }
       }
     }
@@ -707,3 +726,25 @@ class MiraklQueryTests(
         self.assertIsNotNone(node["transformationErrorReportFileUrl"])
         self.assertEqual(len(node["products"]), 1)
         self.assertEqual(node["products"][0]["sku"], "LOCAL-SKU-1")
+
+    def test_mirakl_import_export_files_query_exposes_file_url_and_import_process(self):
+        import_process = baker.make(
+            MiraklSalesChannelImport,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            type=MiraklSalesChannelImport.TYPE_PRODUCTS,
+        )
+        export_file = baker.make(
+            MiraklSalesChannelImportExportFile,
+            import_process=import_process,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        export_file.file.save("mirakl-export.xlsx", ContentFile(b"xlsx"), save=True)
+
+        response = self.strawberry_test_client(query=MIRAKL_IMPORT_EXPORT_FILES_QUERY)
+
+        self.assertIsNone(response.errors)
+        node = response.data["miraklImportExportFiles"]["edges"][0]["node"]
+        self.assertEqual(node["importProcess"]["id"], self.to_global_id(import_process))
+        self.assertEqual(node["importProcess"]["type"], MiraklSalesChannelImport.TYPE_PRODUCTS)
+        self.assertIsNotNone(node["fileUrl"])

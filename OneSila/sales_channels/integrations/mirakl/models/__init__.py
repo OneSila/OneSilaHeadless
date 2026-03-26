@@ -1,7 +1,7 @@
 from .categories import MiraklCategory, MiraklProductCategory
 from .documents import MiraklDocumentType
 from .feeds import MiraklSalesChannelFeed, MiraklSalesChannelFeedItem
-from .imports import MiraklSalesChannelImport
+from .imports import MiraklSalesChannelImport, MiraklSalesChannelImportExportFile
 from .issues import MiraklProductIssue
 from .products import MiraklEanCode, MiraklPrice, MiraklProduct, MiraklProductContent
 from .public_definitions import MiraklPublicDefinition
@@ -40,5 +40,6 @@ __all__ = [
     "MiraklRemoteLanguage",
     "MiraklSalesChannel",
     "MiraklSalesChannelImport",
+    "MiraklSalesChannelImportExportFile",
     "MiraklSalesChannelView",
 ]

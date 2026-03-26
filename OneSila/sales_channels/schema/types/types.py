@@ -268,7 +268,6 @@ class SalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     def import_id(self, info) -> str:
         return to_base64(ImportType, self.pk)
 
-
 @type(ImportProduct, filters=ImportProductFilter, order=ImportProductOrder, pagination=True, fields='__all__')
 class ImportProductType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType

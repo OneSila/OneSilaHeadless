@@ -90,6 +90,9 @@ class ImportMixin:
     def on_fail(self):
         pass
 
+    def validate(self):
+        pass
+
     def get_total_instances(self):
         raise NotImplementedError("'get_total_instances' needs to be implemented in the subclass!")
 
@@ -326,6 +329,8 @@ class ImportMixin:
         self.strat_process()
 
         try:
+            self.validate()
+
             if self.import_properties:
                 self.import_properties_process()
 
