@@ -1,6 +1,11 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
-from sales_channels.integrations.mirakl.models import MiraklPropertySelectValue, MiraklSalesChannel, MiraklSalesChannelFeed
+from sales_channels.integrations.mirakl.models import (
+    MiraklProductCategory,
+    MiraklPropertySelectValue,
+    MiraklSalesChannel,
+    MiraklSalesChannelFeed,
+)
 from sales_channels.signals import (
     add_remote_product_variation,
     create_remote_document_association,
@@ -55,6 +60,25 @@ def mirakl__property_select_value__propagate_local_mapping(sender, instance: Mir
     MiraklPropertySelectValueSiblingMappingFactory(
         remote_select_value=instance,
     ).run()
+
+
+@receiver(post_create, sender="mirakl.MiraklProductCategory")
+@receiver(post_update, sender="mirakl.MiraklProductCategory")
+def mirakl__product_category__propagate_to_variations(sender, instance: MiraklProductCategory, **kwargs):
+    product = getattr(instance, "product", None)
+    if product is None or not product.is_configurable():
+        return
+
+    variations = product.get_configurable_variations(active_only=False)
+    for variation in variations:
+        MiraklProductCategory.objects.update_or_create(
+            multi_tenant_company=instance.multi_tenant_company,
+            product=variation,
+            sales_channel=instance.sales_channel,
+            defaults={
+                "remote_id": instance.remote_id,
+            },
+        )
 
 
 @receiver(refresh_website_pull_models, sender="sales_channels.SalesChannel")

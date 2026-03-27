@@ -15,6 +15,7 @@ from sales_channels.integrations.mirakl.factories.sync.public_definitions import
 )
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
+    MiraklDocumentType,
     MiraklProductType,
     MiraklProductTypeItem,
     MiraklProperty,
@@ -112,6 +113,26 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
                 item={
                     "code": "details_and_care",
                     "label": "Details and Care",
+                    "type": "TEXT",
+                    "type_parameters": [],
+                },
+                values_list_code="",
+                inline_values=[],
+                ),
+                MiraklProperty.REPRESENTATION_PROPERTY,
+            )
+
+    def test_detect_representation_type_does_not_treat_vox_mode_as_vat_rate(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        self.assertEqual(
+            factory._detect_representation_type(
+                item={
+                    "code": "Voice_activation_VOX_mode",
+                    "label": "Voice activation VOX mode",
                     "type": "TEXT",
                     "type_parameters": [],
                 },
@@ -220,11 +241,32 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         )
         self.assertEqual(public_definition.language, "fr")
 
+    def test_public_definition_sync_creates_document_type_for_document_property(self):
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="energy_label",
+            name="Energy label",
+            description="Energy label asset",
+            representation_type=MiraklProperty.REPRESENTATION_DOCUMENT,
+            representation_type_decided=False,
+        )
+
+        synced = MiraklPublicDefinitionSyncFactory(sales_channel=self.sales_channel).run()
+
+        self.assertEqual(synced, 1)
+        remote_property.refresh_from_db()
+        self.assertTrue(remote_property.representation_type_decided)
+        document_type = MiraklDocumentType.objects.get(
+            sales_channel=self.sales_channel,
+            remote_id="energy_label",
+        )
+        self.assertEqual(document_type.name, "Energy label")
+        self.assertEqual(document_type.description, "Energy label asset")
+
     def _payloads_by_path(self):
         return {
-            "/api/documents": {
-                "document_types": [],
-            },
             "/api/offers/states": {
                 "offer_states": [
                     {
@@ -348,6 +390,30 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
                             {"name": "PRECISION", "value": "2"},
                             {"name": "UNIT", "value": "cm"},
                         ],
+                        "channels": [{"code": "WEB"}],
+                    },
+                    {
+                        "code": "pdf_declaration_of_identity",
+                        "label": "Declaration of Identity",
+                        "description": "Identity declaration PDF",
+                        "hierarchy_code": "CHILD",
+                        "required": True,
+                        "variant": False,
+                        "requirement_level": "REQUIRED",
+                        "type": "MEDIA",
+                        "type_parameters": [{"name": "TYPE", "value": "DOCUMENT"}],
+                        "channels": [{"code": "WEB"}],
+                    },
+                    {
+                        "code": "pdf_care_label",
+                        "label": "Care Label",
+                        "description": "Care label PDF",
+                        "hierarchy_code": "",
+                        "required": False,
+                        "variant": False,
+                        "requirement_level": "OPTIONAL",
+                        "type": "MEDIA",
+                        "type_parameters": [{"name": "TYPE", "value": "DOCUMENT"}],
                         "channels": [{"code": "WEB"}],
                     },
                     {
@@ -484,6 +550,25 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         package_length_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="package_length")
         self.assertEqual(package_length_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
         self.assertEqual(package_length_property.name, "Package Length (cm)")
+        declaration_property = MiraklProperty.objects.get(
+            sales_channel=self.sales_channel,
+            code="pdf_declaration_of_identity",
+        )
+        self.assertEqual(declaration_property.representation_type, MiraklProperty.REPRESENTATION_DOCUMENT)
+        declaration_document_type = MiraklDocumentType.objects.get(
+            sales_channel=self.sales_channel,
+            remote_id="pdf_declaration_of_identity",
+        )
+        self.assertEqual(declaration_document_type.name, "Declaration of Identity")
+        self.assertEqual(declaration_document_type.description, "Identity declaration PDF")
+        self.assertEqual(declaration_document_type.required_categories, ["CHILD"])
+        self.assertEqual(declaration_document_type.optional_categories, [])
+        care_label_document_type = MiraklDocumentType.objects.get(
+            sales_channel=self.sales_channel,
+            remote_id="pdf_care_label",
+        )
+        self.assertEqual(care_label_document_type.required_categories, [])
+        self.assertEqual(care_label_document_type.optional_categories, ["CHILD", "PARENT"])
         title_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="product_title")
         self.assertEqual(title_property.representation_type, MiraklProperty.REPRESENTATION_PRODUCT_TITLE)
         self.assertTrue(title_property.is_common)
@@ -558,9 +643,6 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
 
     def test_run_import_uses_roles_for_representation_type_detection(self):
         payloads = {
-            "/api/documents": {
-                "document_types": [],
-            },
             "/api/offers/states": {
                 "offer_states": [],
             },
@@ -644,6 +726,113 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             ).representation_type,
             MiraklProperty.REPRESENTATION_PRODUCT_CONFIGURABLE_SKU,
         )
+
+    def test_upsert_property_reopens_decided_default_value_when_attribute_now_has_multiple_values(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="made_to_order",
+            representation_type=MiraklProperty.REPRESENTATION_DEFAULT_VALUE,
+            representation_type_decided=True,
+            raw_data={"code": "made_to_order", "hierarchy_code": ""},
+        )
+
+        factory._upsert_property(
+            item={
+                "code": "made_to_order",
+                "label": "Made To Order",
+                "hierarchy_code": "",
+                "required": False,
+                "variant": False,
+                "type": "LIST",
+                "values": [
+                    {"code": "yes", "label": "Yes"},
+                    {"code": "no", "label": "No"},
+                ],
+                "channels": [{"code": "WEB"}],
+            }
+        )
+
+        remote_property.refresh_from_db()
+        self.assertEqual(remote_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
+        self.assertFalse(remote_property.representation_type_decided)
+
+    def test_upsert_property_auto_maps_brand_role_to_local_brand_property(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        local_brand_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="brand",
+            type=Property.TYPES.TEXT,
+        )
+
+        remote_property = factory._upsert_property(
+            item={
+                "code": "product_brand",
+                "label": "Brand",
+                "hierarchy_code": "",
+                "required": False,
+                "variant": False,
+                "type": "TEXT",
+                "roles": [{"type": "BRAND"}],
+                "channels": [{"code": "WEB"}],
+            }
+        )
+
+        self.assertIsNotNone(remote_property)
+        remote_property.refresh_from_db()
+        self.assertEqual(remote_property.local_instance_id, local_brand_property.id)
+        self.assertEqual(remote_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
+
+    def test_upsert_property_brand_role_does_not_override_existing_local_mapping(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        existing_local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="manufacturer",
+            type=Property.TYPES.TEXT,
+        )
+        baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="brand",
+            type=Property.TYPES.TEXT,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="product_brand",
+            local_instance=existing_local_property,
+        )
+
+        updated_property = factory._upsert_property(
+            item={
+                "code": "product_brand",
+                "label": "Brand",
+                "hierarchy_code": "",
+                "required": False,
+                "variant": False,
+                "type": "TEXT",
+                "roles": [{"type": "BRAND"}],
+                "channels": [{"code": "WEB"}],
+            }
+        )
+
+        self.assertIsNotNone(updated_property)
+        remote_property.refresh_from_db()
+        self.assertEqual(remote_property.local_instance_id, existing_local_property.id)
 
 class MiraklSchemaImportProcessorTests(DisableMiraklConnectionMixin, TestCase):
     def setUp(self):

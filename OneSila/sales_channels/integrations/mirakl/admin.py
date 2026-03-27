@@ -82,6 +82,17 @@ def set_mirakl_properties_as_image(modeladmin, request, queryset):
     )
 
 
+@admin.action(description="Set representation type to Document")
+def set_mirakl_properties_as_document(modeladmin, request, queryset):
+    _set_mirakl_property_representation_type(
+        modeladmin=modeladmin,
+        request=request,
+        queryset=queryset,
+        representation_type=MiraklProperty.REPRESENTATION_DOCUMENT,
+        label="document",
+    )
+
+
 @admin.register(MiraklSalesChannel)
 class MiraklSalesChannelAdmin(admin.ModelAdmin):
     list_display = ("hostname", "shop_id", "sub_type", "active", "representation_status")
@@ -296,14 +307,14 @@ class MiraklPropertyAdmin(admin.ModelAdmin):
         "updated_at",
     )
     list_filter = (
-        "sales_channel",
-        "representation_type",
         "representation_type_decided",
+        "representation_type",
         "is_common",
         "language",
         "type",
         "original_type",
         "allows_unmapped_values",
+        "sales_channel",
     )
     search_fields = (
         "code",
@@ -330,6 +341,7 @@ class MiraklPropertyAdmin(admin.ModelAdmin):
         set_mirakl_properties_as_unit,
         set_mirakl_properties_as_bullet_point,
         set_mirakl_properties_as_image,
+        set_mirakl_properties_as_document,
     )
     readonly_fields = (
         "representation_type_with_code",

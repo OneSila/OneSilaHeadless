@@ -11,6 +11,7 @@ from properties.models import Property
 from sales_channels.exceptions import MiraklImportMissingProductSkuError
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
+    MiraklDocumentType,
     MiraklProductType,
     MiraklProperty,
     MiraklPropertySelectValue,
@@ -78,6 +79,13 @@ class MiraklReverseProductMapper:
             if normalized_name and normalized_name not in self._product_type_by_name:
                 self._product_type_by_name[normalized_name] = item
         self._select_value_lookup = self._build_select_value_lookup()
+        self._document_type_by_remote_id = {
+            str(item.remote_id or "").strip(): item
+            for item in MiraklDocumentType.objects.filter(sales_channel=sales_channel)
+            .select_related("local_instance")
+            .order_by("id")
+            if str(item.remote_id or "").strip()
+        }
 
     def build(
         self,
@@ -141,6 +149,7 @@ class MiraklReverseProductMapper:
         )
         rrp = offer_data.get("rrp")
         child_images, parent_images = self._build_images(row_fields=row_fields)
+        documents = self._build_documents(row_fields=row_fields)
         properties = self._build_property_entries(
             row_fields=row_fields,
             offer_data=offer_data,
@@ -171,6 +180,8 @@ class MiraklReverseProductMapper:
             child_payload["properties"] = properties
         if child_images:
             child_payload["images"] = child_images
+        if documents:
+            child_payload["documents"] = documents
         if ean_code:
             child_payload["ean_code"] = ean_code
         if currency and (price is not None or rrp is not None):
@@ -403,6 +414,43 @@ class MiraklReverseProductMapper:
             parent_sort_order += 1
 
         return child_images, parent_images
+
+    def _build_documents(self, *, row_fields: dict[str, str]) -> list[dict[str, Any]]:
+        documents: list[dict[str, Any]] = []
+        seen_document_keys: set[tuple[str, str]] = set()
+
+        for code, raw_value in row_fields.items():
+            document_url = str(raw_value or "").strip()
+            if not document_url:
+                continue
+
+            remote_property = self._property_by_code.get(code)
+            if remote_property is None:
+                continue
+            if remote_property.representation_type != MiraklProperty.REPRESENTATION_DOCUMENT:
+                continue
+
+            remote_document_type = self._document_type_by_remote_id.get(str(remote_property.code or "").strip())
+            if remote_document_type is None or remote_document_type.local_instance is None:
+                continue
+
+            document_key = (str(remote_document_type.remote_id or "").strip(), document_url)
+            if document_key in seen_document_keys:
+                continue
+            seen_document_keys.add(document_key)
+
+            documents.append(
+                {
+                    "document_url": document_url,
+                    "title": str(remote_document_type.name or remote_property.name or remote_property.code or "").strip(),
+                    "description": str(remote_document_type.description or remote_property.description or "").strip(),
+                    "document_type": remote_document_type.local_instance,
+                    "document_language": self.default_language,
+                    "sort_order": len(documents),
+                }
+            )
+
+        return documents
 
     def _build_property_entries(
         self,

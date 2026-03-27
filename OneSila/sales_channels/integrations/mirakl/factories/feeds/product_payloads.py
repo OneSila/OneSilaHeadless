@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db import transaction
 
 from eancodes.models import EanCode
-from media.models import Media, MediaProductThrough
+from media.models import DocumentType, Media, MediaProductThrough
 from products.models import Product, ProductTranslation
 from properties.models import ProductProperty, Property
 from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
@@ -26,6 +26,7 @@ from sales_channels.helpers import _content_is_empty, build_content_data
 from sales_channels.integrations.mirakl.factories.mixins import GetMiraklAPIMixin
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
+    MiraklDocumentType,
     MiraklEanCode,
     MiraklPrice,
     MiraklProduct,
@@ -151,6 +152,13 @@ class _MiraklRemoteValueRunner(RemoteValueMixin):
 
 class MiraklProductPayloadBuilder:
     _UNSET = object()
+    KNOWN_VALIDATION_TYPES = (
+        "MAX_LENGTH",
+        "MIN_LENGTH",
+        "FORBIDDEN_WORDS",
+        "PRODUCT_REFERENCE",
+        "SCRIPT",
+    )
 
     OFFER_FIELD_KEYS = [
         "sku",
@@ -193,6 +201,7 @@ class MiraklProductPayloadBuilder:
         self._public_definition_cache: dict[str, MiraklPublicDefinition | None] = {}
         self._local_language_by_remote_code_cache: dict[str, str | None] = {}
         self._offer_property_cache: dict[str, MiraklProperty | None] = {}
+        self._document_type_by_code_cache: dict[str, MiraklDocumentType | None] = {}
 
     def build(self) -> tuple[MiraklProductType, list[dict[str, str]]]:
         self.validate_feed_prerequisites()
@@ -210,6 +219,7 @@ class MiraklProductPayloadBuilder:
         product_properties_by_product = self._load_properties(products=products)
         prices_by_product = self._load_prices(products=products)
         media_by_product = self._load_media(products=lookup_products)
+        documents_by_product = self._load_documents(products=lookup_products)
         eans_by_product = self._load_eans(products=products)
 
         resolved_product_type: MiraklProductType | None = None
@@ -223,6 +233,7 @@ class MiraklProductPayloadBuilder:
                 product_properties=list(product_properties_by_product.get(product.id, [])),
                 prices=list(prices_by_product.get(product.id, [])),
                 images=list(media_by_product.get(product.id, [])) or list(media_by_product.get(content_product.id, [])),
+                documents=list(documents_by_product.get(product.id, [])) or list(documents_by_product.get(content_product.id, [])),
                 ean=eans_by_product.get(product.id, ""),
                 content_product=content_product,
             )
@@ -331,6 +342,7 @@ class MiraklProductPayloadBuilder:
         product_properties: list[ProductProperty],
         prices: list[dict[str, Any]],
         images: list[dict[str, Any]],
+        documents: list[MediaProductThrough],
         ean: str,
         content_product: Product,
     ) -> dict[str, Any]:
@@ -371,6 +383,7 @@ class MiraklProductPayloadBuilder:
             "property_by_id": property_by_id,
             "remote_select_lookup": remote_select_lookup,
             "images": images,
+            "documents": documents,
             "swatch_url": self._resolve_swatch_url(images=images, product_properties=product_properties),
             "ean": ean,
             "price_data": price_data,
@@ -690,6 +703,30 @@ class MiraklProductPayloadBuilder:
                     "sort_order": item.sort_order,
                 }
             )
+        return results
+
+    def _load_documents(self, *, products: list[Product]) -> dict[int, list[MediaProductThrough]]:
+        queryset = (
+            MediaProductThrough.objects.filter(product_id__in=[product.id for product in products])
+            .filter(media__type=Media.FILE)
+            .exclude(media__document_type__code=DocumentType.INTERNAL_CODE)
+            .select_related("media", "media__document_type", "sales_channel")
+            .order_by("product_id", "-media__created_at", "-media_id", "-id")
+        )
+        channel_results: dict[int, list[MediaProductThrough]] = defaultdict(list)
+        default_results: dict[int, list[MediaProductThrough]] = defaultdict(list)
+        for item in queryset.iterator():
+            if item.sales_channel_id == self.sales_channel.id:
+                channel_results[item.product_id].append(item)
+                continue
+            if item.sales_channel_id is None:
+                default_results[item.product_id].append(item)
+
+        results: dict[int, list[MediaProductThrough]] = {}
+        for product in products:
+            product_documents = channel_results.get(product.id) or default_results.get(product.id) or []
+            if product_documents:
+                results[product.id] = product_documents
         return results
 
     def _load_eans(self, *, products: list[Product]) -> dict[int, str]:
@@ -1045,6 +1082,15 @@ class MiraklProductPayloadBuilder:
         return ""
 
     def _resolve_document(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
+        remote_document_type = self._get_document_type_for_property(remote_property=remote_property)
+        if remote_document_type is None or remote_document_type.local_instance_id is None:
+            return ""
+
+        for media_through in product_context["documents"]:
+            media = getattr(media_through, "media", None)
+            if media is None or media.document_type_id != remote_document_type.local_instance_id:
+                continue
+            return self._stringify(media.get_real_document_file())
         return ""
 
     def _resolve_price(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
@@ -1055,6 +1101,25 @@ class MiraklProductPayloadBuilder:
 
     def _resolve_stock(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
         return self._resolve_create_quantity()
+
+    def _get_document_type_for_property(self, *, remote_property: MiraklProperty) -> MiraklDocumentType | None:
+        property_code = str(getattr(remote_property, "code", "") or "").strip()
+        if not property_code:
+            return None
+        if property_code in self._document_type_by_code_cache:
+            return self._document_type_by_code_cache[property_code]
+
+        remote_document_type = (
+            MiraklDocumentType.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_id=property_code,
+            )
+            .select_related("local_instance")
+            .order_by("id")
+            .first()
+        )
+        self._document_type_by_code_cache[property_code] = remote_document_type
+        return remote_document_type
 
     def _resolve_vat_rate(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
         vat_rate = getattr(product_context["product"], "vat_rate", None)
@@ -1134,53 +1199,14 @@ class MiraklProductPayloadBuilder:
         if rendered == "":
             return value
 
-        for entry in self._get_validation_entries(remote_property=remote_property):
-            parts = [part.strip() for part in str(entry).split("|") if part.strip()]
-            if len(parts) < 2:
-                continue
-            rule = parts[0].upper()
-
-            if rule == "MAX_LENGTH":
-                try:
-                    limit = int(parts[1])
-                except (TypeError, ValueError):
-                    continue
-                if len(rendered) > limit:
-                    rendered = rendered[:limit]
-                continue
-
-            if rule == "MIN_LENGTH":
-                try:
-                    limit = int(parts[1])
-                except (TypeError, ValueError):
-                    continue
-                if len(rendered) < limit:
-                    raise MiraklPayloadValidationError(
-                        f"Mirakl field '{remote_property.code}' is shorter than min length {limit} for product {product_context['sku']}."
-                    )
-                continue
-
-            if rule == "FORBIDDEN_WORDS":
-                forbidden_words = [part.strip().lower() for part in parts[1].strip('"').split(",") if part.strip()]
-                for forbidden_word in forbidden_words:
-                    if not forbidden_word:
-                        continue
-                    matched_forbidden_word = self._find_matching_forbidden_word(
-                        value=rendered,
-                        forbidden_word=forbidden_word,
-                    )
-                    if matched_forbidden_word:
-                        raise MiraklPayloadValidationError(
-                            f"Mirakl field '{remote_property.code}' contains forbidden word '{matched_forbidden_word}' for product {product_context['sku']}."
-                        )
-                continue
-
-            if rule == "PRODUCT_REFERENCE":
-                allowed_reference_types = parts[1:]
-                if not self._is_valid_product_reference(value=rendered, allowed_reference_types=allowed_reference_types):
-                    raise MiraklPayloadValidationError(
-                        f"Mirakl field '{remote_property.code}' is not a valid product reference for product {product_context['sku']}."
-                    )
+        for validator_type, validator_value in self._get_validation_entries(remote_property=remote_property):
+            rendered = self._resolve_validation(
+                remote_property=remote_property,
+                validator_type=validator_type,
+                validator_value=validator_value,
+                value=rendered,
+                product_context=product_context,
+            )
 
         return rendered
 
@@ -1239,7 +1265,69 @@ class MiraklProductPayloadBuilder:
             return value
         return self._format_date(value=value, pattern=pattern)
 
-    def _get_validation_entries(self, *, remote_property: MiraklProperty) -> list[str]:
+    def _resolve_validation(
+        self,
+        *,
+        remote_property: MiraklProperty,
+        validator_type: str,
+        validator_value: str,
+        value: str,
+        product_context: dict[str, Any],
+    ) -> str:
+        if validator_type == "MAX_LENGTH":
+            try:
+                limit = int(str(validator_value).split("|", 1)[0].strip())
+            except (TypeError, ValueError):
+                return value
+            if len(value) > limit:
+                return value[:limit]
+            return value
+
+        if validator_type == "MIN_LENGTH":
+            try:
+                limit = int(str(validator_value).split("|", 1)[0].strip())
+            except (TypeError, ValueError):
+                return value
+            if len(value) < limit:
+                raise MiraklPayloadValidationError(
+                    f"Mirakl field '{remote_property.code}' is shorter than min length {limit} for product {product_context['sku']}."
+                )
+            return value
+
+        if validator_type == "FORBIDDEN_WORDS":
+            forbidden_words = [part.strip().lower() for part in validator_value.strip('"').split(",") if part.strip()]
+            for forbidden_word in forbidden_words:
+                matched_forbidden_word = self._find_matching_forbidden_word(
+                    value=value,
+                    forbidden_word=forbidden_word,
+                )
+                if matched_forbidden_word:
+                    raise MiraklPayloadValidationError(
+                        f"Mirakl field '{remote_property.code}' contains forbidden word '{matched_forbidden_word}' for product {product_context['sku']}."
+                    )
+            return value
+
+        if validator_type == "PRODUCT_REFERENCE":
+            allowed_reference_types = [part.strip() for part in validator_value.split("|") if part.strip()]
+            if not self._is_valid_product_reference(value=value, allowed_reference_types=allowed_reference_types):
+                raise MiraklPayloadValidationError(
+                    f"Mirakl field '{remote_property.code}' is not a valid product reference for product {product_context['sku']}."
+                )
+            return value
+
+        if validator_type == "SCRIPT":
+            return value
+
+        return value
+
+    def _get_validation_entries(self, *, remote_property: MiraklProperty) -> list[tuple[str, str]]:
+        raw_entries = self._get_raw_validation_entries(remote_property=remote_property)
+        entries: list[tuple[str, str]] = []
+        for raw_entry in raw_entries:
+            entries.extend(self._parse_validation_entry(raw_entry=raw_entry))
+        return entries
+
+    def _get_raw_validation_entries(self, *, remote_property: MiraklProperty) -> list[str]:
         validations = remote_property.validations
         if isinstance(validations, str):
             return [validations]
@@ -1256,6 +1344,30 @@ class MiraklProductPayloadBuilder:
                     entries.extend(str(item) for item in value if item not in (None, ""))
             return entries
         return []
+
+    def _parse_validation_entry(self, *, raw_entry: str) -> list[tuple[str, str]]:
+        normalized_entry = str(raw_entry or "").strip()
+        if not normalized_entry:
+            return []
+
+        pattern = re.compile(
+            rf"(?P<validator>{'|'.join(self.KNOWN_VALIDATION_TYPES)})\|",
+            re.IGNORECASE,
+        )
+        matches = list(pattern.finditer(normalized_entry))
+        if not matches:
+            return []
+
+        parsed_entries: list[tuple[str, str]] = []
+        for index, match in enumerate(matches):
+            validator_type = str(match.group("validator") or "").upper()
+            value_start = match.end()
+            value_end = matches[index + 1].start() if index + 1 < len(matches) else len(normalized_entry)
+            validator_value = normalized_entry[value_start:value_end].strip().rstrip(",").strip()
+            if not validator_type:
+                continue
+            parsed_entries.append((validator_type, validator_value))
+        return parsed_entries
 
     def _build_delete_placeholder(self, *, remote_property: MiraklProperty, product_context: dict[str, Any]) -> str:
         select_placeholder = self._get_first_select_value(remote_property=remote_property)
@@ -1291,11 +1403,10 @@ class MiraklProductPayloadBuilder:
         return self._serialize_remote_select_value(select_value=select_value)
 
     def _build_delete_product_reference_placeholder(self, *, remote_property: MiraklProperty) -> str:
-        for entry in self._get_validation_entries(remote_property=remote_property):
-            parts = [part.strip() for part in str(entry).split("|") if part.strip()]
-            if not parts or parts[0].upper() != "PRODUCT_REFERENCE":
+        for validator_type, validator_value in self._get_validation_entries(remote_property=remote_property):
+            if validator_type != "PRODUCT_REFERENCE":
                 continue
-            for reference_type in parts[1:]:
+            for reference_type in [part.strip() for part in validator_value.split("|") if part.strip()]:
                 normalized_type = str(reference_type or "").upper()
                 if normalized_type == "EAN-8":
                     return "00000000"

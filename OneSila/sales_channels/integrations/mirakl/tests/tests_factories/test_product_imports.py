@@ -2,6 +2,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 from django.core.files.base import ContentFile
+from media.models import DocumentType, Media, MediaProductThrough
 from model_bakery import baker
 from openpyxl import Workbook
 
@@ -15,6 +16,7 @@ from properties.models import (
 from sales_channels.integrations.mirakl.factories.imports.products import MiraklProductsImportProcessor
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
+    MiraklDocumentType,
     MiraklPrice,
     MiraklProduct,
     MiraklProductCategory,
@@ -178,6 +180,71 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             MiraklPrice.objects.filter(
                 remote_product=remote_product,
                 sales_channel=self.sales_channel,
+            ).exists()
+        )
+
+    @patch("imports_exports.factories.media.ImportDocumentInstance._build_download_content", return_value=b"%PDF-1.4 mock")
+    @patch.object(MiraklProductsImportProcessor, "mirakl_paginated_get")
+    def test_run_import_creates_child_documents_from_mapped_document_properties(
+        self,
+        mirakl_paginated_get_mock,
+        _build_download_content_mock,
+    ):
+        self._create_basic_properties()
+        local_document_type = baker.make(
+            DocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            name="Declaration of Identity",
+        )
+        baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="pdf_declaration_of_identity",
+            representation_type=MiraklProperty.REPRESENTATION_DOCUMENT,
+        )
+        baker.make(
+            MiraklDocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="pdf_declaration_of_identity",
+            name="Declaration of Identity",
+            local_instance=local_document_type,
+        )
+        baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CAT-DOC",
+            name="Category Doc",
+            is_leaf=True,
+        )
+        self._create_export_file(
+            codes=["shop_sku", "product_title", "product_category", "pdf_declaration_of_identity"],
+            rows=[["SELLER-DOC-1", "Documented Product", "CAT-DOC", "https://cdn.example.com/declaration.pdf"]],
+        )
+        mirakl_paginated_get_mock.return_value = [
+            {
+                "shop_sku": "SELLER-DOC-1",
+                "product_sku": "REMOTE-DOC-1",
+                "product_title": "Documented Product",
+                "category_code": "CAT-DOC",
+                "channels": ["UK"],
+                "active": True,
+            }
+        ]
+
+        MiraklProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        ).run()
+
+        product = Product.objects.get(multi_tenant_company=self.multi_tenant_company, sku="SELLER-DOC-1")
+        self.assertTrue(
+            MediaProductThrough.objects.filter(
+                product=product,
+                media__type=Media.FILE,
+                media__document_type=local_document_type,
             ).exists()
         )
 
