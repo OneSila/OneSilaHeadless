@@ -14,6 +14,7 @@ from django.utils.html import format_html
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
+from django.db.models import Q
 import json
 from pygments import highlight
 from pygments.lexers import JsonLexer
@@ -28,6 +29,38 @@ from sales_channels.models import SalesChannel, RemoteLog
 class PublicIntegrationTypeTranslationInline(admin.TabularInline):
     model = PublicIntegrationTypeTranslation
     extra = 1
+
+
+class _BaseLogoPresenceFilter(admin.SimpleListFilter):
+    title = ""
+    parameter_name = ""
+    field_name = ""
+
+    def lookups(self, request, model_admin):
+        return (
+            ("yes", _("Yes")),
+            ("no", _("No")),
+        )
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == "yes":
+            return queryset.exclude(**{f"{self.field_name}__isnull": True}).exclude(**{self.field_name: ""})
+        if value == "no":
+            return queryset.filter(Q(**{f"{self.field_name}__isnull": True}) | Q(**{self.field_name: ""}))
+        return queryset
+
+
+class HasPngFilter(_BaseLogoPresenceFilter):
+    title = _("has_png")
+    parameter_name = "has_png"
+    field_name = "logo_png"
+
+
+class HasSvgFilter(_BaseLogoPresenceFilter):
+    title = _("has_svg")
+    parameter_name = "has_svg"
+    field_name = "logo_svg"
 
 
 @admin.register(Integration)
@@ -172,7 +205,7 @@ class PublicIntegrationTypeAdmin(SharedModelAdmin):
         "supports_open_ai_product_feed",
         "sort_order",
     )
-    list_filter = ("category", "active", "is_beta", "supports_open_ai_product_feed")
+    list_filter = ("category", "active", "is_beta", "supports_open_ai_product_feed", HasPngFilter, HasSvgFilter)
     search_fields = ("key", "type", "subtype", "translations__name", "translations__description")
     raw_id_fields = ("based_to",)
     inlines = (PublicIntegrationTypeTranslationInline,)

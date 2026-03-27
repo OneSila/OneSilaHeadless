@@ -173,12 +173,20 @@ class MiraklProductPayloadBuilder:
         "update-delete",
     ]
 
-    def __init__(self, *, remote_product, sales_channel_view=None, action: str = SalesChannelFeedItem.ACTION_UPDATE) -> None:
+    def __init__(
+        self,
+        *,
+        remote_product,
+        sales_channel_view=None,
+        action: str = SalesChannelFeedItem.ACTION_UPDATE,
+        is_create: bool = False,
+    ) -> None:
         self.remote_product = remote_product
         self.sales_channel = remote_product.sales_channel
         self.local_product = remote_product.local_instance
         self.sales_channel_view = sales_channel_view
         self.action = action
+        self.is_create = is_create
         self.language = getattr(self.sales_channel.multi_tenant_company, "language", None)
         self._category_cache: dict[str, MiraklCategory | None] = {}
         self._product_type_cache: dict[tuple[int | None, int | None], MiraklProductType | None] = {}
@@ -495,7 +503,7 @@ class MiraklProductPayloadBuilder:
         }
 
     def _resolve_create_quantity(self) -> str:
-        if self.action != SalesChannelFeedItem.ACTION_CREATE:
+        if not self.is_create:
             return ""
         starting_stock = getattr(self.sales_channel, "starting_stock", None)
         if starting_stock in (None, ""):
@@ -1754,6 +1762,7 @@ class MiraklProductBaseFactory(GetMiraklAPIMixin, _MiraklFeedPersistenceMixin):
             ),
             sales_channel_view=self.view,
             action=self.feed_action,
+            is_create=self.is_create,
         ).validate_feed_prerequisites()
 
     def __init__(self, *args, view=None, force_validation_only: bool = False, force_full_update: bool = False, **kwargs):
@@ -1827,6 +1836,7 @@ class MiraklProductBaseFactory(GetMiraklAPIMixin, _MiraklFeedPersistenceMixin):
             remote_product=self.remote_instance,
             sales_channel_view=self.view,
             action=self.feed_action,
+            is_create=self.is_create,
         ).build()
         self.payload = {
             "rows": rows,
