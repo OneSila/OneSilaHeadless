@@ -128,7 +128,7 @@ class SalesChannelFeedProductPayloadFactory:
             media = item.media
             if media.type != Media.IMAGE:
                 continue
-            url = media.image_url()
+            url = media.image_web_url
             if not url:
                 continue
             results[item.product_id].append(

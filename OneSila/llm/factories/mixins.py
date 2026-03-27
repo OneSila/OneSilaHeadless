@@ -252,7 +252,7 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
             sales_channel=None,
         )
 
-        self.images = [item.media.image_url() for item in images_queryset]
+        self.images = [item.media.image_web_url for item in images_queryset]
 
     def _set_documents(self):
 

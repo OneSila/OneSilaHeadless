@@ -97,15 +97,11 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
             if url:
                 return f"{generate_absolute_url(trailing_slash=False)}{url}"
 
-        if hasattr(media, "image_url") and callable(getattr(media, "image_url")):
-            url = media.image_url()
-            if url:
-                return url
+        if hasattr(media, "image_web_url") and getattr(media, "image_web_url"):
+            return media.image_web_url
         url = getattr(media, "image_url", None)
         if isinstance(url, str) and url.strip():
             return url.strip()
-        if hasattr(media, "image_web_url") and getattr(media, "image_web_url"):
-            return media.image_web_url
         if getattr(media, "video_url", None):
             return media.video_url
         if getattr(media, "description", None):

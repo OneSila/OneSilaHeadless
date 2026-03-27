@@ -99,7 +99,7 @@ class ContentTemplateDataBuilder:
     def _serialize_media(self) -> dict[str, object]:
         serialized = [
             SerializedMedia(
-                url=assignment.media.image_url(),
+                url=assignment.media.image_web_url,
                 thumbnail=assignment.media.onesila_thumbnail_url(),
                 is_main=assignment.is_main_image,
                 title=assignment.media.title,

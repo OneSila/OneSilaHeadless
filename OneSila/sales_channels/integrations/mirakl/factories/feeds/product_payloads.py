@@ -671,7 +671,7 @@ class MiraklProductPayloadBuilder:
             media = item.media
             if media.type != Media.IMAGE:
                 continue
-            url = media.image_url()
+            url = media.image_web_url
             if not url:
                 continue
             results[item.product_id].append(
@@ -1348,8 +1348,8 @@ class MiraklProductPayloadBuilder:
                 continue
             select_value = getattr(product_property, "value_select", None)
             image = getattr(select_value, "image", None)
-            if image and hasattr(image, "image_url"):
-                return self._stringify(image.image_url())
+            if image:
+                return self._stringify(image.image_web_url)
         return ""
 
     def _get_main_image_url(self, *, images: list[dict[str, Any]]) -> str:
