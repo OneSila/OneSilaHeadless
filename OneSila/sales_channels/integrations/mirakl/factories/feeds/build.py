@@ -58,7 +58,6 @@ class MiraklProductFeedFactory:
             type=MiraklSalesChannelFeed.TYPE_COMBINED,
             status__in=[
                 MiraklSalesChannelFeed.STATUS_PENDING,
-                MiraklSalesChannelFeed.STATUS_SUBMITTED,
                 MiraklSalesChannelFeed.STATUS_PROCESSING,
             ],
         ).exclude(id=feed.id).exists()

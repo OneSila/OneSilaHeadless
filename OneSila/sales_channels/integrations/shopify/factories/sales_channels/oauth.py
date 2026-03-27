@@ -19,8 +19,8 @@ class GetShopifyRedirectUrlFactory:
         self.redirect_url = None
 
         shopify.Session.setup(
-            api_key=self.sales_channel.api_key,
-            secret=self.sales_channel.api_secret
+            api_key=settings.SHOPIFY_API_KEY,
+            secret=settings.SHOPIFY_API_SECRET
         )
 
     def clean_shop_hostname(self, hostname: str) -> str:
@@ -73,10 +73,7 @@ class ValidateShopifyAuthFactory(GetShopifyApiMixin):
         self.host = host
 
     def exchange_token(self):
-        shopify.Session.setup(
-            api_key=self.sales_channel.api_key,
-            secret=self.sales_channel.api_secret,
-        )
+        shopify.Session.setup(api_key=settings.SHOPIFY_API_KEY, secret=settings.SHOPIFY_API_SECRET)
         session = shopify.Session(self.shop, settings.SHOPIFY_API_VERSION)
 
         try:

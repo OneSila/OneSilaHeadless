@@ -41,6 +41,10 @@ from sales_channels.integrations.mirakl.models import (
     MiraklSalesChannelFeed,
     MiraklSalesChannelFeedItem,
 )
+from sales_channels.integrations.mirakl.utils.helpers import (
+    build_remote_property_mapping_label,
+    get_local_instance_label,
+)
 from sales_channels.integrations.mirakl.utils.type_parameters import get_mirakl_type_parameter_value
 from sales_channels.models import SalesChannelFeedItem, SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPriceListItem
@@ -86,8 +90,10 @@ class _MiraklRemoteValueRunner(RemoteValueMixin):
 
         mapped_value = self.remote_select_lookup.get((remote_property.id, local_select_value.id))
         if mapped_value is None:
+            local_value_label = get_local_instance_label(local_instance=local_select_value)
             raise MissingMappingError(
-                f"Map the OneSila select value for Mirakl field '{remote_property.code}' before pushing."
+                f"Map the OneSila select value '{local_value_label}' for "
+                f"{build_remote_property_mapping_label(remote_property=remote_property)} before pushing."
             )
         return self._serialize_remote_select_value(select_value=mapped_value)
 
@@ -110,8 +116,10 @@ class _MiraklRemoteValueRunner(RemoteValueMixin):
         for local_select_value in product_property.value_multi_select.all():
             mapped_value = self.remote_select_lookup.get((remote_property.id, local_select_value.id))
             if mapped_value is None:
+                local_value_label = get_local_instance_label(local_instance=local_select_value)
                 raise MissingMappingError(
-                    f"Map all OneSila multiselect values for Mirakl field '{remote_property.code}' before pushing."
+                    f"Map the OneSila multiselect value '{local_value_label}' for "
+                    f"{build_remote_property_mapping_label(remote_property=remote_property)} before pushing."
                 )
             mapped_values.append(self._serialize_remote_select_value(select_value=mapped_value))
 
@@ -771,7 +779,7 @@ class MiraklProductPayloadBuilder:
                 representation_type=representation_type,
             ):
                 raise MissingMappingError(
-                    f"Map Mirakl field '{remote_property.code}'"
+                    f"Map {build_remote_property_mapping_label(remote_property=remote_property)} before pushing."
                 )
             raise PreFlightCheckError(
                 self._build_missing_required_value_message(
@@ -795,11 +803,7 @@ class MiraklProductPayloadBuilder:
                 f"Mirakl required field '{remote_property.code}' is missing for product {product_label}."
             )
 
-        local_property_label = (
-            getattr(local_instance, "internal_name", None)
-            or getattr(local_instance, "name", None)
-            or str(local_instance.id)
-        )
+        local_property_label = get_local_instance_label(local_instance=local_instance)
         parent_product = product_context.get("parent_product")
         if product is not None and parent_product is not None and getattr(product, "id", None) != getattr(parent_product, "id", None):
             return (

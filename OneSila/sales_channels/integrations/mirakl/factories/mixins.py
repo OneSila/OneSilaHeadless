@@ -17,6 +17,9 @@ class GetMiraklAPIMixin:
     default_timeout = 30
     default_page_size = 100
 
+    def _build_retry_delay(self, *, attempt: int) -> int:
+        return max(1, 2 ** max(0, attempt - 1))
+
     def get_api(self):
         return self
 
@@ -82,17 +85,37 @@ class GetMiraklAPIMixin:
             headers.setdefault("Content-Type", "application/json")
 
         for attempt in range(1, max_attempts + 1):
-            response = self.get_mirakl_session().request(
-                method=method,
-                url=url,
-                params=request_params,
-                json=None if files else payload,
-                data=None if not files else payload,
-                files=files,
-                headers=headers,
-                timeout=request_timeout,
-                verify=self.sales_channel.verify_ssl,
-            )
+            try:
+                response = self.get_mirakl_session().request(
+                    method=method,
+                    url=url,
+                    params=request_params,
+                    json=None if files else payload,
+                    data=None if not files else payload,
+                    files=files,
+                    headers=headers,
+                    timeout=request_timeout,
+                    verify=self.sales_channel.verify_ssl,
+                )
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                if attempt < max_attempts:
+                    sleep_for = self._build_retry_delay(attempt=attempt)
+                    logger.warning(
+                        "Mirakl request failed for %s %s (%s/%s). Retrying in %s seconds.",
+                        method,
+                        path,
+                        attempt,
+                        max_attempts,
+                        sleep_for,
+                        exc_info=exc,
+                    )
+                    time.sleep(sleep_for)
+                    continue
+                raise ValueError(
+                    f"Mirakl request timed out for {method} {path} after {max_attempts} attempts: {exc}"
+                ) from exc
+            except requests.exceptions.RequestException as exc:
+                raise ValueError(f"Mirakl request failed for {method} {path}: {exc}") from exc
 
             if response.status_code == 429 and attempt < max_attempts:
                 retry_after = response.headers.get("Retry-After", "1")
