@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
     """Fetch and mirror the Mirakl schema metadata."""
 
+    schema_timeout = 120
+
     def __init__(self, *, sales_channel, import_process=None):
         self.sales_channel = sales_channel
         self.import_process = import_process
@@ -125,33 +127,35 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         return self.summary_data
 
     def _get_document_types(self) -> list[dict[str, Any]]:
-        response = self.mirakl_get(path="/api/documents")
+        response = self.mirakl_get(path="/api/documents", timeout=self.schema_timeout)
         return self._normalize_records(response.get("document_types"))
 
     def _get_offer_states(self) -> list[dict[str, Any]]:
         response = self.mirakl_get(
             path="/api/offers/states",
             params={"active": "true"},
+            timeout=self.schema_timeout,
         )
         return self._normalize_records(response.get("offer_states"))
 
     def _get_logistic_classes(self) -> list[dict[str, Any]]:
-        response = self.mirakl_get(path="/api/shipping/logistic_classes")
+        response = self.mirakl_get(path="/api/shipping/logistic_classes", timeout=self.schema_timeout)
         return self._normalize_records(response.get("logistic_classes"))
 
     def _get_hierarchies(self) -> list[dict[str, Any]]:
-        response = self.mirakl_get(path="/api/hierarchies")
+        response = self.mirakl_get(path="/api/hierarchies", timeout=self.schema_timeout)
         return self._normalize_records(response.get("hierarchies"))
 
     def _get_attributes(self) -> list[dict[str, Any]]:
         response = self.mirakl_get(
             path="/api/products/attributes",
             params={"all_operator_attributes": True},
+            timeout=self.schema_timeout,
         )
         return self._normalize_records(response.get("attributes"))
 
     def _get_value_lists(self) -> list[dict[str, Any]]:
-        response = self.mirakl_get(path="/api/values_lists")
+        response = self.mirakl_get(path="/api/values_lists", timeout=self.schema_timeout)
         return self._normalize_records(response.get("values_lists"))
 
     def _prepare_progress(

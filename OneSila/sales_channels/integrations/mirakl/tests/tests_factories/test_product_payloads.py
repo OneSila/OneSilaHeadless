@@ -9,7 +9,7 @@ from core.tests import TestCase
 from media.models import Media, MediaProductThrough
 from products.models import ConfigurableVariation
 from properties.models import Property, ProductProperty, PropertySelectValue
-from properties.models import ProductPropertiesRule, PropertySelectValueTranslation
+from properties.models import ProductPropertiesRule, PropertySelectValueTranslation, PropertyTranslation
 from properties.models import ProductPropertyTextTranslation
 from products.models import ProductTranslation, ProductTranslationBulletPoint
 from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
@@ -272,6 +272,12 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             type=Property.TYPES.SELECT,
         )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+            language="en",
+            name="Colour",
+        )
         builder, _, product = self._build_builder(
             remote_code="colour",
             local_property=local_property,
@@ -283,6 +289,12 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             property=local_property,
         )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=local_select_value,
+            language="en",
+            value="Purple",
+        )
         baker.make(
             ProductProperty,
             multi_tenant_company=self.multi_tenant_company,
@@ -293,7 +305,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         with self.assertRaisesMessage(
             MissingMappingError,
-            "Missing Mirakl mappings:\n- Map the OneSila select value for Mirakl field 'colour' before pushing.",
+            "Missing Mirakl mappings:\n- Map the OneSila select value 'Purple' for Mirakl field 'colour' (local 'Colour') before pushing.",
         ):
             builder.build()
 
