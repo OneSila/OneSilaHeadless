@@ -6,7 +6,7 @@ from eancodes.models import EanCode
 from model_bakery import baker
 
 from core.tests import TestCase
-from media.models import Media, MediaProductThrough
+from media.models import DocumentType, Media, MediaProductThrough
 from products.models import ConfigurableVariation
 from properties.models import Property, ProductProperty, PropertySelectValue
 from properties.models import ProductPropertiesRule, PropertySelectValueTranslation, PropertyTranslation
@@ -19,6 +19,7 @@ from sales_channels.integrations.mirakl.factories.feeds.product_payloads import 
 )
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
+    MiraklDocumentType,
     MiraklProduct,
     MiraklProductCategory,
     MiraklProductType,
@@ -450,8 +451,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["materials"], "COTTON_CODE,LINEN_CODE")
 
-    @patch("media.models.Media.image_url", return_value="https://cdn.example.com/color.jpg")
-    def test_required_swatch_uses_color_image_media(self, _image_url_mock):
+    def test_required_swatch_uses_color_image_media(self):
         local_property = baker.make(
             Property,
             multi_tenant_company=self.multi_tenant_company,
@@ -480,9 +480,56 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=None,
         )
 
-        _, rows = builder.build()
+        with patch.object(Media, "image_web_url", new=property(lambda self: "https://cdn.example.com/color.jpg")):
+            _, rows = builder.build()
 
         self.assertEqual(rows[0]["swatch"], "https://cdn.example.com/color.jpg")
+
+    @patch("media.models.Media.get_real_document_file", return_value="https://cdn.example.com/declaration.pdf")
+    def test_document_representation_uses_mapped_local_document_type(self, _document_url_mock):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="pdf_declaration_of_identity",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_DOCUMENT
+        remote_property.save(update_fields=["local_instance", "representation_type"])
+        local_document_type = baker.make(
+            DocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            name="Declaration of Identity",
+        )
+        baker.make(
+            MiraklDocumentType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="pdf_declaration_of_identity",
+            name="Declaration of Identity",
+            local_instance=local_document_type,
+        )
+        media = baker.make(
+            Media,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.FILE,
+            document_type=local_document_type,
+        )
+        baker.make(
+            MediaProductThrough,
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            media=media,
+            sales_channel=None,
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["pdf_declaration_of_identity"], "https://cdn.example.com/declaration.pdf")
 
     def test_empty_rich_text_translation_is_treated_as_blank(self):
         local_property = baker.make(
@@ -678,7 +725,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
                 return "https://cdn.example.com/parent.jpg"
             return ""
 
-        with patch("media.models.Media.image_url", autospec=True, side_effect=_image_url):
+        with patch.object(Media, "image_web_url", new=property(_image_url)):
             _, rows = MiraklProductPayloadBuilder(
                 remote_product=remote_product,
                 sales_channel_view=self.view,
@@ -687,8 +734,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(rows[0]["title_field"], "Parent Name")
         self.assertEqual(rows[0]["main_image"], "https://cdn.example.com/child.jpg")
 
-    @patch("media.models.Media.image_url", return_value="https://cdn.example.com/parent.jpg")
-    def test_configurable_variations_fallback_to_parent_images_when_variation_has_none(self, _image_url_mock):
+    def test_configurable_variations_fallback_to_parent_images_when_variation_has_none(self):
         parent_product = baker.make(
             "products.Product",
             multi_tenant_company=self.multi_tenant_company,
@@ -792,10 +838,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=None,
         )
 
-        _, rows = MiraklProductPayloadBuilder(
-            remote_product=remote_product,
-            sales_channel_view=self.view,
-        ).build()
+        with patch.object(Media, "image_web_url", new=property(lambda self: "https://cdn.example.com/parent.jpg")):
+            _, rows = MiraklProductPayloadBuilder(
+                remote_product=remote_product,
+                sales_channel_view=self.view,
+            ).build()
 
         self.assertEqual(rows[0]["title_field"], "Parent Name")
         self.assertEqual(rows[0]["main_image"], "https://cdn.example.com/parent.jpg")
@@ -1380,6 +1427,42 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             ),
             clean_value,
         )
+
+    def test_raw_validation_string_parses_known_validators_and_ignores_script(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, _ = self._build_builder(
+            remote_code="product_title",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.validations = (
+            'MAX_LENGTH|10,MIN_LENGTH|3,SCRIPT|"let patternArg = /foo,bar/;"|false,'
+            'FORBIDDEN_WORDS|"scarface,mob"'
+        )
+        remote_property.save()
+
+        self.assertEqual(
+            builder._apply_remote_validations(
+                remote_property=remote_property,
+                value="Elegant table lamp",
+                product_context={"sku": "SKU-1"},
+            ),
+            "Elegant ta",
+        )
+
+        with self.assertRaisesMessage(
+            MiraklPayloadValidationError,
+            "Mirakl field 'product_title' contains forbidden word 'scarface' for product SKU-1.",
+        ):
+            builder._apply_remote_validations(
+                remote_property=remote_property,
+                value="Scarface lamp",
+                product_context={"sku": "SKU-1"},
+            )
 
     def test_precision_type_parameter_truncates_numeric_value(self):
         local_property = baker.make(

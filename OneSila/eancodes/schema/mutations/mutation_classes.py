@@ -53,6 +53,61 @@ class AssignEanCodeMutation(CreateMutation, GetCurrentUserMixin):
         return to_assign
 
 
+class ManualAssignEanCodeMutation(CreateMutation, GetCurrentUserMixin):
+    def create(self, data: dict[str, Any], *, info: Info):
+        from products.models import Product
+
+        multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
+        prod = data.get("product", None)
+        ean = data.get("ean_code", None)
+
+        if prod is None:
+            raise IntegrityError(_("Please provide a product"))
+
+        if ean is None:
+            raise IntegrityError(_("Please provide an EAN code"))
+
+        product_pk = getattr(prod.pk, "pk", prod.pk)
+        ean_code_pk = getattr(ean.pk, "pk", ean.pk)
+
+        product = (
+            Product.objects.filter_multi_tenant(multi_tenant_company=multi_tenant_company)
+            .filter(pk=product_pk)
+            .first()
+        )
+        if product is None:
+            raise IntegrityError(_("Please provide a valid product"))
+
+        ean_code = (
+            EanCode.objects.filter_multi_tenant(multi_tenant_company=multi_tenant_company)
+            .filter(pk=ean_code_pk)
+            .first()
+        )
+        if ean_code is None:
+            raise IntegrityError(_("Please provide a valid EAN code"))
+
+        if ean_code.already_used:
+            raise IntegrityError(_("This EAN code has already been used."))
+
+        if not ean_code.internal:
+            raise IntegrityError(_("Only internal EAN codes can be manually assigned."))
+
+        if (
+            EanCode.objects.filter_multi_tenant(multi_tenant_company=multi_tenant_company)
+            .filter(product=product)
+            .exists()
+        ):
+            raise IntegrityError(_("This product already has an EAN code assigned."))
+
+        if ean_code.product_id is not None:
+            raise IntegrityError(_("This EAN code is already assigned to another product."))
+
+        ean_code.product = product
+        ean_code.save()
+
+        return ean_code
+
+
 class ReleaseEanCodeMutation(UpdateMutation, GetCurrentUserMixin):
     def update(self, info: Info, instance: EanCode, data: dict[str, Any]):
 

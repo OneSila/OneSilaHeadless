@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import os
 import re
 from typing import Iterable
@@ -17,10 +19,12 @@ from sales_channels.integrations.mirakl.models import (
 
 
 class MiraklTransformationErrorReportIssueSyncFactory:
-    """Parse the Mirakl P47 source-file error report and upsert product issues."""
+    """Parse Mirakl product import issue reports and upsert product issues."""
 
-    SOURCE_ERROR = "transformation_error_report_error"
-    SOURCE_WARNING = "transformation_error_report_warning"
+    SOURCE_ERROR_REPORT_ERROR = "error_report_error"
+    SOURCE_ERROR_REPORT_WARNING = "error_report_warning"
+    SOURCE_TRANSFORMATION_ERROR = "transformation_error_report_error"
+    SOURCE_TRANSFORMATION_WARNING = "transformation_error_report_warning"
 
     def __init__(self, *, feed) -> None:
         self.feed = feed
@@ -29,6 +33,71 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         self.ean_headers = self._get_candidate_ean_headers()
 
     def run(self) -> int:
+        remote_product_lookup = self._build_remote_product_lookup()
+        touched_remote_product_ids: set[int] = set()
+        synced_issues = self._sync_csv_error_report(
+            remote_product_lookup=remote_product_lookup,
+            touched_remote_product_ids=touched_remote_product_ids,
+        )
+        synced_issues += self._sync_transformation_error_report(
+            remote_product_lookup=remote_product_lookup,
+            touched_remote_product_ids=touched_remote_product_ids,
+        )
+
+        self._refresh_remote_product_statuses(
+            remote_product_ids=sorted(touched_remote_product_ids),
+        )
+        return synced_issues
+
+    def _sync_csv_error_report(
+        self,
+        *,
+        remote_product_lookup: dict[str, MiraklProduct],
+        touched_remote_product_ids: set[int],
+    ) -> int:
+        if not self.feed.error_report_file:
+            return 0
+
+        try:
+            with self.feed.error_report_file.open("rb") as file_handle:
+                content = file_handle.read()
+        except OSError:
+            return 0
+        if not content:
+            return 0
+
+        text = self._decode_csv_bytes(content=content)
+        if not text.strip():
+            return 0
+
+        synced_issues = 0
+        dialect = self._detect_csv_dialect(text=text)
+        for raw_row in csv.DictReader(io.StringIO(text), dialect=dialect):
+            row = self._normalize_mapping_row(raw_row=raw_row)
+            if not row:
+                continue
+            remote_product = self._resolve_remote_product(
+                row=row,
+                remote_product_lookup=remote_product_lookup,
+            )
+            if remote_product is None:
+                continue
+
+            synced_issues += self._upsert_issues(
+                remote_product=remote_product,
+                row=row,
+                source_error=self.SOURCE_ERROR_REPORT_ERROR,
+                source_warning=self.SOURCE_ERROR_REPORT_WARNING,
+            )
+            touched_remote_product_ids.add(remote_product.id)
+        return synced_issues
+
+    def _sync_transformation_error_report(
+        self,
+        *,
+        remote_product_lookup: dict[str, MiraklProduct],
+        touched_remote_product_ids: set[int],
+    ) -> int:
         if not self.feed.transformation_error_report_file:
             return 0
 
@@ -36,9 +105,6 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         extension = os.path.splitext(filename)[1].lower()
         if extension not in {".xlsx", ".xlsm"}:
             return 0
-
-        remote_product_lookup = self._build_remote_product_lookup()
-        touched_remote_product_ids: set[int] = set()
 
         synced_issues = 0
         with self.feed.transformation_error_report_file.open("rb") as file_handle:
@@ -69,14 +135,12 @@ class MiraklTransformationErrorReportIssueSyncFactory:
                     synced_issues += self._upsert_issues(
                         remote_product=remote_product,
                         row=row,
+                        source_error=self.SOURCE_TRANSFORMATION_ERROR,
+                        source_warning=self.SOURCE_TRANSFORMATION_WARNING,
                     )
                     touched_remote_product_ids.add(remote_product.id)
             finally:
                 workbook.close()
-
-        self._refresh_remote_product_statuses(
-            remote_product_ids=sorted(touched_remote_product_ids),
-        )
         return synced_issues
 
     def _resolve_sales_channel_instance(self, *, feed):
@@ -223,12 +287,19 @@ class MiraklTransformationErrorReportIssueSyncFactory:
             resolved = get_real_instance()
         return resolved if isinstance(resolved, MiraklProduct) else None
 
-    def _upsert_issues(self, *, remote_product: MiraklProduct, row: dict[str, str]) -> int:
+    def _upsert_issues(
+        self,
+        *,
+        remote_product: MiraklProduct,
+        row: dict[str, str],
+        source_error: str,
+        source_warning: str,
+    ) -> int:
         created_or_updated = 0
         line_number = row.get("line_number") or row.get("line_number_") or row.get("line")
         for source, severity, column_name in (
-            (self.SOURCE_ERROR, "ERROR", "errors"),
-            (self.SOURCE_WARNING, "WARNING", "warnings"),
+            (source_error, "ERROR", "errors"),
+            (source_warning, "WARNING", "warnings"),
         ):
             for code, message in self._parse_issue_entries(value=row.get(column_name, "")):
                 self._upsert_issue(
@@ -330,6 +401,18 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         text = re.sub(r"[^a-z0-9_]+", "_", text)
         return text.strip("_")
 
+    def _normalize_mapping_row(self, *, raw_row) -> dict[str, str]:
+        if not isinstance(raw_row, dict):
+            return {}
+        row = {
+            self._normalize_header(value=header): self._stringify(value=value)
+            for header, value in raw_row.items()
+            if header is not None
+        }
+        if any(value for value in row.values()):
+            return row
+        return {}
+
     def _normalize_lookup_value(self, *, value) -> str:
         return self._stringify(value=value).strip()
 
@@ -337,6 +420,21 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         if value in (None, ""):
             return ""
         return str(value)
+
+    def _decode_csv_bytes(self, *, content: bytes) -> str:
+        for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+            try:
+                return content.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return content.decode("utf-8", errors="ignore")
+
+    def _detect_csv_dialect(self, *, text: str):
+        sample = text[:4096]
+        try:
+            return csv.Sniffer().sniff(sample, delimiters=",;\t|")
+        except csv.Error:
+            return csv.excel
 
     def _refresh_remote_product_statuses(self, *, remote_product_ids: list[int]) -> None:
         if not remote_product_ids:

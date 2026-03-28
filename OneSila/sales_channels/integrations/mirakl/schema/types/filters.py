@@ -95,7 +95,6 @@ class MiraklDocumentTypeFilter(SearchFilterMixin):
     local_instance: auto
     remote_id: auto
     name: auto
-    entity: auto
 
 
 @filter(MiraklProductType)

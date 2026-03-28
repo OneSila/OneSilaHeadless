@@ -2,7 +2,7 @@ from typing import Optional
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from core.schema.core.mutations import create, update, delete, type, List
-from .fields import generate_eancodes, assign_ean_code, release_ean_code
+from .fields import generate_eancodes, assign_ean_code, manual_assign_ean_code, release_ean_code
 from ..types.types import EanCodeType
 from ..types.input import EanCodeInput, EanCodePartialInput, BulkAssignEancodesInput
 from strawberry import Info
@@ -21,6 +21,7 @@ class EanCodesMutation:
 
     generate_ean_codes: Optional[EanCodeType] = generate_eancodes()
     assign_ean_code: EanCodeType = assign_ean_code()
+    manual_assign_ean_code: EanCodeType = manual_assign_ean_code()
     release_ean_code: EanCodeType = release_ean_code()
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)

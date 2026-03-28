@@ -29,7 +29,7 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
         )
 
     @patch("sales_channels.integrations.mirakl.factories.feeds.new_product_report.MiraklNewProductReportSyncFactory.run")
-    def test_run_updates_feed_reports_and_resolves_product_statuses(self, new_product_report_mock):
+    def test_run_leaves_clean_products_pending_when_mirakl_has_error_report(self, new_product_report_mock):
         submitted_feed = baker.make(
             MiraklSalesChannelFeed,
             sales_channel=self.sales_channel,
@@ -53,14 +53,14 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
             remote_sku="SKU-REJECTED",
             syncing_current_percentage=100,
         )
-        baker.make(
+        clean_feed_item = baker.make(
             MiraklSalesChannelFeedItem,
             multi_tenant_company=self.multi_tenant_company,
             feed=submitted_feed,
             remote_product=clean_remote_product,
             status=MiraklSalesChannelFeedItem.STATUS_PENDING,
         )
-        baker.make(
+        rejected_feed_item = baker.make(
             MiraklSalesChannelFeedItem,
             multi_tenant_company=self.multi_tenant_company,
             feed=submitted_feed,
@@ -149,8 +149,101 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
         self.assertTrue(bool(submitted_feed.transformation_error_report_file))
         self.assertIsNotNone(self.sales_channel.last_product_imports_request_date)
         self.assertEqual(ignored_feed.status, MiraklSalesChannelFeed.STATUS_PENDING)
+        clean_feed_item.refresh_from_db()
+        rejected_feed_item.refresh_from_db()
         clean_remote_product.refresh_from_db()
         rejected_remote_product.refresh_from_db()
+        self.assertEqual(clean_feed_item.status, MiraklSalesChannelFeedItem.STATUS_PENDING)
+        self.assertEqual(rejected_feed_item.status, MiraklSalesChannelFeedItem.STATUS_FAILED)
+        self.assertEqual(clean_remote_product.status, MiraklProduct.STATUS_PENDING_APPROVAL)
+        self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+        new_product_report_mock.assert_called_once()
+
+    @patch("sales_channels.integrations.mirakl.factories.feeds.new_product_report.MiraklNewProductReportSyncFactory.run")
+    def test_run_completes_clean_products_when_no_standard_error_report_exists(self, new_product_report_mock):
+        submitted_feed = baker.make(
+            MiraklSalesChannelFeed,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            remote_id="2010",
+            product_remote_id="2010",
+        )
+        clean_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="SKU-CLEAN-2",
+            syncing_current_percentage=100,
+        )
+        rejected_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="SKU-REJECTED-2",
+            syncing_current_percentage=100,
+        )
+        clean_feed_item = baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=submitted_feed,
+            remote_product=clean_remote_product,
+            status=MiraklSalesChannelFeedItem.STATUS_PENDING,
+        )
+        rejected_feed_item = baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=submitted_feed,
+            remote_product=rejected_remote_product,
+            status=MiraklSalesChannelFeedItem.STATUS_PENDING,
+        )
+        baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=rejected_remote_product,
+            code="1000",
+            main_code="1000",
+            severity="ERROR",
+            raw_data={"source": "transformation_error_report_error"},
+        )
+        tracking = {
+            "import_id": 2010,
+            "import_status": "COMPLETE",
+            "reason_status": "Processed",
+            "has_error_report": False,
+            "has_new_product_report": True,
+            "has_transformation_error_report": True,
+            "has_transformed_file": False,
+            "transform_lines_read": 2,
+            "transform_lines_in_success": 1,
+            "transform_lines_in_error": 1,
+            "transform_lines_with_warning": 0,
+        }
+        download_response = Mock(
+            status_code=200,
+            content=b"report-content",
+            headers={"Content-Type": "text/csv"},
+        )
+
+        with patch.object(
+            MiraklImportStatusSyncFactory,
+            "mirakl_paginated_get",
+            return_value=[tracking],
+        ), patch.object(
+            MiraklImportStatusSyncFactory,
+            "_request",
+            side_effect=[download_response, download_response],
+        ):
+            MiraklImportStatusSyncFactory(sales_channel=self.sales_channel).run()
+
+        clean_feed_item.refresh_from_db()
+        rejected_feed_item.refresh_from_db()
+        clean_remote_product.refresh_from_db()
+        rejected_remote_product.refresh_from_db()
+
+        self.assertEqual(clean_feed_item.status, MiraklSalesChannelFeedItem.STATUS_SUCCESS)
+        self.assertEqual(rejected_feed_item.status, MiraklSalesChannelFeedItem.STATUS_FAILED)
         self.assertEqual(clean_remote_product.status, MiraklProduct.STATUS_COMPLETED)
         self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
         new_product_report_mock.assert_called_once()

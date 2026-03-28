@@ -3,8 +3,11 @@ from unittest.mock import patch
 from model_bakery import baker
 
 from core.tests import TestCase
+from products.models import ConfigurableVariation, Product
 from properties.models import Property, PropertySelectValue
 from sales_channels.integrations.mirakl.models import (
+    MiraklCategory,
+    MiraklProductCategory,
     MiraklProperty,
     MiraklPropertySelectValue,
     MiraklSalesChannel,
@@ -153,3 +156,85 @@ class MiraklPropertySelectValueReceiverTests(DisableMiraklConnectionMixin, TestC
         remote_value.save(update_fields=["value"])
 
         sync_factory_cls.assert_not_called()
+
+
+class MiraklProductCategoryReceiverTests(DisableMiraklConnectionMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+            hostname="mirakl.example.com",
+            shop_id=123,
+            api_key="secret-token",
+        )
+        self.category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="leaf-1",
+            name="Leaf",
+            is_leaf=True,
+        )
+        self.parent_product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+            sku="PARENT-1",
+        )
+        self.child_product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            sku="CHILD-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=self.parent_product,
+            variation=self.child_product,
+        )
+
+    def test_post_create_propagates_parent_category_to_variations(self):
+        MiraklProductCategory.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=self.parent_product,
+            remote_id="leaf-1",
+        )
+
+        self.assertTrue(
+            MiraklProductCategory.objects.filter(
+                product=self.child_product,
+                sales_channel=self.sales_channel,
+                remote_id="leaf-1",
+            ).exists()
+        )
+
+    def test_post_update_updates_variation_category(self):
+        other_category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="leaf-2",
+            name="Leaf 2",
+            is_leaf=True,
+        )
+        parent_mapping = MiraklProductCategory.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=self.parent_product,
+            remote_id="leaf-1",
+        )
+        child_mapping = MiraklProductCategory.objects.get(
+            product=self.child_product,
+            sales_channel=self.sales_channel,
+        )
+        self.assertEqual(child_mapping.remote_id, "leaf-1")
+
+        parent_mapping.remote_id = other_category.remote_id
+        parent_mapping.save(update_fields=["remote_id"])
+
+        child_mapping.refresh_from_db()
+        self.assertEqual(child_mapping.remote_id, "leaf-2")

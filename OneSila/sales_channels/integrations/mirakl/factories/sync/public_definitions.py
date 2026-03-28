@@ -1,4 +1,5 @@
 from sales_channels.integrations.mirakl.models import (
+    MiraklDocumentType,
     MiraklProperty,
     MiraklPropertySelectValue,
     MiraklPublicDefinition,
@@ -28,12 +29,30 @@ class MiraklPublicDefinitionSyncFactory:
             public_definition.yes_text_value = yes_value
             public_definition.no_text_value = no_value
             public_definition.save()
+            self._ensure_document_type(remote_property=remote_property)
 
             remote_property.representation_type_decided = True
             remote_property.save(update_fields=["representation_type_decided"])
             synced += 1
 
         return synced
+
+    def _ensure_document_type(self, *, remote_property: MiraklProperty) -> None:
+        if remote_property.representation_type != MiraklProperty.REPRESENTATION_DOCUMENT:
+            return
+
+        remote_id = str(remote_property.code or "").strip()
+        if not remote_id:
+            return
+
+        remote_document_type, _ = MiraklDocumentType.objects.get_or_create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            remote_id=remote_id,
+        )
+        remote_document_type.name = str(remote_property.name or remote_id).strip()
+        remote_document_type.description = str(remote_property.description or "").strip()
+        remote_document_type.save()
 
     def _resolve_boolean_values(self, *, remote_property) -> tuple[str, str]:
         yes_value = remote_property.yes_text_value or ""

@@ -71,7 +71,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             message="Starting Mirakl schema sync",
             hostname=self.sales_channel.hostname,
         )
-        document_types = self._get_document_types()
         offer_states = self._get_offer_states()
         logistic_classes = self._get_logistic_classes()
         hierarchies = self._get_hierarchies()
@@ -86,7 +85,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         attributes = self._get_attributes()
         self._log_info(
             message="Fetched Mirakl schema payloads",
-            document_types=len(document_types),
             offer_states=len(offer_states),
             logistic_classes=len(logistic_classes),
             hierarchies=len(hierarchies),
@@ -95,7 +93,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         )
 
         self._prepare_progress(
-            document_types=document_types,
             offer_states=offer_states,
             logistic_classes=logistic_classes,
             hierarchies=hierarchies,
@@ -104,8 +101,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         )
         self._index_value_lists(value_lists=value_lists)
 
-        self._set_phase(phase_name="document_types", total=len(document_types))
-        self.sync_document_types(document_types=document_types)
         self._set_phase(phase_name="categories", total=len(hierarchies))
         self.sync_categories(hierarchies=hierarchies)
         self._set_phase(phase_name="properties", total=len(attributes))
@@ -125,10 +120,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             **self.summary_data,
         )
         return self.summary_data
-
-    def _get_document_types(self) -> list[dict[str, Any]]:
-        response = self.mirakl_get(path="/api/documents", timeout=self.schema_timeout)
-        return self._normalize_records(response.get("document_types"))
 
     def _get_offer_states(self) -> list[dict[str, Any]]:
         response = self.mirakl_get(
@@ -161,7 +152,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
     def _prepare_progress(
         self,
         *,
-        document_types: list[dict[str, Any]],
         offer_states: list[dict[str, Any]],
         logistic_classes: list[dict[str, Any]],
         hierarchies: list[dict[str, Any]],
@@ -182,7 +172,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
 
         self._progress_total = max(
             1,
-            len(document_types) + len(hierarchies) + len(attributes) + synthetic_property_total + value_count,
+            len(hierarchies) + len(attributes) + synthetic_property_total + value_count,
         )
         self._progress_log_interval = self._build_log_interval(total=self._progress_total, minimum=500)
         self._next_progress_log_at = self._progress_log_interval
@@ -367,37 +357,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 if update_fields:
                     product_type.save(update_fields=update_fields)
 
-    def sync_document_types(self, *, document_types: list[dict[str, Any]]) -> None:
-        for item in document_types:
-            code = self._clean_string(item.get("code"))
-            if not code:
-                continue
-
-            remote_document_type = self._get_existing_by_lookup(
-                model_class=MiraklDocumentType,
-                lookup={
-                    "sales_channel": self.sales_channel,
-                    "multi_tenant_company": self.sales_channel.multi_tenant_company,
-                    "remote_id": code,
-                },
-            )
-            if remote_document_type is None:
-                remote_document_type = MiraklDocumentType(
-                    sales_channel=self.sales_channel,
-                    multi_tenant_company=self.sales_channel.multi_tenant_company,
-                    remote_id=code,
-                )
-
-            remote_document_type.name = self._clean_string(item.get("label")) or code
-            remote_document_type.description = self._clean_string(item.get("description"))
-            remote_document_type.entity = self._clean_string(item.get("entity"))
-            remote_document_type.mime_types = self._ensure_json_value(item.get("mime_types"), default=[])
-            remote_document_type.raw_data = item
-            remote_document_type.save()
-
-            self.summary_data["document_types"] += 1
-            self._increment_progress()
-
     def sync_properties(self, *, attributes: list[dict[str, Any]]) -> None:
         product_types_by_code = {
             product_type.remote_id: product_type
@@ -407,6 +366,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             product_type.id: set()
             for product_type in product_types_by_code.values()
         }
+        expected_document_property_ids: set[int] = set()
 
         sorted_attributes = self._sort_attributes_for_import(attributes=attributes)
 
@@ -427,6 +387,8 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             if remote_property is None:
                 continue
 
+            if remote_property.representation_type == MiraklProperty.REPRESENTATION_DOCUMENT:
+                expected_document_property_ids.add(remote_property.id)
             self._sync_property_applicabilities(remote_property=remote_property, item=item)
             for product_type in target_product_types:
                 expected_property_ids_by_product_type.setdefault(product_type.id, set()).add(remote_property.id)
@@ -464,6 +426,89 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 stale_items = stale_items.exclude(remote_property_id__in=expected_property_ids)
             stale_items.delete()
 
+        self._sync_document_types_from_document_properties(
+            document_property_ids=expected_document_property_ids,
+        )
+
+    def _sync_document_types_from_document_properties(self, *, document_property_ids: set[int]) -> None:
+        if not document_property_ids:
+            return
+
+        queryset = (
+            MiraklProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                id__in=document_property_ids,
+            )
+            .select_related("local_instance")
+            .order_by("id")
+        )
+        for remote_property in queryset:
+            if remote_property.representation_type != MiraklProperty.REPRESENTATION_DOCUMENT:
+                continue
+            self._upsert_document_type_for_property(remote_property=remote_property)
+
+    def _upsert_document_type_for_property(self, *, remote_property: MiraklProperty) -> None:
+        remote_id = self._clean_string(remote_property.code)
+        if not remote_id:
+            return
+
+        remote_document_type = self._get_existing_by_lookup(
+            model_class=MiraklDocumentType,
+            lookup={
+                "sales_channel": self.sales_channel,
+                "multi_tenant_company": self.sales_channel.multi_tenant_company,
+                "remote_id": remote_id,
+            },
+        )
+        if remote_document_type is None:
+            remote_document_type = MiraklDocumentType(
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                remote_id=remote_id,
+            )
+
+        required_categories, optional_categories = self._build_document_type_category_lists(
+            remote_property=remote_property,
+        )
+        remote_document_type.name = self._clean_string(remote_property.name) or remote_id
+        remote_document_type.description = self._clean_string(remote_property.description)
+        remote_document_type.required_categories = required_categories
+        remote_document_type.optional_categories = optional_categories
+        remote_document_type.save()
+
+        self.summary_data["document_types"] += 1
+
+    def _build_document_type_category_lists(self, *, remote_property: MiraklProperty) -> tuple[list[str], list[str]]:
+        required_categories: set[str] = set()
+        optional_categories: set[str] = set()
+        queryset = (
+            MiraklProductTypeItem.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_property=remote_property,
+            )
+            .select_related("product_type__category")
+            .order_by("id")
+        )
+        for product_type_item in queryset:
+            category = getattr(getattr(product_type_item, "product_type", None), "category", None)
+            category_remote_id = self._clean_string(getattr(category, "remote_id", ""))
+            if not category_remote_id:
+                continue
+            if self._is_required_product_type_item(product_type_item=product_type_item):
+                required_categories.add(category_remote_id)
+                optional_categories.discard(category_remote_id)
+                continue
+            if category_remote_id not in required_categories:
+                optional_categories.add(category_remote_id)
+
+        return sorted(required_categories), sorted(optional_categories)
+
+    def _is_required_product_type_item(self, *, product_type_item: MiraklProductTypeItem) -> bool:
+        requirement_level = self._clean_string(product_type_item.requirement_level).upper()
+        if requirement_level == "REQUIRED":
+            return True
+        return bool(product_type_item.required)
+
     def _upsert_property(self, *, item: dict[str, Any]) -> MiraklProperty | None:
         code = self._clean_string(item.get("code"))
         if not code:
@@ -492,6 +537,13 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
                 code=code,
             )
+        existing_representation_type = str(getattr(remote_property, "representation_type", "") or "")
+        existing_representation_type_decided = bool(getattr(remote_property, "representation_type_decided", False))
+        detected_representation_type = self._detect_representation_type(
+            item=item,
+            values_list_code=values_list_code,
+            inline_values=inline_values,
+        )
         if self._should_replace_property_definition(remote_property=remote_property, item=item):
             remote_property.code = code
             remote_property.name = self._build_property_name(item=item, code=code)
@@ -503,11 +555,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 Property.TYPES.SELECT,
                 Property.TYPES.MULTISELECT,
             }
-            remote_property.representation_type = self._detect_representation_type(
-                item=item,
-                values_list_code=values_list_code,
-                inline_values=inline_values,
-            )
+            remote_property.representation_type = detected_representation_type
             remote_property.default_value = self._detect_default_value(
                 item=item,
                 values_list_code=values_list_code,
@@ -523,6 +571,16 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             remote_property.transformations = self._ensure_json_value(item.get("transformations"), default=[])
             remote_property.raw_data = item
         self._apply_public_definition(remote_property=remote_property)
+        self._apply_brand_role_local_mapping(
+            remote_property=remote_property,
+            item=item,
+        )
+        if self._should_reopen_default_value_representation_decision(
+            existing_representation_type=existing_representation_type,
+            existing_representation_type_decided=existing_representation_type_decided,
+            detected_representation_type=detected_representation_type,
+        ):
+            remote_property.representation_type_decided = False
         remote_property.save()
         self.summary_data["properties"] += 1
 
@@ -530,6 +588,33 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             self._inline_property_values[remote_property.code] = inline_values
 
         return remote_property
+
+    def _apply_brand_role_local_mapping(self, *, remote_property: MiraklProperty, item: dict[str, Any]) -> None:
+        if getattr(remote_property, "local_instance_id", None):
+            return
+        if not self._item_has_role_type(item=item, role_type="BRAND"):
+            return
+
+        remote_property.local_instance = (
+            Property.objects.filter(
+                internal_name="brand",
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+            )
+            .order_by("id")
+            .first()
+        )
+
+    def _item_has_role_type(self, *, item: dict[str, Any], role_type: str) -> bool:
+        normalized_role_type = self._clean_string(role_type).upper()
+        if not normalized_role_type:
+            return False
+
+        for role in self._normalize_records(
+            self._ensure_json_value(item.get("roles"), default=[]),
+        ):
+            if self._clean_string(role.get("type")).upper() == normalized_role_type:
+                return True
+        return False
 
     def _build_property_name(self, *, item: dict[str, Any], code: str) -> str:
         base_name = self._clean_string(item.get("label")) or code
@@ -846,7 +931,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             return MiraklProperty.REPRESENTATION_IMAGE
         if "image" in code:
             return MiraklProperty.REPRESENTATION_IMAGE
-        if "vat" in code or "tax_rate" in code:
+        if self._is_vat_rate_code(code=code):
             return MiraklProperty.REPRESENTATION_VAT_RATE
         if "backorder" in code:
             return MiraklProperty.REPRESENTATION_ALLOW_BACKORDER
@@ -876,6 +961,18 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             if representation_type:
                 return representation_type
         return ""
+
+    def _is_vat_rate_code(self, *, code: str) -> bool:
+        normalized_code = self._normalize_lookup_token(code)
+        if normalized_code in {"vat", "vat_rate", "tax_rate"}:
+            return True
+
+        code_tokens = [token for token in normalized_code.split("_") if token]
+        token_pairs = {
+            (code_tokens[index], code_tokens[index + 1])
+            for index in range(len(code_tokens) - 1)
+        }
+        return ("vat", "rate") in token_pairs or ("tax", "rate") in token_pairs
 
     def _detect_default_value(
         self,
@@ -1168,6 +1265,19 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         existing_score = self._attribute_item_specificity_score(item=existing_raw_data)
         incoming_score = self._attribute_item_specificity_score(item=item)
         return incoming_score >= existing_score
+
+    def _should_reopen_default_value_representation_decision(
+        self,
+        *,
+        existing_representation_type: str,
+        existing_representation_type_decided: bool,
+        detected_representation_type: str,
+    ) -> bool:
+        if not existing_representation_type_decided:
+            return False
+        if existing_representation_type != MiraklProperty.REPRESENTATION_DEFAULT_VALUE:
+            return False
+        return detected_representation_type != MiraklProperty.REPRESENTATION_DEFAULT_VALUE
 
     def _resolve_target_product_types(
         self,

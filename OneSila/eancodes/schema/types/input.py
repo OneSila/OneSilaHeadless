@@ -27,5 +27,11 @@ class AssignEancodeInput:
 
 
 @strawberry_input
+class ManualAssignEancodeInput:
+    product: ProductPartialInput
+    ean_code: EanCodePartialInput
+
+
+@strawberry_input
 class BulkAssignEancodesInput:
     products: Optional[List[ProductPartialInput]] = None

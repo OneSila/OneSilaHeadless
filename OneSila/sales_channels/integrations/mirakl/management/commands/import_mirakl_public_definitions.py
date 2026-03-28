@@ -10,6 +10,10 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("file_name", help="File name inside mirakl/utils/public_definitions/.")
         parser.add_argument(
+            "--hostname",
+            help="Import only Mirakl public definitions for the given hostname.",
+        )
+        parser.add_argument(
             "--skip-existing",
             action="store_true",
             help="Create new definitions but leave existing hostname/property_code pairs untouched.",
@@ -31,13 +35,19 @@ class Command(BaseCommand):
                 stats = public_definition_helpers.import_public_definitions_from_file(
                     file_path=file_path,
                     skip_existing=bool(options["skip_existing"]),
+                    hostname=options["hostname"],
                 )
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
 
+        hostname_message = ""
+        if options["hostname"]:
+            hostname_message = f" for hostname {options['hostname']}"
+
         self.stdout.write(
             self.style.SUCCESS(
-                "Imported Mirakl public definitions from "
+                "Imported Mirakl public definitions"
+                f"{hostname_message} from "
                 f"{file_path.name}: created={stats['created']}, updated={stats['updated']}, skipped={stats['skipped']}."
             )
         )
