@@ -75,10 +75,14 @@ def serialize_public_definition(*, definition: MiraklPublicDefinition) -> dict[s
     }
 
 
-def export_public_definitions_to_file(*, file_path: Path) -> int:
+def export_public_definitions_to_file(*, file_path: Path, hostname: str | None = None) -> int:
+    queryset = MiraklPublicDefinition.objects.all()
+    if hostname:
+        queryset = queryset.filter(hostname=hostname)
+
     definitions = [
         serialize_public_definition(definition=definition)
-        for definition in MiraklPublicDefinition.objects.order_by("hostname", "property_code")
+        for definition in queryset.order_by("hostname", "property_code")
     ]
     file_path.write_text(
         json.dumps(definitions, indent=2, sort_keys=True, ensure_ascii=False),
@@ -87,7 +91,7 @@ def export_public_definitions_to_file(*, file_path: Path) -> int:
     return len(definitions)
 
 
-def import_public_definitions_from_file(*, file_path: Path, skip_existing: bool = False) -> dict[str, int]:
+def import_public_definitions_from_file(*, file_path: Path, skip_existing: bool = False, hostname: str | None = None) -> dict[str, int]:
     payload = json.loads(file_path.read_text(encoding="utf-8"))
     if not isinstance(payload, list):
         raise ValueError("Public definitions file must contain a JSON list.")
@@ -103,7 +107,10 @@ def import_public_definitions_from_file(*, file_path: Path, skip_existing: bool 
             raise ValueError(f"Definition #{index} must be a JSON object.")
 
         cleaned_definition = clean_public_definition_payload(payload=raw_definition)
-        hostname = cleaned_definition["hostname"]
+        if hostname and cleaned_definition["hostname"] != hostname:
+            continue
+
+        definition_hostname = cleaned_definition["hostname"]
         property_code = cleaned_definition["property_code"]
         defaults = {
             field_name: cleaned_definition[field_name]
@@ -112,7 +119,7 @@ def import_public_definitions_from_file(*, file_path: Path, skip_existing: bool 
         }
 
         definition, created = MiraklPublicDefinition.objects.get_or_create(
-            hostname=hostname,
+            hostname=definition_hostname,
             property_code=property_code,
             defaults=defaults,
         )

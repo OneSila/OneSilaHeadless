@@ -195,10 +195,13 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 filename_base=f"mirakl-product-transform-errors-{feed.remote_id}",
             )
             feed.refresh_from_db(fields=["transformation_error_report_file"])
-        if feed.has_transformation_error_report and feed.transformation_error_report_file:
-            self._sync_transformation_report_issues(feed=feed)
+        if (
+            (feed.has_error_report and feed.error_report_file)
+            or (feed.has_transformation_error_report and feed.transformation_error_report_file)
+        ):
+            self._sync_report_issues(feed=feed)
 
-    def _sync_transformation_report_issues(self, *, feed: MiraklSalesChannelFeed) -> None:
+    def _sync_report_issues(self, *, feed: MiraklSalesChannelFeed) -> None:
         from sales_channels.integrations.mirakl.factories.feeds.issues_report import (
             MiraklTransformationErrorReportIssueSyncFactory,
         )
@@ -207,7 +210,7 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
             MiraklTransformationErrorReportIssueSyncFactory(feed=feed).run()
         except Exception:
             logger.exception(
-                "Failed to sync Mirakl transformation report issues for feed_id=%s remote_id=%s",
+                "Failed to sync Mirakl import report issues for feed_id=%s remote_id=%s",
                 feed.id,
                 feed.remote_id,
             )
@@ -269,7 +272,7 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
 
         remote_id = feed.product_remote_id or feed.remote_id
         if feed.status in {SalesChannelFeed.STATUS_SUCCESS, SalesChannelFeed.STATUS_PARTIAL}:
-            self._mark_items_success(feed=feed, remote_id=remote_id)
+            self._mark_items_success(feed=feed, remote_id=remote_id, allow_completion=not feed.has_error_report)
             feed.error_message = ""
             feed.save(update_fields=["error_message"])
             return
@@ -279,7 +282,7 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
         feed.save(update_fields=["error_message"])
         self._mark_items_failed(feed=feed, remote_id=remote_id, message=message)
 
-    def _mark_items_success(self, *, feed: MiraklSalesChannelFeed, remote_id: str) -> None:
+    def _mark_items_success(self, *, feed: MiraklSalesChannelFeed, remote_id: str, allow_completion: bool) -> None:
         for item in MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related("remote_product"):
             remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
             if remote_product is None:
@@ -302,6 +305,9 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                     identifier=f"mirakl-product-feed-{remote_id}",
                     remote_product=remote_product,
                 )
+                continue
+
+            if not allow_completion:
                 continue
 
             item.status = SalesChannelFeedItem.STATUS_SUCCESS

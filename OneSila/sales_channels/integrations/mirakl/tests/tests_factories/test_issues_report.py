@@ -153,6 +153,39 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
         self.remote_product.refresh_from_db()
         self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
 
+    def test_run_parses_csv_error_report_and_upserts_issues_for_feed_rows(self):
+        self.feed.error_report_file.save(
+            "mirakl-product-errors.csv",
+            ContentFile(
+                "\n".join(
+                    [
+                        '"product_category","product_id","ean","line_number","errors"',
+                        '"Toys/Dress Up & Role Play","ILFD4043XS+5029+1479-58","5056863153211","3","1000|The attribute main_image is required,1001|Brand is required"',
+                    ]
+                )
+            ),
+            save=True,
+        )
+
+        synced_issues = MiraklTransformationErrorReportIssueSyncFactory(feed=self.feed).run()
+
+        self.assertEqual(synced_issues, 2)
+        self.assertEqual(MiraklProductIssue.objects.filter(remote_product=self.remote_product).count(), 2)
+
+        error_issue = MiraklProductIssue.objects.get(
+            remote_product=self.remote_product,
+            code="1000",
+        )
+        self.assertEqual(error_issue.main_code, "1000")
+        self.assertEqual(error_issue.message, "The attribute main_image is required")
+        self.assertEqual(error_issue.severity, "ERROR")
+        self.assertEqual(error_issue.raw_data["source"], "error_report_error")
+        self.assertEqual(error_issue.raw_data["line_number"], "3")
+        self.assertEqual(list(error_issue.views.values_list("id", flat=True)), [self.view.id])
+
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
     def test_run_uses_sales_channel_representation_headers_without_hardcoded_fallbacks(self):
         custom_property = baker.make(
             MiraklProperty,

@@ -767,11 +767,10 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=self.sales_channel,
             import_process=self.import_process,
         )
-        local_brand_property = baker.make(
-            Property,
+        local_brand_property, _ = Property.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             internal_name="brand",
-            type=Property.TYPES.TEXT,
+            defaults={"type": Property.TYPES.TEXT},
         )
 
         remote_property = factory._upsert_property(
@@ -803,11 +802,10 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             internal_name="manufacturer",
             type=Property.TYPES.TEXT,
         )
-        baker.make(
-            Property,
+        Property.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             internal_name="brand",
-            type=Property.TYPES.TEXT,
+            defaults={"type": Property.TYPES.TEXT},
         )
         remote_property = baker.make(
             MiraklProperty,

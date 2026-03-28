@@ -451,8 +451,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["materials"], "COTTON_CODE,LINEN_CODE")
 
-    @patch("media.models.Media.image_url", return_value="https://cdn.example.com/color.jpg")
-    def test_required_swatch_uses_color_image_media(self, _image_url_mock):
+    def test_required_swatch_uses_color_image_media(self):
         local_property = baker.make(
             Property,
             multi_tenant_company=self.multi_tenant_company,
@@ -481,7 +480,8 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=None,
         )
 
-        _, rows = builder.build()
+        with patch.object(Media, "image_web_url", new=property(lambda self: "https://cdn.example.com/color.jpg")):
+            _, rows = builder.build()
 
         self.assertEqual(rows[0]["swatch"], "https://cdn.example.com/color.jpg")
 
@@ -725,7 +725,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
                 return "https://cdn.example.com/parent.jpg"
             return ""
 
-        with patch("media.models.Media.image_url", autospec=True, side_effect=_image_url):
+        with patch.object(Media, "image_web_url", new=property(_image_url)):
             _, rows = MiraklProductPayloadBuilder(
                 remote_product=remote_product,
                 sales_channel_view=self.view,
@@ -734,8 +734,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(rows[0]["title_field"], "Parent Name")
         self.assertEqual(rows[0]["main_image"], "https://cdn.example.com/child.jpg")
 
-    @patch("media.models.Media.image_url", return_value="https://cdn.example.com/parent.jpg")
-    def test_configurable_variations_fallback_to_parent_images_when_variation_has_none(self, _image_url_mock):
+    def test_configurable_variations_fallback_to_parent_images_when_variation_has_none(self):
         parent_product = baker.make(
             "products.Product",
             multi_tenant_company=self.multi_tenant_company,
@@ -839,10 +838,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=None,
         )
 
-        _, rows = MiraklProductPayloadBuilder(
-            remote_product=remote_product,
-            sales_channel_view=self.view,
-        ).build()
+        with patch.object(Media, "image_web_url", new=property(lambda self: "https://cdn.example.com/parent.jpg")):
+            _, rows = MiraklProductPayloadBuilder(
+                remote_product=remote_product,
+                sales_channel_view=self.view,
+            ).build()
 
         self.assertEqual(rows[0]["title_field"], "Parent Name")
         self.assertEqual(rows[0]["main_image"], "https://cdn.example.com/parent.jpg")

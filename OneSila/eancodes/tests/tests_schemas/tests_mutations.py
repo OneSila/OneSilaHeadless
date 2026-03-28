@@ -35,7 +35,9 @@ class ManualAssignEanCodeMutationTestCase(TransactionTestCaseMixin, TransactionT
 
     def _assert_graphql_error_contains(self, *, response, text):
         self.assertTrue(response.errors)
-        self.assertIn(text, response.errors[0].message)
+        error = response.errors[0]
+        message = error.get("message", "") if isinstance(error, dict) else getattr(error, "message", "")
+        self.assertIn(text, message)
 
     def test_manual_assign_ean_code(self):
         ean_code = EanCode.objects.create(
@@ -54,7 +56,8 @@ class ManualAssignEanCodeMutationTestCase(TransactionTestCaseMixin, TransactionT
         payload = resp.data["manualAssignEanCode"]
         self.assertEqual(payload["id"], self.to_global_id(ean_code))
         self.assertEqual(payload["eanCode"], ean_code.ean_code)
-        self.assertEqual(payload["product"]["id"], self.to_global_id(self.product))
+        _, product_id = self.from_global_id(payload["product"]["id"])
+        self.assertEqual(str(product_id), str(self.product.id))
 
         ean_code.refresh_from_db()
         self.assertEqual(ean_code.product_id, self.product.id)
