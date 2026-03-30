@@ -8,6 +8,11 @@ from core import models
 
 class Notification(models.Model):
     TYPE_COLLABORATION_MENTION = "COLLABORATION_MENTION"
+    TYPE_REMOTE_PRODUCT_STATUS_CHANGED = "REMOTE_PRODUCT_STATUS_CHANGED"
+    TYPE_IMPORT_FINISHED = "IMPORT_FINISHED"
+    TYPE_IMPORT_FAILED = "IMPORT_FAILED"
+    TYPE_AI_BULK_TRANSLATE = "AI_BULK_TRANSLATE"
+    TYPE_AI_BULK_GENERATE = "AI_BULK_GENERATE"
 
     type = django_models.CharField(max_length=64, db_index=True)
     title = django_models.CharField(max_length=255)

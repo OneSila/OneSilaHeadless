@@ -158,7 +158,21 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
                 mutable_fields.append("required_feed_sync")
             kwargs["update_fields"] = mutable_fields
 
-        super().save(*args, **kwargs)
+        repeat_failed_status_notification = (
+            not is_new
+            and self.status == self.STATUS_FAILED
+            and "status" in (kwargs.get("update_fields") or [])
+            and not self.is_dirty_field("status")
+        )
+        if repeat_failed_status_notification:
+            self._repeat_failed_status_notification = True
+            kwargs["force_save"] = True
+
+        try:
+            super().save(*args, **kwargs)
+        finally:
+            if repeat_failed_status_notification and hasattr(self, "_repeat_failed_status_notification"):
+                delattr(self, "_repeat_failed_status_notification")
 
     def refresh_status(self, *, commit: bool = True, override_status: str | None = None) -> str:
         computed_status = override_status or self._determine_status()

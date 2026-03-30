@@ -20,7 +20,7 @@ from .types.input import (
     ChatGptProductFeedConfigInput,
     ChatGptProductFeedConfigPartialInput,
 )
-from core.schema.core.helpers import get_multi_tenant_company
+from core.schema.core.helpers import get_current_user, get_multi_tenant_company
 from products.models import Product
 from sales_channels.models import SalesChannel
 from django.core.exceptions import ValidationError
@@ -109,6 +109,7 @@ class LlmMutation:
         from llm.tasks import llm__ai_translate__run_bulk_ai_translation_flow
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        current_user = get_current_user(info)
 
         product_ids = [p.id.node_id for p in instance.products or []]
         property_ids = [p.id.node_id for p in instance.properties or []]
@@ -122,6 +123,7 @@ class LlmMutation:
             property_ids=property_ids,
             value_ids=value_ids,
             override_translation=instance.override_translation,
+            current_user_id=getattr(current_user, "id", None),
         )
 
         return AiTaskResponse(success=True)
@@ -136,6 +138,7 @@ class LlmMutation:
         from llm.flows.bulk_generate_content import BulkGenerateContentFlow
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        current_user = get_current_user(info)
         product_ids = [p.id.node_id for p in instance.products or []]
         sales_channel_inputs = instance.sales_channels or []
         sales_channel_languages: dict[str, list[str]] = {}
@@ -178,6 +181,7 @@ class LlmMutation:
             sales_channel_languages={str(key): value for key, value in sales_channel_languages.items()},
             override=instance.override or False,
             additional_informations=instance.additional_informations,
+            current_user_id=getattr(current_user, "id", None),
         )
 
         return AiBulkContentResponse(success=True)

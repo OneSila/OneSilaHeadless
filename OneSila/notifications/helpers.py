@@ -2,12 +2,16 @@ from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.conf import settings
 from django.utils.html import strip_tags
 from django.template.loader import render_to_string
+from urllib.parse import urlencode
 
 from premailer import transform
 from collections import namedtuple
 from get_absolute_url.helpers import generate_absolute_url
+from integrations.constants import INTEGRATIONS_TYPES_MAP
 
 import re
+
+from .models import Notification
 
 
 EmailAttachment = namedtuple('EmailAttachment', 'name, content')
@@ -56,3 +60,77 @@ def send_branded_mail(subject, html, to_email, from_email=None, fail_silently=Tr
     return mail.send(fail_silently=fail_silently)
 
     # return send_mail(subject, text, from_email, [to_email], html_message=html, fail_silently=fail_silently, **kwargs)
+
+
+def build_product_tab_url(*, product, tab: str) -> str | None:
+    if product is None or not getattr(product, "global_id", None):
+        return None
+
+    return _build_frontend_url(
+        path=f"/products/product/{product.global_id}",
+        query_params={"tab": tab},
+    )
+
+
+def build_sales_channel_tab_url(*, sales_channel, tab: str) -> str | None:
+    if sales_channel is None:
+        return None
+
+    resolved = sales_channel.get_real_instance() if hasattr(sales_channel, "get_real_instance") else sales_channel
+    global_id = getattr(resolved, "global_id", None)
+    if not global_id:
+        return None
+
+    integration_type = INTEGRATIONS_TYPES_MAP.get(type(resolved))
+    if not integration_type:
+        return None
+
+    return _build_frontend_url(
+        path=f"/integrations/{integration_type}/{global_id}",
+        query_params={"tab": tab},
+    )
+
+
+def build_import_tab_url(*, import_process) -> str | None:
+    resolved = import_process.get_real_instance() if hasattr(import_process, "get_real_instance") else import_process
+    sales_channel = getattr(resolved, "sales_channel", None)
+    if sales_channel is None:
+        return None
+
+    return build_sales_channel_tab_url(sales_channel=sales_channel, tab="imports")
+
+
+def create_user_notification(
+    *,
+    user,
+    notification_type: str,
+    title: str,
+    message: str = "",
+    url: str | None = None,
+    metadata: dict | None = None,
+    actor=None,
+    multi_tenant_company=None,
+):
+    if user is None:
+        return None
+
+    return Notification.objects.create(
+        multi_tenant_company=multi_tenant_company or getattr(user, "multi_tenant_company", None),
+        created_by_multi_tenant_user=actor,
+        last_update_by_multi_tenant_user=actor,
+        user=user,
+        type=notification_type,
+        title=title,
+        message=message,
+        url=url,
+        metadata=metadata or {},
+    )
+
+
+def _build_frontend_url(*, path: str, query_params: dict[str, str] | None = None) -> str:
+    base_url = generate_absolute_url(trailing_slash=False).rstrip("/")
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    if not query_params:
+        return f"{base_url}{normalized_path}"
+
+    return f"{base_url}{normalized_path}?{urlencode(query_params)}"

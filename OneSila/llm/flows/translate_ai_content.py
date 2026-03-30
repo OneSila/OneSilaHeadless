@@ -144,7 +144,17 @@ class AITranslateContentFlow:
 
 
 class BulkAiTranslateContentFlow:
-    def __init__(self, multi_tenant_company, from_language_code: str, to_language_codes: list[str], products=None, properties=None, values=None, override_translation: bool = False,):
+    def __init__(
+        self,
+        multi_tenant_company,
+        from_language_code: str,
+        to_language_codes: list[str],
+        products=None,
+        properties=None,
+        values=None,
+        override_translation: bool = False,
+        current_user=None,
+    ):
         self.multi_tenant_company = multi_tenant_company
         self.from_language_code = from_language_code
         self.to_language_codes = to_language_codes
@@ -153,6 +163,7 @@ class BulkAiTranslateContentFlow:
         self.values = values or PropertySelectValue.objects.none()
         self.total_points = 0
         self.override_translation = override_translation
+        self.current_user = current_user
 
     def translate_products(self):
 
@@ -303,3 +314,26 @@ class BulkAiTranslateContentFlow:
         self.translate_products()
         self.translate_properties()
         self.translate_values()
+        self._create_notifications()
+
+    def _create_notifications(self) -> None:
+        if not self.current_user:
+            return
+
+        from notifications.helpers import build_product_tab_url, create_user_notification
+        from notifications.models import Notification
+
+        for product in self.products:
+            create_user_notification(
+                user=self.current_user,
+                notification_type=Notification.TYPE_AI_BULK_TRANSLATE,
+                title="AI translation finished",
+                message=f"Translated content for {product.sku}.",
+                url=build_product_tab_url(product=product, tab="productContent"),
+                actor=self.current_user,
+                multi_tenant_company=self.multi_tenant_company,
+                metadata={
+                    "product_id": product.id,
+                    "product_global_id": product.global_id,
+                },
+            )

@@ -5,7 +5,11 @@ from model_bakery import baker
 from unittest.mock import patch
 
 from core.tests import TestCase
+from imports_exports.models import Import, MappedImport
+from notifications.helpers import build_import_tab_url, build_product_tab_url
 from notifications.models import CollaborationEntry, CollaborationMention, CollaborationThread, Notification
+from sales_channels.models import SalesChannelViewAssign
+from sales_channels.models.products import RemoteProduct
 
 
 class CollaborationModelTestCase(TestCase):
@@ -111,3 +115,200 @@ class CollaborationModelTestCase(TestCase):
         self.assertEqual(notification.message, "Please review")
         self.assertEqual(notification.metadata["mention_id"], mention.id)
         mock_refresh_subscription_receiver.assert_called_once_with(mentioned_user)
+
+
+class NotificationReceiverTestCase(TestCase):
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_remote_product_status_change_creates_notification(self, mock_refresh_subscription_receiver):
+        product = baker.make(
+            "products.Product",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+            sku="SKU-1",
+        )
+        sales_channel = baker.make(
+            "ebay.EbaySalesChannel",
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="ebay-test",
+        )
+        view = baker.make(
+            "ebay.EbaySalesChannelView",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+        )
+        remote_product = baker.make(
+            "ebay.EbayProduct",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            local_instance=product,
+            status=RemoteProduct.STATUS_PROCESSING,
+            syncing_current_percentage=0,
+        )
+        baker.make(
+            SalesChannelViewAssign,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            sales_channel_view=view,
+            product=product,
+            remote_product=remote_product,
+            created_by_multi_tenant_user=self.user,
+            last_update_by_multi_tenant_user=self.user,
+        )
+
+        remote_product.status = RemoteProduct.STATUS_COMPLETED
+        remote_product.syncing_current_percentage = 100
+        remote_product.save(update_fields=["status", "syncing_current_percentage"], skip_status_check=False)
+
+        notification = Notification.objects.get(
+            user=self.user,
+            type=Notification.TYPE_REMOTE_PRODUCT_STATUS_CHANGED,
+        )
+        self.assertEqual(notification.url, build_product_tab_url(product=product, tab="websites"))
+        self.assertEqual(notification.message, "Product SKU-1 changed to Completed.")
+        self.assertEqual(notification.metadata["status"], RemoteProduct.STATUS_COMPLETED)
+        mock_refresh_subscription_receiver.assert_called_once_with(self.user)
+
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_remote_product_status_change_skips_notifications_while_importing(self, mock_refresh_subscription_receiver):
+        product = baker.make(
+            "products.Product",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+            sku="SKU-2",
+        )
+        sales_channel = baker.make(
+            "ebay.EbaySalesChannel",
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="ebay-importing",
+            is_importing=True,
+        )
+        view = baker.make(
+            "ebay.EbaySalesChannelView",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+        )
+        remote_product = baker.make(
+            "ebay.EbayProduct",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            local_instance=product,
+            status=RemoteProduct.STATUS_PROCESSING,
+        )
+        baker.make(
+            SalesChannelViewAssign,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            sales_channel_view=view,
+            product=product,
+            remote_product=remote_product,
+            last_update_by_multi_tenant_user=self.user,
+        )
+
+        remote_product.status = RemoteProduct.STATUS_FAILED
+        remote_product.save(update_fields=["status"], skip_status_check=False)
+
+        self.assertFalse(
+            Notification.objects.filter(type=Notification.TYPE_REMOTE_PRODUCT_STATUS_CHANGED).exists()
+        )
+        mock_refresh_subscription_receiver.assert_not_called()
+
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_remote_product_repeat_failed_status_creates_notification(self, mock_refresh_subscription_receiver):
+        product = baker.make(
+            "products.Product",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+            sku="SKU-3",
+        )
+        sales_channel = baker.make(
+            "ebay.EbaySalesChannel",
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="ebay-failed-repeat",
+        )
+        view = baker.make(
+            "ebay.EbaySalesChannelView",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+        )
+        remote_product = baker.make(
+            "ebay.EbayProduct",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            local_instance=product,
+            status=RemoteProduct.STATUS_FAILED,
+        )
+        baker.make(
+            SalesChannelViewAssign,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            sales_channel_view=view,
+            product=product,
+            remote_product=remote_product,
+            last_update_by_multi_tenant_user=self.user,
+        )
+
+        remote_product.status = RemoteProduct.STATUS_FAILED
+        remote_product.save(update_fields=["status"], skip_status_check=False)
+
+        notification = Notification.objects.get(
+            user=self.user,
+            type=Notification.TYPE_REMOTE_PRODUCT_STATUS_CHANGED,
+        )
+        self.assertEqual(notification.message, "Product SKU-3 changed to Failed.")
+        self.assertEqual(notification.metadata["status"], RemoteProduct.STATUS_FAILED)
+        self.assertEqual(notification.metadata["previous_status"], RemoteProduct.STATUS_FAILED)
+        mock_refresh_subscription_receiver.assert_called_once_with(self.user)
+
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_mapped_import_success_creates_notification_for_creator(self, mock_refresh_subscription_receiver):
+        import_process = baker.make(
+            MappedImport,
+            multi_tenant_company=self.multi_tenant_company,
+            created_by_multi_tenant_user=self.user,
+            last_update_by_multi_tenant_user=self.user,
+            status=Import.STATUS_PROCESSING,
+            name="Mapped catalog import",
+        )
+
+        import_process.status = Import.STATUS_SUCCESS
+        import_process.save(update_fields=["status"])
+
+        notification = Notification.objects.get(
+            user=self.user,
+            type=Notification.TYPE_IMPORT_FINISHED,
+        )
+        self.assertIsNone(notification.url)
+        self.assertEqual(notification.message, "Mapped catalog import is Success.")
+        self.assertEqual(notification.metadata["status"], Import.STATUS_SUCCESS)
+        mock_refresh_subscription_receiver.assert_called_once_with(self.user)
+
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_sales_channel_import_failure_uses_imports_tab_url(self, mock_refresh_subscription_receiver):
+        sales_channel = baker.make(
+            "mirakl.MiraklSalesChannel",
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="mirakl-test",
+            sub_type="debenhams",
+        )
+        import_process = baker.make(
+            "mirakl.MiraklSalesChannelImport",
+            multi_tenant_company=self.multi_tenant_company,
+            created_by_multi_tenant_user=self.user,
+            last_update_by_multi_tenant_user=self.user,
+            sales_channel=sales_channel,
+            status=Import.STATUS_PROCESSING,
+        )
+
+        import_process.status = Import.STATUS_FAILED
+        import_process.save(update_fields=["status"])
+
+        notification = Notification.objects.get(
+            user=self.user,
+            type=Notification.TYPE_IMPORT_FAILED,
+        )
+        self.assertEqual(notification.url, build_import_tab_url(import_process=import_process))
+        self.assertIn("/integrations/mirakl/", notification.url)
+        self.assertNotIn("/integrations/debenhams/", notification.url)
+        self.assertEqual(notification.message, "MiraklSalesChannelImport is Failed.")
+        self.assertEqual(notification.metadata["status"], Import.STATUS_FAILED)
+        mock_refresh_subscription_receiver.assert_called_once_with(self.user)
