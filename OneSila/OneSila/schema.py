@@ -16,6 +16,7 @@ from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSub
 from eancodes.schema import EanCodesQuery, EanCodesMutation, EanCodesSubscription
 from lead_times.schema import LeadTimesQuery
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
+from notifications.schema import NotificationsQuery, NotificationsMutation
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
 from products_inspector.schema import ProductsInspectorSubscription, ProductsInspectorMutation
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
@@ -56,6 +57,7 @@ class Query(
         LanguageQuery,
         LeadTimesQuery,
         MediaQuery,
+        NotificationsQuery,
         MultiTenantQuery,
         MagentoSalesChannelsQuery,
         ShopifySalesChannelsQuery,
@@ -82,6 +84,7 @@ class Mutation(
         CurrenciesMutation,
         EanCodesMutation,
         MediaMutation,
+        NotificationsMutation,
         MultiTenantMutation,
         ShopifySalesChannelMutation,
         SheinSalesChannelMutation,
