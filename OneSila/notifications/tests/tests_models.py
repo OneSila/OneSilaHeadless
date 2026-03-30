@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from core.tests import TestCase
 from imports_exports.models import Import, MappedImport
-from notifications.helpers import build_import_tab_url, build_product_tab_url
+from notifications.helpers import build_import_tab_url, build_product_tab_url, create_user_notification
 from notifications.models import CollaborationEntry, CollaborationMention, CollaborationThread, Notification
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.products import RemoteProduct
@@ -118,6 +118,31 @@ class CollaborationModelTestCase(TestCase):
 
 
 class NotificationReceiverTestCase(TestCase):
+    def test_create_user_notification_skips_duplicate_within_one_minute(self):
+        first = create_user_notification(
+            user=self.user,
+            notification_type=Notification.TYPE_REMOTE_PRODUCT_STATUS_CHANGED,
+            title="Remote product status updated",
+            message="Product SKU-1 changed to Completed.",
+            url="/products/test",
+            actor=self.user,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        second = create_user_notification(
+            user=self.user,
+            notification_type=Notification.TYPE_REMOTE_PRODUCT_STATUS_CHANGED,
+            title="Remote product status updated",
+            message="Product SKU-1 changed to Completed.",
+            url="/products/test",
+            actor=self.user,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)
+        self.assertEqual(Notification.objects.count(), 1)
+
     @patch("notifications.receivers.refresh_subscription_receiver")
     def test_remote_product_status_change_creates_notification(self, mock_refresh_subscription_receiver):
         product = baker.make(

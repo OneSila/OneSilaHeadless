@@ -2,7 +2,9 @@ from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.conf import settings
 from django.utils.html import strip_tags
 from django.template.loader import render_to_string
+from django.utils import timezone
 from urllib.parse import urlencode
+from datetime import timedelta
 
 from premailer import transform
 from collections import namedtuple
@@ -112,6 +114,19 @@ def create_user_notification(
     multi_tenant_company=None,
 ):
     if user is None:
+        return None
+
+    cutoff = timezone.now() - timedelta(minutes=1)
+    duplicate_exists = Notification.objects.filter(
+        user=user,
+        type=notification_type,
+        created_by_multi_tenant_user=actor,
+        title=title,
+        message=message,
+        url=url,
+        created_at__gte=cutoff,
+    ).exists()
+    if duplicate_exists:
         return None
 
     return Notification.objects.create(
