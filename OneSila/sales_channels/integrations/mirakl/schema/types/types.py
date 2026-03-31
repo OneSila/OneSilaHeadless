@@ -200,6 +200,12 @@ class MiraklPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     local_instance: Optional[Annotated["PropertySelectValueType", lazy("properties.schema.types.types")]]
 
     @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import RemotePropertySelectValueType
+
+        return to_base64(RemotePropertySelectValueType, self.pk)
+
+    @field()
     def label(self, info) -> str:
         return self.value or self.code
 

@@ -15,7 +15,7 @@ from .fields import (
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
     SalesChannelViewAssignType, SalesChannelContentTemplateType, SalesChannelImportType, RemoteLanguageType, \
     RemoteCurrencyType, ImportPropertyType, SalesChannelContentTemplateCheckType, FormattedIssueType, \
-    SalesChannelGptFeedType, RemoteDocumentTypeType
+    SalesChannelGptFeedType, RemoteDocumentTypeType, RemotePropertySelectValueType
 from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInput, SalesChannelInput, \
     SalesChannelPartialInput, \
     SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
@@ -23,14 +23,17 @@ from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInpu
     SalesChannelContentTemplateInput, SalesChannelContentTemplatePartialInput, \
     SalesChannelGptFeedPartialInput, \
     RemoteLanguagePartialInput, RemoteCurrencyPartialInput, ImportPropertyInput, \
-    RemoteDocumentTypePartialInput
+    RemoteDocumentTypePartialInput, RemotePropertySelectValuePartialInput
 from core.helpers import get_languages
 from products.models import Product
+from properties.models import PropertySelectValue
+from properties.schema.types.input import PropertySelectValuePartialInput
 from sales_channels.content_templates import (
     build_content_template_context,
     render_sales_channel_content_template,
 )
-from sales_channels.models import SalesChannel, SalesChannelGptFeed, SalesChannelImport, SalesChannelViewAssign
+from sales_channels.models import SalesChannel, SalesChannelGptFeed, SalesChannelImport, SalesChannelViewAssign, RemotePropertySelectValue
+from ...integrations.mirakl.schema.types import MiraklPropertySelectValueType
 
 
 @type(name='Mutation')
@@ -318,6 +321,63 @@ class SalesChannelsMutation:
         if isinstance(resolved_channel, MiraklSalesChannel):
             mirakl_map_perfect_match_select_values_db_task(sales_channel_id=resolved_channel.id)
             return True
+
+        raise ValidationError("Unsupported sales channel integration.")
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def duplicate_sales_channel_select_value_mapping(
+        self,
+        info: Info,
+        *,
+        sales_channel: SalesChannelPartialInput,
+        remote_property_select_value: RemotePropertySelectValuePartialInput,
+        local_instance: PropertySelectValuePartialInput,
+    ) -> MiraklPropertySelectValueType:
+        from sales_channels.integrations.mirakl.models import MiraklProperty, MiraklPropertySelectValue, MiraklSalesChannel
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        try:
+            channel = SalesChannel.objects.get(
+                id=sales_channel.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except SalesChannel.DoesNotExist as exc:
+            raise PermissionError("Invalid company") from exc
+
+        source = RemotePropertySelectValue.objects.select_related(
+            "remote_property",
+            "local_instance",
+            "sales_channel",
+        ).get(
+            id=remote_property_select_value.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+        local_value = PropertySelectValue.objects.select_related("property").get(
+            id=local_instance.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        if source.sales_channel_id != channel.id:
+            raise ValidationError("Remote property select value does not belong to the selected sales channel.")
+
+        resolved_channel = channel.get_real_instance()
+
+        if isinstance(resolved_channel, MiraklSalesChannel):
+            if not isinstance(source, MiraklPropertySelectValue):
+                raise ValidationError("Remote property select value is not a Mirakl select value.")
+
+            if source.remote_property is None:
+                raise ValidationError("Remote property select value has no remote property.")
+
+            remote_property = source.remote_property.get_real_instance()
+            if remote_property.representation_type != MiraklProperty.REPRESENTATION_PROPERTY:
+                raise ValidationError("Only Mirakl properties with representation type 'property' can be duplicated.")
+
+            return MiraklPropertySelectValue.objects.duplicate_for_local_instance(
+                source=source,
+                local_instance=local_value,
+            )
 
         raise ValidationError("Unsupported sales channel integration.")
 

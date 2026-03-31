@@ -13,6 +13,9 @@ from properties.models import (
     Property,
     PropertySelectValue,
 )
+from sales_channels.integrations.mirakl.factories.imports.products.reverse_mapper import (
+    MiraklReverseProductMapper,
+)
 from sales_channels.integrations.mirakl.factories.imports.products import MiraklProductsImportProcessor
 from sales_channels.integrations.mirakl.models import (
     MiraklCategory,
@@ -57,6 +60,73 @@ class MiraklProductsImportProcessorTests(DisableMiraklConnectionMixin, TestCase)
             type=MiraklSalesChannelImport.TYPE_PRODUCTS,
             skip_broken_records=True,
         )
+
+    def test_reverse_mapper_prefers_first_duplicate_select_value_by_id(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        first_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        second_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_property,
+            code="occasion",
+            representation_type=MiraklProperty.REPRESENTATION_PROPERTY,
+            type=Property.TYPES.SELECT,
+        )
+        first_value = baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
+            local_instance=first_local_value,
+            code="CASUAL",
+            value="Casual",
+        )
+        second_value = MiraklPropertySelectValue.objects.duplicate_for_local_instance(
+            source=first_value,
+            local_instance=second_local_value,
+        )
+        unused_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="unused_property",
+            representation_type=MiraklProperty.REPRESENTATION_PROPERTY,
+            type=Property.TYPES.SELECT,
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=unused_property,
+            code="UNUSED",
+            value="Unused",
+        )
+
+        mapper = MiraklReverseProductMapper(sales_channel=self.sales_channel)
+        mapper._ensure_select_value_lookup_for_headers(
+            row_fields={"occasion": "Casual"},
+        )
+
+        self.assertEqual(
+            mapper._select_value_lookup[(remote_property.id, "casual")].id,
+            first_value.id,
+        )
+        self.assertNotEqual(first_value.id, second_value.id)
+        self.assertNotIn((unused_property.id, "unused"), mapper._select_value_lookup)
 
     def _build_workbook_bytes(self, *, codes, rows, error_rows=None):
         workbook = Workbook()
