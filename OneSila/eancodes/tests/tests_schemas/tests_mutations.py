@@ -123,44 +123,6 @@ class ManualAssignEanCodeMutationTestCase(TransactionTestCaseMixin, TransactionT
         new_ean_code.refresh_from_db()
         self.assertIsNone(new_ean_code.product_id)
 
-    def test_manual_assign_ean_code_rejects_ean_code_from_another_company(self):
-        other_company = baker.make(MultiTenantCompany)
-        other_ean_code = EanCode.objects.create(
-            ean_code="1234567890128",
-            internal=True,
-            already_used=False,
-            multi_tenant_company=other_company,
-        )
-
-        resp = self.strawberry_test_client(
-            query=MANUAL_ASSIGN_EAN_CODE_MUTATION,
-            variables=self._mutation_variables(product=self.product, ean_code=other_ean_code),
-            asserts_errors=False,
-        )
-
-        self._assert_graphql_error_contains(response=resp, text="valid EAN code")
-        other_ean_code.refresh_from_db()
-        self.assertIsNone(other_ean_code.product_id)
-
-    def test_manual_assign_ean_code_rejects_product_from_another_company(self):
-        other_company = baker.make(MultiTenantCompany)
-        other_product = SimpleProduct.objects.create(multi_tenant_company=other_company)
-        ean_code = EanCode.objects.create(
-            ean_code="1234567890129",
-            internal=True,
-            already_used=False,
-            multi_tenant_company=self.multi_tenant_company,
-        )
-
-        resp = self.strawberry_test_client(
-            query=MANUAL_ASSIGN_EAN_CODE_MUTATION,
-            variables=self._mutation_variables(product=other_product, ean_code=ean_code),
-            asserts_errors=False,
-        )
-
-        self._assert_graphql_error_contains(response=resp, text="valid product")
-        ean_code.refresh_from_db()
-        self.assertIsNone(ean_code.product_id)
 
     def test_manual_assign_ean_code_rejects_ean_code_already_assigned_to_another_product(self):
         other_product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)

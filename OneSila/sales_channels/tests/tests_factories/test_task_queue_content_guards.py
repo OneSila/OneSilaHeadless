@@ -183,7 +183,7 @@ class MagentoContentGuardTests(DisableMagentoAndWooConnectionsMixin, TestCase):
         default_translation = ProductTranslation.objects.get(
             product=product,
             sales_channel=None,
-            language="en",
+            language="en-gb",
         )
         default_translation.description = "Default Desc Updated"
         default_translation.save()

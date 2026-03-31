@@ -5,7 +5,7 @@ from llm.factories.bulk_content import BulkContentLLM
 from llm.flows.bulk_generate_content import BulkGenerateContentFlow
 from notifications.helpers import build_product_tab_url
 from notifications.models import Notification
-from products.models import ProductTranslation, ProductTranslationBulletPoint, SimpleProduct
+from products.models import ProductTranslation, ProductTranslationBulletPoint, SimpleProduct, Product
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.integrations.ebay.models import EbaySalesChannel
 
@@ -227,6 +227,7 @@ class BulkContentGenerationFlowTestCase(TestCase):
             user=self.user,
             type=Notification.TYPE_AI_BULK_GENERATE,
         )
-        self.assertEqual(notification.url, build_product_tab_url(product=self.product, tab="productContent"))
+        product_obj = Product.objects.get(id=self.product.id)
+        self.assertEqual(notification.url, build_product_tab_url(product=product_obj, tab="productContent"))
         self.assertEqual(notification.metadata["product_id"], self.product.id)
         mock_refresh_subscription_receiver.assert_called_once_with(self.user)
