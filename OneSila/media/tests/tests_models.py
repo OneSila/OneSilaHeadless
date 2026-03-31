@@ -245,7 +245,7 @@ class MediaDocumentTypeTestCase(TestCase):
                 Media.objects.filter(id=media.id).update(document_type=None)
 
     def test_document_language_defaults_to_company_language(self):
-        self.multi_tenant_company.language = "de"
+        self.multi_tenant_company.language = "de-de"
         self.multi_tenant_company.save(update_fields=["language"])
 
         media = Media.objects.create(
@@ -253,7 +253,7 @@ class MediaDocumentTypeTestCase(TestCase):
             multi_tenant_company=self.multi_tenant_company,
         )
 
-        self.assertEqual(media.document_language, "de")
+        self.assertEqual(media.document_language, "de-de")
 
     def test_document_language_keeps_explicit_value(self):
         explicit_language = next(

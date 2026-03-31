@@ -115,15 +115,15 @@ class MagentoContentGuardTests(DisableMagentoAndWooConnectionsMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_product=remote_product,
-            content_data={"en": {"name": "Old Name", "description": "Old Desc"}},
+            content_data={"en-gb": {"name": "Old Name", "description": "Old Desc"}},
         )
 
         task_runner = self._build_task(product=product)
         result = task_runner.guard(target=self._get_target(remote_product=remote_product))
         self.assertTrue(result.allowed)
         remote_content.refresh_from_db()
-        self.assertEqual(remote_content.content_data["en"]["name"], "New Name")
-        self.assertEqual(remote_content.content_data["en"]["description"], "New Desc")
+        self.assertEqual(remote_content.content_data["en-gb"]["name"], "New Name")
+        self.assertEqual(remote_content.content_data["en-gb"]["description"], "New Desc")
 
     def test_guard_allows_when_remote_missing(self):
         product = Product.objects.create(

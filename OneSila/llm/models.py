@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core import models
 from core.helpers import get_languages
+from core.locales import LANGUAGE_MAX_LENGTH
 
 
 class AbstractAiProcess(models.Model):
@@ -59,7 +60,7 @@ class BrandCustomPrompt(models.Model):
     LANGUAGES = get_languages()
 
     brand_value = models.ForeignKey('properties.PropertySelectValue', on_delete=models.CASCADE)
-    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE, null=True, blank=True)
+    language = models.CharField(max_length=LANGUAGE_MAX_LENGTH, choices=LANGUAGES, default=settings.LANGUAGE_CODE, null=True, blank=True)
     prompt = models.TextField()
 
 

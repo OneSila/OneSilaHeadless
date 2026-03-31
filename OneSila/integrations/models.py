@@ -11,6 +11,7 @@ import json
 from datetime import datetime
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
+from core.locales import LANGUAGE_MAX_LENGTH
 
 from integrations.validators import hostname_validator
 from core.managers import Manager as SharedManager
@@ -372,7 +373,7 @@ class PublicIntegrationTypeTranslation(models.SharedModel):
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     language = models.CharField(
-        max_length=7,
+        max_length=LANGUAGE_MAX_LENGTH,
         choices=settings.LANGUAGES,
         default=settings.LANGUAGE_CODE,
         db_index=True,

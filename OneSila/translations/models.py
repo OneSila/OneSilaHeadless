@@ -4,6 +4,7 @@ from core import models
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from core.helpers import get_languages
+from core.locales import LANGUAGE_MAX_LENGTH
 from django.db.models import Model as OldModel
 
 
@@ -13,7 +14,7 @@ class TranslationFieldsMixin(models.Model):
     """
     LANGUAGES = get_languages()
 
-    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE, db_index=True)
+    language = models.CharField(max_length=LANGUAGE_MAX_LENGTH, choices=LANGUAGES, default=settings.LANGUAGE_CODE, db_index=True)
 
     class Meta:
         abstract = True

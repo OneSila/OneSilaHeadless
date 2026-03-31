@@ -14,6 +14,7 @@ from imagekit.exceptions import MissingSource
 
 from core.typing import LanguageType, TimezoneType
 from core.helpers import get_languages
+from core.locales import LANGUAGE_MAX_LENGTH
 from core.managers import MultiTenantManager, MultiTenantUserLoginTokenManager
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
@@ -38,7 +39,7 @@ class MultiTenantCompany(TimeStampMixin, models.Model):
     postcode = models.CharField(max_length=100, null=True, blank=True)
     city = models.CharField(max_length=100, null=True, blank=True)
     country = models.CharField(max_length=3, choices=COUNTRY_CHOICES, null=True, blank=True)
-    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
+    language = models.CharField(max_length=LANGUAGE_MAX_LENGTH, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
     languages = models.JSONField(default=list, blank=True, help_text="List of enabled language codes for this company.")
 
     email = models.EmailField(blank=True, null=True)
@@ -137,7 +138,7 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     invitation_accepted = models.BooleanField(default=False)
 
     # Profile data:
-    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
+    language = models.CharField(max_length=LANGUAGE_MAX_LENGTH, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
     timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=timezone.get_default_timezone().key)
     mobile_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     whatsapp_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)

@@ -30,7 +30,7 @@ class RemoteProductContentHashTests(DisableMagentoAndWooConnectionsMixin, TestCa
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_product=self.remote_product,
-            content_data={"en": {"name": "Hat", "description": "Desc"}},
+            content_data={"en-gb": {"name": "Hat", "description": "Desc"}},
         )
         self.assertIsNotNone(content.content_data_hash)
 
@@ -40,15 +40,15 @@ class RemoteProductContentHashTests(DisableMagentoAndWooConnectionsMixin, TestCa
             sales_channel=self.sales_channel,
             remote_product=self.remote_product,
             content_data={
-                "en": {"name": "Hat", "description": "Desc"},
-                "fr": {"name": "Chapeau", "description": "Desc FR"},
+                "en-gb": {"name": "Hat", "description": "Desc"},
+                "fr-fr": {"name": "Chapeau", "description": "Desc FR"},
             },
         )
         initial_hash = content.content_data_hash
 
         content.content_data = {
-            "fr": {"name": "Chapeau", "description": "Desc FR"},
-            "en": {"name": "Hat", "description": "Desc"},
+            "fr-fr": {"name": "Chapeau", "description": "Desc FR"},
+            "en-gb": {"name": "Hat", "description": "Desc"},
         }
         content.save()
 
@@ -59,11 +59,11 @@ class RemoteProductContentHashTests(DisableMagentoAndWooConnectionsMixin, TestCa
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_product=self.remote_product,
-            content_data={"en": {"name": "Hat", "description": "Desc"}},
+            content_data={"en-gb": {"name": "Hat", "description": "Desc"}},
         )
         initial_hash = content.content_data_hash
 
-        content.content_data = {"en": {"name": "Hat", "description": "Updated"}}
+        content.content_data = {"en-gb": {"name": "Hat", "description": "Updated"}}
         content.save()
 
         self.assertNotEqual(content.content_data_hash, initial_hash)
