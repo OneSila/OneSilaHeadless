@@ -36,7 +36,7 @@ class MagentoContentGuardTests(DisableMagentoAndWooConnectionsMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             sales_channel_view=self.sales_channel_view,
-            local_instance="en",
+            local_instance="en-gb",
             remote_code="en_US",
         )
 
@@ -58,7 +58,7 @@ class MagentoContentGuardTests(DisableMagentoAndWooConnectionsMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=product,
             sales_channel=sales_channel,
-            language="en",
+            language="en-gb",
             name=name,
             description=description,
         )

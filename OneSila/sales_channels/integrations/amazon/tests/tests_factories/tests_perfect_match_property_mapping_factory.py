@@ -35,7 +35,7 @@ class AmazonPerfectMatchPropertyMappingFactoryTest(DisableWooCommerceSignalsMixi
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
-            local_instance="en",
+            local_instance="en-gb",
             remote_code="en_US",
             remote_id="LANG",
         )
@@ -49,7 +49,7 @@ class AmazonPerfectMatchPropertyMappingFactoryTest(DisableWooCommerceSignalsMixi
         PropertyTranslation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             property=matching_property,
-            language="en",
+            language="en-gb",
             name="Color",
         )
 

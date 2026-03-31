@@ -29,7 +29,7 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
         )
 
     @patch("sales_channels.integrations.mirakl.factories.feeds.new_product_report.MiraklNewProductReportSyncFactory.run")
-    def test_run_leaves_clean_products_pending_when_mirakl_has_error_report(self, new_product_report_mock):
+    def test_run_completes_clean_products_when_mirakl_has_error_report(self, new_product_report_mock):
         submitted_feed = baker.make(
             MiraklSalesChannelFeed,
             sales_channel=self.sales_channel,
@@ -155,7 +155,7 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
         rejected_remote_product.refresh_from_db()
         self.assertEqual(clean_feed_item.status, MiraklSalesChannelFeedItem.STATUS_PENDING)
         self.assertEqual(rejected_feed_item.status, MiraklSalesChannelFeedItem.STATUS_FAILED)
-        self.assertEqual(clean_remote_product.status, MiraklProduct.STATUS_PENDING_APPROVAL)
+        self.assertEqual(clean_remote_product.status, MiraklProduct.STATUS_COMPLETED)
         self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
         new_product_report_mock.assert_called_once()
 

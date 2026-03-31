@@ -71,8 +71,9 @@ class MiraklProductFeedBuildFactoryTests(DisableMiraklConnectionMixin, TestCase)
             payload_data=[{"sku": "SKU-1"}],
         )
 
-    def test_run_returns_none_and_resets_feed_to_gathering_when_group_has_active_feed(self):
+    def test_run_returns_none_and_deletes_feed_when_group_has_active_feed(self):
         ready_feed = self._make_ready_feed()
+        ready_feed_id = ready_feed.id
         baker.make(
             MiraklSalesChannelFeed,
             multi_tenant_company=self.multi_tenant_company,
@@ -86,9 +87,8 @@ class MiraklProductFeedBuildFactoryTests(DisableMiraklConnectionMixin, TestCase)
 
         result = MiraklProductFeedBuildFactory(feed=ready_feed).run()
 
-        ready_feed.refresh_from_db()
         self.assertIsNone(result)
-        self.assertEqual(ready_feed.status, MiraklSalesChannelFeed.STATUS_GATHERING_PRODUCTS)
+        self.assertFalse(MiraklSalesChannelFeed.objects.filter(id=ready_feed_id).exists())
 
     def test_run_deletes_feed_without_rows(self):
         ready_feed = self._make_ready_feed()

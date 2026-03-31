@@ -298,5 +298,4 @@ class MiraklMutationTests(
             },
         )
 
-        self.assertIsNotNone(response.errors)
-        self.assertIn("representation type 'property'", response.errors[0].message)
+        self.assertIn("representation type 'property'", response.errors[0]['message'])

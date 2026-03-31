@@ -329,7 +329,7 @@ class AmazonSelectValueTranslationReceiverTest(TestCase):
             sales_channel=self.sales_channel,
             sales_channel_view=self.marketplace,
             remote_code="en_US",
-            local_instance="en",
+            local_instance="en-gb",
         )
 
         val = AmazonPropertySelectValue.objects.create(

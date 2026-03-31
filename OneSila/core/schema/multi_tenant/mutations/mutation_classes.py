@@ -190,7 +190,6 @@ class EnableUserMutation(MultiTenantUserStatusMutation):
 
 class UpdateOnboardingStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
     def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
-        from core.factories.multi_tenant import CreateInternalCompanyFromOwnerCompany
 
         user = self.get_current_user(info)
         status = data['onboarding_status']
@@ -201,10 +200,6 @@ class UpdateOnboardingStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
         with DjangoOptimizerExtension.disabled():
             user.onboarding_status = status
             user.save()
-
-            if status == MultiTenantUser.ADD_CURRENCY:
-                fac = CreateInternalCompanyFromOwnerCompany(user.multi_tenant_company)
-                fac.run()
 
             return MultiTenantUser.objects.get(id=user.id)
 

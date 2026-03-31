@@ -770,7 +770,6 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         local_brand_property, _ = Property.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             internal_name="brand",
-            defaults={"type": Property.TYPES.TEXT},
         )
 
         remote_property = factory._upsert_property(
@@ -780,7 +779,7 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
                 "hierarchy_code": "",
                 "required": False,
                 "variant": False,
-                "type": "TEXT",
+                "type": "SELECT",
                 "roles": [{"type": "BRAND"}],
                 "channels": [{"code": "WEB"}],
             }

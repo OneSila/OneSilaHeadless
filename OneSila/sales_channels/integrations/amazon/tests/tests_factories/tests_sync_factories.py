@@ -67,7 +67,7 @@ class AmazonSyncFactoriesTest(TestCase):
             sales_channel=self.sales_channel,
             sales_channel_view=self.marketplace_en,
             remote_code="en",
-            local_instance="en",
+            local_instance="en-gb",
         )
         AmazonRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,
