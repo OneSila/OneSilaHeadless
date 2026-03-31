@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from core.schema.core.helpers import get_current_user
 from core.schema.core.types.types import relay, type, field, lazy, Annotated
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from notifications.models import (
@@ -13,12 +14,20 @@ if TYPE_CHECKING:
     from core.schema.multi_tenant.types.types import MultiTenantUserType
 
 
+
 @type(
     Notification,
     pagination=True,
     fields=["id", "type", "title", "message", "url", "opened", "metadata", "created_at", "updated_at"],
 )
 class NotificationType(relay.Node, GetQuerysetMultiTenantMixin):
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        user = get_current_user(info)
+        if not user:
+            return queryset.none()
+        queryset = queryset.filter(user=user)
+        return super().get_queryset(queryset, info, **kwargs)
     pass
 
 
