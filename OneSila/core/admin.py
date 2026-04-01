@@ -35,7 +35,7 @@ class MultiTenantUserAdmin(BaseUserAdmin):
 @django_admin.register(MultiTenantCompany)
 class MultiTenantCompanyAdmin(django_admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
-    list_display = ('name', 'active')
+    list_display = ('name', 'active', 'created_at')
     ordering = ('name',)
     search_fields = ('name',)
     list_filter = ('active',)
