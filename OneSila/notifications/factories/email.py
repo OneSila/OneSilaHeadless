@@ -28,10 +28,12 @@ class SendBrandedEmail:
 
     def run(self):
         activate(self.user.language)
-        self.set_template_variables()
-        self.compile_html_body()
-        self.send_email()
-        deactivate()
+        try:
+            self.set_template_variables()
+            self.compile_html_body()
+            self.send_email()
+        finally:
+            deactivate()
 
 
 class SendWelcomeEmailFactory(SendBrandedEmail):
@@ -104,7 +106,8 @@ class SendImportReportEmailFactory:
 
     def run(self):
         activate(self.language)
-        html_body = render_to_string(self.template_path, self.context)
-        send_branded_mail(self.subject, html_body, self.email)
-        deactivate()
-
+        try:
+            html_body = render_to_string(self.template_path, self.context)
+            send_branded_mail(self.subject, html_body, self.email)
+        finally:
+            deactivate()

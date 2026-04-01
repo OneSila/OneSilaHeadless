@@ -235,6 +235,42 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         ):
             builder.build()
 
+    def test_create_quantity_uses_starting_stock_when_remote_sku_missing(self):
+        self.sales_channel.starting_stock = 7
+        self.sales_channel.save(update_fields=["starting_stock"])
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, _ = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+            action=SalesChannelFeedItem.ACTION_UPDATE,
+        )
+        builder.remote_product.remote_sku = ""
+
+        self.assertEqual(builder._resolve_create_quantity(), "7")
+
+    def test_create_quantity_is_blank_once_remote_sku_exists(self):
+        self.sales_channel.starting_stock = 7
+        self.sales_channel.save(update_fields=["starting_stock"])
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, _ = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+            action=SalesChannelFeedItem.ACTION_CREATE,
+        )
+        builder.remote_product.remote_sku = "MKP-REMOTE-1"
+
+        self.assertEqual(builder._resolve_create_quantity(), "")
+
     def test_required_mapped_field_for_variation_mentions_variation_product(self):
         local_property = baker.make(
             Property,

@@ -120,7 +120,7 @@ class AmazonProductTestMixin:
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
             remote_code="en",
-            local_instance="en"
+            local_instance="en-gb"
         )
         self.product = baker.make(
             "products.Product",

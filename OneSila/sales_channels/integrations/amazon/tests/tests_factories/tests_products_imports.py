@@ -269,7 +269,7 @@ class AmazonProductsImportProcessorDocumentsTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
-            local_instance="en",
+            local_instance="en-gb",
             remote_code="en_GB",
         )
         self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
@@ -356,7 +356,7 @@ class AmazonProductsImportProcessorDocumentsTest(TestCase):
         )
         for document in documents:
             self.assertTrue(document["document_url"].startswith("https://"))
-            self.assertEqual(document["document_language"], "en")
+            self.assertEqual(document["document_language"], "en-gb")
 
     def test_handle_documents_creates_amazon_associations_without_remote_document(self):
         product = baker.make(

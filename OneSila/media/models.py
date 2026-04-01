@@ -22,6 +22,7 @@ from .managers import (
     MediaManager,
     MediaProductThroughManager,
 )
+from core.locales import LANGUAGE_MAX_LENGTH
 
 
 import os
@@ -183,7 +184,7 @@ class Media(models.Model):
         blank=True,
     )
     document_language = models.CharField(
-        max_length=7,
+        max_length=LANGUAGE_MAX_LENGTH,
         choices=MultiTenantCompany.LANGUAGE_CHOICES,
         null=True,
         blank=True,

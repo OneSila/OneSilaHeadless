@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from core import models
 from polymorphic.models import PolymorphicModel
 from core.helpers import get_languages
+from core.locales import LANGUAGE_MAX_LENGTH
 from integrations.models import Integration
 from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.managers import SalesChannelViewAssignManager, SalesChannelViewManager
@@ -430,7 +431,7 @@ class SalesChannelContentTemplate(models.Model):
     )
 
     language = models.CharField(
-        max_length=7,
+        max_length=LANGUAGE_MAX_LENGTH,
         choices=get_languages(),
         help_text="Language code this template targets.",
     )
@@ -462,7 +463,7 @@ class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     LANGUAGE_CHOICES = get_languages()
 
     local_instance = models.CharField(
-        max_length=7,
+        max_length=LANGUAGE_MAX_LENGTH,
         choices=LANGUAGE_CHOICES,
         null=True,
         blank=True,

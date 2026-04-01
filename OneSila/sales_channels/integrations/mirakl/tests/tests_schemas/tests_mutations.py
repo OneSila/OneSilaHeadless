@@ -5,7 +5,12 @@ from model_bakery import baker
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from properties.models import Property, PropertySelectValue, PropertySelectValueTranslation
-from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
+from sales_channels.integrations.mirakl.models import (
+    MiraklProperty,
+    MiraklPropertySelectValue,
+    MiraklSalesChannel,
+    MiraklSalesChannelImport,
+)
 from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
 
@@ -57,6 +62,27 @@ mutation ($data: MiraklSalesChannelImportInput!) {
       status
       type
     }
+  }
+}
+"""
+
+DUPLICATE_SALES_CHANNEL_SELECT_VALUE_MAPPING_MUTATION = """
+mutation (
+  $salesChannel: SalesChannelPartialInput!,
+  $remotePropertySelectValue: RemotePropertySelectValuePartialInput!,
+  $localInstance: PropertySelectValuePartialInput!
+) {
+  duplicateSalesChannelSelectValueMapping(
+    salesChannel: $salesChannel,
+    remotePropertySelectValue: $remotePropertySelectValue,
+    localInstance: $localInstance
+  ) {
+    id
+    remoteId
+    code
+    value
+    localInstance { id }
+    remoteProperty { id }
   }
 }
 """
@@ -156,3 +182,120 @@ class MiraklMutationTests(
         )
         created_import = MiraklSalesChannelImport.objects.latest("id")
         self.assertEqual(created_import.type, MiraklSalesChannelImport.TYPE_PRODUCTS)
+
+    def test_duplicate_mirakl_property_select_value_for_local_instance(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        first_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        second_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_property,
+            representation_type=MiraklProperty.REPRESENTATION_PROPERTY,
+            code="occasion",
+            type=Property.TYPES.SELECT,
+        )
+        source = baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
+            local_instance=first_local_value,
+            code="CASUAL",
+            value="Casual",
+            value_list_code="occasion",
+            value_list_label="Occasion",
+            raw_data={"code": "CASUAL"},
+        )
+
+        response = self.strawberry_test_client(
+            query=DUPLICATE_SALES_CHANNEL_SELECT_VALUE_MAPPING_MUTATION,
+            variables={
+                "salesChannel": {
+                    "id": self.to_global_id(self.sales_channel),
+                },
+                "remotePropertySelectValue": {
+                    "id": self.to_global_id(source),
+                },
+                "localInstance": {
+                    "id": self.to_global_id(second_local_value),
+                },
+            },
+        )
+
+        self.assertIsNone(response.errors)
+        payload = response.data["duplicateSalesChannelSelectValueMapping"]
+        duplicate = MiraklPropertySelectValue.objects.exclude(id=source.id).get()
+
+        self.assertEqual(payload["id"], self.to_global_id(duplicate))
+        self.assertEqual(payload["remoteId"], source.remote_id)
+        self.assertEqual(payload["code"], source.code)
+        self.assertEqual(payload["value"], source.value)
+        self.assertEqual(duplicate.local_instance, second_local_value)
+        self.assertEqual(duplicate.remote_property, remote_property)
+        self.assertEqual(duplicate.raw_data, source.raw_data)
+
+    def test_duplicate_mirakl_property_select_value_rejects_non_property_representation(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        first_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        second_local_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_property,
+            representation_type=MiraklProperty.REPRESENTATION_DEFAULT_VALUE,
+            code="occasion",
+            type=Property.TYPES.SELECT,
+        )
+        source = baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
+            local_instance=first_local_value,
+            code="CASUAL",
+            value="Casual",
+        )
+
+        response = self.strawberry_test_client(
+            query=DUPLICATE_SALES_CHANNEL_SELECT_VALUE_MAPPING_MUTATION,
+            variables={
+                "salesChannel": {
+                    "id": self.to_global_id(self.sales_channel),
+                },
+                "remotePropertySelectValue": {
+                    "id": self.to_global_id(source),
+                },
+                "localInstance": {
+                    "id": self.to_global_id(second_local_value),
+                },
+            },
+        )
+
+        self.assertIn("representation type 'property'", response.errors[0]['message'])

@@ -27,6 +27,7 @@ class BulkGenerateContentFlow:
         sales_channel_languages: dict[int | str, list[str]],
         override: bool,
         preview: bool,
+        current_user=None,
         additional_informations: str | None = None,
         debug: bool = True,
     ):
@@ -49,6 +50,7 @@ class BulkGenerateContentFlow:
                 self.sales_channel_defaults[channel_key] = channel_default
         self.override = override
         self.preview = preview
+        self.current_user = current_user
         self.additional_informations = additional_informations
         self.debug = debug
         if self.default_channel_languages:
@@ -438,4 +440,28 @@ class BulkGenerateContentFlow:
             return [
                 {integration_id: payload} for integration_id, payload in self.preview_payload.items()
             ]
+
+        self._create_notifications()
         return {}
+
+    def _create_notifications(self) -> None:
+        if not self.current_user:
+            return
+
+        from notifications.helpers import build_product_tab_url, create_user_notification
+        from notifications.models import Notification
+
+        for product in self.products:
+            create_user_notification(
+                user=self.current_user,
+                notification_type=Notification.TYPE_AI_BULK_GENERATE,
+                title="AI content generation finished",
+                message=f"Generated content for {product.sku}.",
+                url=build_product_tab_url(product=product, tab="productContent"),
+                actor=self.current_user,
+                multi_tenant_company=self.multi_tenant_company,
+                metadata={
+                    "product_id": product.id,
+                    "product_global_id": product.global_id,
+                },
+            )

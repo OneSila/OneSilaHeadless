@@ -598,7 +598,7 @@ class SheinProductBaseFactory(
         if self.skip_checks:
             return True
         try:
-            response = self.shein_post(path=self.publish_permission_path)
+            response = self.shein_get(path=self.publish_permission_path)
             data = response.json() if hasattr(response, "json") else {}
             info = data.get("info") if isinstance(data, dict) else {}
             if isinstance(info, dict):

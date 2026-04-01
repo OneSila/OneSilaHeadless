@@ -37,7 +37,7 @@ class TranslationsQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             for code, name in TranslationFieldsMixin.LANGUAGES if code in multi_company_languages
         ]
 
-        default_language_code = "en"
+        default_language_code = "en-gb"
         default_language_name = dict(TranslationFieldsMixin.LANGUAGES).get(default_language_code, "Unknown")
         expected_default_language = TranslationLanguageType(code=default_language_code, name=default_language_name)
 

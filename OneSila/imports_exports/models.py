@@ -10,6 +10,7 @@ import mimetypes
 from django.core.exceptions import ValidationError
 
 from core.helpers import get_languages
+from core.locales import LANGUAGE_MAX_LENGTH
 from core.upload_paths import tenant_upload_to
 
 
@@ -270,7 +271,7 @@ class TypedImport(Import):
     )
 
     language = models.CharField(
-        max_length=7,
+        max_length=LANGUAGE_MAX_LENGTH,
         choices=LANGUAGE_CHOICES,
         null=True,
         blank=True,

@@ -23,13 +23,21 @@ DEFAULT_AES_IV = "space-station-default-iv"
 
 SHEIN_LANGUAGE_HEADER_MAP: dict[str, str] = {
     "en": "en",
+    "en-gb": "en",
+    "en-us": "en",
     "fr": "fr",
+    "fr-fr": "fr",
     "es": "es",
+    "es-es": "es",
     "de": "de",
+    "de-de": "de",
     "zh-hans": "zh-cn",
+    "zh-cn": "zh-cn",
     "th": "th",
+    "th-th": "th",
     "pt": "pt-br",
     "pt-br": "pt-br",
+    "pt-pt": "pt-br",
 }
 
 
@@ -39,8 +47,8 @@ def map_language_for_header(language_code: Optional[str]) -> str:
     if not language_code:
         return DEFAULT_LANGUAGE
 
-    normalised = language_code.lower()
-    return SHEIN_LANGUAGE_HEADER_MAP.get(normalised, DEFAULT_LANGUAGE)
+    normalized = str(language_code).strip().lower()
+    return SHEIN_LANGUAGE_HEADER_MAP.get(normalized, DEFAULT_LANGUAGE)
 
 
 # ---------------------------------------------------------------------------

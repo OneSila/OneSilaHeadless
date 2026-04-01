@@ -7,6 +7,8 @@ from llm.factories.translations import StringTranslationLLM
 from llm.flows.generate_ai_content import AIGenerateContentFlow
 from llm.flows.translate_ai_content import AITranslateContentFlow, BulkAiTranslateContentFlow
 from llm.schema.types.input import ContentAiGenerateType
+from notifications.helpers import build_product_tab_url
+from notifications.models import Notification
 from products.models import ProductTranslation, SimpleProduct
 
 
@@ -68,6 +70,26 @@ class SubtitleAiFlowsTestCase(TestCase):
         translation = ProductTranslation.objects.get(product=self.product, language="nl")
         self.assertEqual(translation.subtitle, "translated-Stay dry in style")
         self.assertEqual(flow.total_points, 4)
+
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_bulk_translation_creates_product_notification(self, mock_refresh_subscription_receiver):
+        with patch.object(StringTranslationLLM, "translate", new=_fake_translate):
+            flow = BulkAiTranslateContentFlow(
+                multi_tenant_company=self.multi_tenant_company,
+                from_language_code=self.multi_tenant_company.language,
+                to_language_codes=["nl"],
+                products=SimpleProduct.objects.filter(id=self.product.id),
+                current_user=self.user,
+            )
+            flow.run()
+
+        notification = Notification.objects.get(
+            user=self.user,
+            type=Notification.TYPE_AI_BULK_TRANSLATE,
+        )
+        self.assertEqual(notification.url, build_product_tab_url(product=self.product, tab="productContent"))
+        self.assertEqual(notification.metadata["product_id"], self.product.id)
+        mock_refresh_subscription_receiver.assert_called_once_with(self.user)
 
     def test_ai_generate_flow_uses_subtitle_factory(self):
         with patch.object(SubtitleLLM, "generate_response", new=_fake_generate):

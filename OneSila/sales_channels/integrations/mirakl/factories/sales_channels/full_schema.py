@@ -603,6 +603,8 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             .order_by("id")
             .first()
         )
+        remote_property.original_type = Property.TYPES.SELECT
+        remote_property.type = Property.TYPES.SELECT
 
     def _item_has_role_type(self, *, item: dict[str, Any], role_type: str) -> bool:
         normalized_role_type = self._clean_string(role_type).upper()

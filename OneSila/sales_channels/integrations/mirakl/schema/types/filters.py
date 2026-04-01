@@ -131,7 +131,9 @@ class MiraklPropertyFilter(
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
+    allows_unmapped_values: auto
     code: auto
+    default_value: auto
     type: auto
     is_common: auto
     representation_type: auto

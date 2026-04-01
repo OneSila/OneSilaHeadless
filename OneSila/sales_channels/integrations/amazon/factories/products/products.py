@@ -284,6 +284,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         attrs = {}
         language_tag = self.view.language_tag if self.view else None
         marketplace_id = self.view.remote_id if self.view else None
+
         if item_name:
             attrs["item_name"] = [{
                 "value": item_name,

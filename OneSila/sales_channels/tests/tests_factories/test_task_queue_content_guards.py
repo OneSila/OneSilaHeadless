@@ -36,7 +36,7 @@ class MagentoContentGuardTests(DisableMagentoAndWooConnectionsMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             sales_channel_view=self.sales_channel_view,
-            local_instance="en",
+            local_instance="en-gb",
             remote_code="en_US",
         )
 
@@ -58,7 +58,7 @@ class MagentoContentGuardTests(DisableMagentoAndWooConnectionsMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=product,
             sales_channel=sales_channel,
-            language="en",
+            language="en-gb",
             name=name,
             description=description,
         )
@@ -115,15 +115,15 @@ class MagentoContentGuardTests(DisableMagentoAndWooConnectionsMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_product=remote_product,
-            content_data={"en": {"name": "Old Name", "description": "Old Desc"}},
+            content_data={"en-gb": {"name": "Old Name", "description": "Old Desc"}},
         )
 
         task_runner = self._build_task(product=product)
         result = task_runner.guard(target=self._get_target(remote_product=remote_product))
         self.assertTrue(result.allowed)
         remote_content.refresh_from_db()
-        self.assertEqual(remote_content.content_data["en"]["name"], "New Name")
-        self.assertEqual(remote_content.content_data["en"]["description"], "New Desc")
+        self.assertEqual(remote_content.content_data["en-gb"]["name"], "New Name")
+        self.assertEqual(remote_content.content_data["en-gb"]["description"], "New Desc")
 
     def test_guard_allows_when_remote_missing(self):
         product = Product.objects.create(
@@ -183,7 +183,7 @@ class MagentoContentGuardTests(DisableMagentoAndWooConnectionsMixin, TestCase):
         default_translation = ProductTranslation.objects.get(
             product=product,
             sales_channel=None,
-            language="en",
+            language="en-gb",
         )
         default_translation.description = "Default Desc Updated"
         default_translation.save()

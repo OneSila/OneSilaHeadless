@@ -52,6 +52,15 @@ class MultiTenantUserType(relay.Node):
     def full_name(self, info) -> str | None:
         return self.full_name
 
+    @field()
+    def notifications(self, info) -> List[Annotated['NotificationType', lazy("notifications.schema.types.types")]]:
+        from notifications.models import Notification
+
+        return Notification.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            user=self,
+        ).order_by("-created_at", "-id")
+
 
 @type(MultiTenantCompany, fields='__all__')
 class MultiTenantCompanyType(relay.Node):

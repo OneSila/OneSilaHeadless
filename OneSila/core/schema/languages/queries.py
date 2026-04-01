@@ -16,13 +16,24 @@ from core.schema.core.helpers import get_multi_tenant_company, get_current_user
 from core.schema.languages.types.types import ContentViewType, LanguageType
 
 
+def _build_language_type(*, code: str) -> LanguageType:
+    language_info = get_language_info(code)
+    return LanguageType(
+        bidi=language_info["bidi"],
+        code=code,
+        name=language_info["name"],
+        name_local=language_info["name_local"],
+        name_translated=language_info["name_translated"],
+    )
+
+
 def get_languages(info) -> List[LanguageType]:
     user = get_current_user(info)
 
     if not user.is_anonymous:
         activate(user.language)
 
-    languages = [LanguageType(**get_language_info(code)) for code, _ in settings.LANGUAGES]
+    languages = [_build_language_type(code=code) for code, _ in settings.LANGUAGES]
 
     if not user.is_anonymous:
         deactivate()
@@ -36,7 +47,7 @@ def get_interface_languages(info) -> List[LanguageType]:
     if not user.is_anonymous:
         activate(user.language)
 
-    languages = [LanguageType(**get_language_info(code)) for code, _ in settings.INTERFACE_LANGUAGES]
+    languages = [_build_language_type(code=code) for code, _ in settings.INTERFACE_LANGUAGES]
 
     if not user.is_anonymous:
         deactivate()
@@ -45,13 +56,13 @@ def get_interface_languages(info) -> List[LanguageType]:
 
 
 def get_default_language() -> LanguageType:
-    return LanguageType(**get_language_info(settings.LANGUAGE_CODE))
+    return _build_language_type(code=settings.LANGUAGE_CODE)
 
 
 def get_current_user_language(info) -> LanguageType:
     user = get_current_user(info)
     activate(user.language)
-    lang = LanguageType(**get_language_info(user.language))
+    lang = _build_language_type(code=user.language)
     deactivate()
     return lang
 
@@ -64,7 +75,7 @@ def get_company_languages(info) -> List[LanguageType]:
     allowed_codes = set(multi_tenant_company.languages or [multi_tenant_company.language])
 
     languages = [
-        LanguageType(**get_language_info(code))
+        _build_language_type(code=code)
         for code, _ in settings.LANGUAGES
         if code in allowed_codes
     ]

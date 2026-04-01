@@ -78,7 +78,8 @@ class MiraklReverseProductMapper:
             normalized_name = self._normalize_lookup_token(value=item.name)
             if normalized_name and normalized_name not in self._product_type_by_name:
                 self._product_type_by_name[normalized_name] = item
-        self._select_value_lookup = self._build_select_value_lookup()
+        self._select_value_lookup: dict[tuple[int, str], MiraklPropertySelectValue] = {}
+        self._loaded_select_value_property_ids: set[int] = set()
         self._document_type_by_remote_id = {
             str(item.remote_id or "").strip(): item
             for item in MiraklDocumentType.objects.filter(sales_channel=sales_channel)
@@ -94,6 +95,7 @@ class MiraklReverseProductMapper:
         offer_data: dict[str, Any] | None = None,
     ) -> MiraklMappedRow:
         offer_data = dict(offer_data or {})
+        self._ensure_select_value_lookup_for_headers(row_fields=row_fields)
 
         shop_sku = self._resolve_required_product_sku(row_fields=row_fields)
         parent_sku = self._resolve_optional_representation(
@@ -671,16 +673,44 @@ class MiraklReverseProductMapper:
     def _normalize_lookup_token(self, *, value: Any) -> str:
         return str(value or "").strip().lower()
 
-    def _build_select_value_lookup(self) -> dict[tuple[int, str], MiraklPropertySelectValue]:
+    def _ensure_select_value_lookup_for_headers(self, *, row_fields: dict[str, str]) -> None:
+        relevant_property_ids = {
+            remote_property.id
+            for code in row_fields.keys()
+            if (remote_property := self._property_by_code.get(code)) is not None
+        }
+        property_ids_to_load = relevant_property_ids - self._loaded_select_value_property_ids
+        if not property_ids_to_load:
+            return
+
+        self._loaded_select_value_property_ids.update(property_ids_to_load)
+        for key, item in self._build_select_value_lookup(
+            remote_property_ids=property_ids_to_load,
+        ).items():
+            if key not in self._select_value_lookup:
+                self._select_value_lookup[key] = item
+
+    def _build_select_value_lookup(
+        self,
+        *,
+        remote_property_ids: set[int] | None = None,
+    ) -> dict[tuple[int, str], MiraklPropertySelectValue]:
         lookup: dict[tuple[int, str], MiraklPropertySelectValue] = {}
-        queryset = MiraklPropertySelectValue.objects.filter(sales_channel=self.sales_channel).select_related(
+        queryset = MiraklPropertySelectValue.objects.filter(sales_channel=self.sales_channel)
+        if remote_property_ids is not None:
+            if not remote_property_ids:
+                return lookup
+            queryset = queryset.filter(remote_property_id__in=remote_property_ids)
+
+        queryset = queryset.select_related(
             "local_instance",
             "remote_property",
-        )
+        ).order_by("id")
         for item in queryset:
             candidates = [item.value, item.code]
             for candidate in candidates:
                 normalized = str(candidate or "").strip().lower()
-                if normalized:
-                    lookup[(item.remote_property_id, normalized)] = item
+                key = (item.remote_property_id, normalized)
+                if normalized and key not in lookup:
+                    lookup[key] = item
         return lookup

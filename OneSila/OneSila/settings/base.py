@@ -17,6 +17,11 @@ import os
 import sys
 
 from core.exceptions import ValidationError
+from core.locales import (
+    CANONICAL_LANGUAGES,
+    DEFAULT_LANGUAGE_CODE,
+    INTERFACE_LANGUAGES as CANONICAL_INTERFACE_LANGUAGES,
+)
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.strawberry import StrawberryIntegration
@@ -194,54 +199,12 @@ LOCALE_PATHS = (
     os.path.join(BASE_DIR, 'locale'),
 )
 
-LANGUAGE_CODE = 'en'
+LANGUAGE_CODE = DEFAULT_LANGUAGE_CODE
 
 # the languages the interface is translated on
-INTERFACE_LANGUAGES = (
-    ('en', _('English')),
-    ('nl', _('Dutch')),
-)
+INTERFACE_LANGUAGES = CANONICAL_INTERFACE_LANGUAGES
 
-LANGUAGES = (
-    ('en', _('English')),
-    ('fr', _('French')),
-    ('nl', _('Dutch')),
-    ('de', _('German')),
-    ('it', _('Italian')),
-    ('es', _('Spanish')),
-    ('pt', _('Portuguese')),
-    ('pl', _('Polish')),
-    ('ro', _('Romanian')),
-    ('bg', _('Bulgarian')),
-    ('hr', _('Croatian')),
-    ('cs', _('Czech')),
-    ('da', _('Danish')),
-    ('et', _('Estonian')),
-    ('fi', _('Finnish')),
-    ('el', _('Greek')),
-    ('hu', _('Hungarian')),
-    ('lv', _('Latvian')),
-    ('lt', _('Lithuanian')),
-    ('sk', _('Slovak')),
-    ('sl', _('Slovenian')),
-    ('sv', _('Swedish')),
-    ('th', _('Thai')),
-    ('ja', _('Japanese')),
-    ('zh-hans', _('Chinese (Simplified)')),
-    ('hi', _('Hindi')),
-    ('pt-br', _('Portuguese (Brazil)')),
-    ('ru', _('Russian')),
-    ('af', _('Afrikaans')),
-    ('ar', _('Arabic')),
-    ('he', _('Hebrew')),
-    ('tr', _('Turkish')),
-    ('id', _('Indonesian')),
-    ('ko', _('Korean')),
-    ('ms', _('Malay')),
-    ('vi', _('Vietnamese')),
-    ('fa', _('Persian')),
-    ('ur', _('Urdu')),
-)
+LANGUAGES = CANONICAL_LANGUAGES
 
 
 TIME_ZONE = 'Europe/London'

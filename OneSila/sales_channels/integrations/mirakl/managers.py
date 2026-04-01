@@ -1,3 +1,6 @@
+from copy import deepcopy
+
+from django.core.exceptions import ValidationError
 from django.db.models import BooleanField, Case, Q, Value, When
 from polymorphic.managers import PolymorphicManager, PolymorphicQuerySet
 
@@ -90,3 +93,59 @@ class MiraklProductTypeManager(_MappingManagerMixin, MultiTenantManager):
 
 class MiraklPropertySelectValueManager(_MappingManagerMixin, PolymorphicManager, MultiTenantManager):
     queryset_class = MiraklPropertySelectValueQuerySet
+
+    def duplicate_for_local_instance(self, *, source, local_instance):
+        from sales_channels.integrations.mirakl.models import MiraklProperty
+
+        if source is None:
+            raise ValidationError("Source Mirakl property select value is required.")
+
+        if local_instance is None:
+            raise ValidationError("Target local property select value is required.")
+
+        remote_property = getattr(source, "remote_property", None)
+        if remote_property is None:
+            raise ValidationError("Source Mirakl property select value has no remote property.")
+
+        remote_property = remote_property.get_real_instance()
+        if remote_property.representation_type != MiraklProperty.REPRESENTATION_PROPERTY:
+            raise ValidationError("Only Mirakl properties with representation type 'property' can be duplicated.")
+
+        if not remote_property.local_instance_id:
+            raise ValidationError("Mirakl property must be mapped to a local property before duplicating values.")
+
+        if getattr(local_instance, "property_id", None) != remote_property.local_instance_id:
+            raise ValidationError("Target local property select value must belong to the mapped local property.")
+
+        if not source.local_instance_id:
+            raise ValidationError("Source Mirakl property select value must already be mapped locally.")
+
+        if source.local_instance_id == local_instance.id:
+            raise ValidationError("Source and target local property select values must be different.")
+
+        existing = self.filter(
+            remote_property=remote_property,
+            local_instance=local_instance,
+        ).first()
+        if existing is not None:
+            raise ValidationError("A Mirakl property select value for this local value already exists.")
+
+        return self.create(
+            multi_tenant_company=source.multi_tenant_company,
+            sales_channel=source.sales_channel,
+            remote_id=source.remote_id,
+            successfully_created=source.successfully_created,
+            outdated=source.outdated,
+            outdated_since=source.outdated_since,
+            local_instance=local_instance,
+            remote_property=remote_property,
+            allow_multiple=source.allow_multiple,
+            bool_value=source.bool_value,
+            code=source.code,
+            value=source.value,
+            label_translations=deepcopy(source.label_translations),
+            value_label_translations=deepcopy(source.value_label_translations),
+            value_list_code=source.value_list_code,
+            value_list_label=source.value_list_label,
+            raw_data=deepcopy(source.raw_data),
+        )

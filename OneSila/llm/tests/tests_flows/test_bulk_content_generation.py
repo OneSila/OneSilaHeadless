@@ -3,7 +3,9 @@ from unittest.mock import patch
 from core.tests import TestCase
 from llm.factories.bulk_content import BulkContentLLM
 from llm.flows.bulk_generate_content import BulkGenerateContentFlow
-from products.models import ProductTranslation, ProductTranslationBulletPoint, SimpleProduct
+from notifications.helpers import build_product_tab_url
+from notifications.models import Notification
+from products.models import ProductTranslation, ProductTranslationBulletPoint, SimpleProduct, Product
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.integrations.ebay.models import EbaySalesChannel
 
@@ -192,3 +194,40 @@ class BulkContentGenerationFlowTestCase(TestCase):
                 preview=True,
             )
             flow.flow()
+
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_non_preview_bulk_generation_creates_product_notification(self, mock_refresh_subscription_receiver):
+        sales_channel = EbaySalesChannel.objects.create(
+            hostname="ebay-notify",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        integration_id = sales_channel.global_id
+
+        def _fake_generate(self, *, max_attempts: int = 2):
+            return {
+                integration_id: {
+                    "en": {
+                        "name": "Generated Name",
+                    }
+                }
+            }
+
+        with patch.object(BulkContentLLM, "generate_content", new=_fake_generate):
+            flow = BulkGenerateContentFlow(
+                multi_tenant_company=self.multi_tenant_company,
+                product_ids=[self.product.id],
+                sales_channel_languages={sales_channel.id: ["en"]},
+                override=True,
+                preview=False,
+                current_user=self.user,
+            )
+            flow.flow()
+
+        notification = Notification.objects.get(
+            user=self.user,
+            type=Notification.TYPE_AI_BULK_GENERATE,
+        )
+        product_obj = Product.objects.get(id=self.product.id)
+        self.assertEqual(notification.url, build_product_tab_url(product=product_obj, tab="productContent"))
+        self.assertEqual(notification.metadata["product_id"], self.product.id)
+        mock_refresh_subscription_receiver.assert_called_once_with(self.user)
