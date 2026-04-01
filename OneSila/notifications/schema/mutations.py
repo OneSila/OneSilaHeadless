@@ -38,6 +38,25 @@ class NotificationsMutation:
         return notification
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def mark_notification_as_unread(self, info: Info, *, data: OpenNotificationInput) -> NotificationType:
+        user = get_current_user(info)
+        if data.id.type_name != "NotificationType":
+            raise PermissionDenied("Invalid notification")
+
+        notification = Notification.objects.get(
+            id=data.id.node_id,
+            multi_tenant_company=user.multi_tenant_company,
+        )
+
+        if notification.user_id != user.id:
+            raise PermissionDenied("Invalid notification")
+
+        notification.opened = False
+        notification.last_update_by_multi_tenant_user = user
+        notification.save()
+        return notification
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def mark_all_notifications_as_view(self, info: Info) -> bool:
         user = get_current_user(info)
         Notification.objects.filter(

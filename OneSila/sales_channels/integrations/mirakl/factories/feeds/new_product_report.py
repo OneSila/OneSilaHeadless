@@ -223,13 +223,16 @@ class MiraklNewProductReportSyncFactory(GetMiraklAPIMixin):
         lookup: dict[str, MiraklProduct] = {}
         queryset = MiraklSalesChannelFeedItem.objects.filter(feed=self.feed).select_related("remote_product")
         for item in queryset.iterator():
-            remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
-            if remote_product is None:
+            base_remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
+            if base_remote_product is None:
                 continue
             for row in self._iter_item_rows(item=item):
                 reference = self._extract_reference(row=row)
                 if reference:
-                    lookup[reference] = remote_product
+                    lookup[reference] = self._resolve_row_remote_product(
+                        base_remote_product=base_remote_product,
+                        row=row,
+                    )
 
         ean_matches = (
             MiraklEanCode.objects.filter(remote_product__sales_channel=self.sales_channel)
@@ -255,6 +258,33 @@ class MiraklNewProductReportSyncFactory(GetMiraklAPIMixin):
                 self._normalize_header(value=key): self._stringify(value=value)
                 for key, value in row.items()
             }
+
+    def _resolve_row_remote_product(
+        self,
+        *,
+        base_remote_product: MiraklProduct,
+        row: dict[str, str],
+    ) -> MiraklProduct:
+        local_product = getattr(base_remote_product, "local_instance", None)
+        is_configurable = getattr(local_product, "is_configurable", None)
+        if local_product is None or not callable(is_configurable) or not is_configurable():
+            return base_remote_product
+
+        row_sku = self._normalize_lookup_value(value=row.get("sku") or row.get("product_id"))
+        if not row_sku or row_sku == str(getattr(local_product, "sku", "") or "").strip():
+            return base_remote_product
+
+        matched = (
+            MiraklProduct.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_parent_product=base_remote_product,
+                local_instance__sku=row_sku,
+            )
+            .select_related("local_instance")
+            .order_by("id")
+            .first()
+        )
+        return matched or base_remote_product
 
     def _resolve_remote_product(
         self,

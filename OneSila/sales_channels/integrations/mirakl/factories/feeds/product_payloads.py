@@ -15,7 +15,7 @@ from eancodes.models import EanCode
 from media.models import DocumentType, Media, MediaProductThrough
 from products.models import Product, ProductTranslation
 from properties.models import ProductProperty, Property
-from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
+from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError, SwitchedToSyncException
 from sales_channels.factories.products.products import (
     RemoteProductCreateFactory,
     RemoteProductDeleteFactory,
@@ -223,10 +223,12 @@ class MiraklProductPayloadBuilder:
         resolved_product_type: MiraklProductType | None = None
         rows: list[dict[str, str]] = []
         for product in products:
+            row_remote_product = self._resolve_row_remote_product(product=product)
             content_product = self._get_content_source_product(product=product)
             translation_candidates = list(translations.get(content_product.id, []))
             product_context = self._build_product_context(
                 product=product,
+                remote_product=row_remote_product,
                 translations=translation_candidates,
                 product_properties=list(product_properties_by_product.get(product.id, [])),
                 prices=list(prices_by_product.get(product.id, [])),
@@ -336,6 +338,7 @@ class MiraklProductPayloadBuilder:
         self,
         *,
         product: Product,
+        remote_product: MiraklProduct,
         translations: list[ProductTranslation],
         product_properties: list[ProductProperty],
         prices: list[dict[str, Any]],
@@ -371,6 +374,7 @@ class MiraklProductPayloadBuilder:
 
         return {
             "product": product,
+            "remote_product": remote_product,
             "parent_product": self.local_product if self.local_product and self.local_product.is_configurable() else None,
             "content_product": content_product,
             "translation": translation,
@@ -394,6 +398,37 @@ class MiraklProductPayloadBuilder:
             "bullet_points": [self._stringify(point) for point in content_payload.get("bulletPoints", []) if self._stringify(point)],
             "url_key": getattr(translation, "url_key", None) or "",
         }
+
+    def _resolve_row_remote_product(self, *, product: Product) -> MiraklProduct:
+        if (
+            self.local_product is None
+            or not self.local_product.is_configurable()
+            or product.id == self.local_product.id
+        ):
+            return self.remote_product
+
+        remote_product, created = MiraklProduct.objects.get_or_create(
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_parent_product=self.remote_product,
+            defaults={
+                "is_variation": True,
+            },
+        )
+
+        update_fields: list[str] = []
+        if not created and remote_product.is_variation is not True:
+            remote_product.is_variation = True
+            update_fields.append("is_variation")
+        if not created and remote_product.remote_parent_product_id != self.remote_product.id:
+            remote_product.remote_parent_product = self.remote_product
+            update_fields.append("remote_parent_product")
+
+        if update_fields:
+            remote_product.save(update_fields=update_fields)
+
+        return remote_product
 
     def _build_row(self, *, product_context: dict[str, Any]) -> dict[str, str]:
         row: dict[str, str] = {}
@@ -482,7 +517,7 @@ class MiraklProductPayloadBuilder:
         description = product_context["description"]
         short_description = product_context["short_description"]
         price = self._stringify(price_data.get("full_price"))
-        quantity = self._resolve_create_quantity()
+        quantity = self._resolve_create_quantity(product_context=product_context)
         if self.action == SalesChannelFeedItem.ACTION_DELETE:
             if not description:
                 description = self._default_delete_text()
@@ -510,13 +545,20 @@ class MiraklProductPayloadBuilder:
             "discount-start-date": self._format_date(price_data.get("start_date")),
             "discount-end-date": self._format_date(price_data.get("end_date")),
             "leadtime-to-ship": "",
-            "update-delete": self.action.upper(),
+            "update-delete": self._resolve_update_delete_value(),
         }
 
-    def _resolve_create_quantity(self) -> str:
-        remote_sku = str(getattr(self.remote_product, "remote_sku", "") or "").strip()
+    def _resolve_update_delete_value(self) -> str:
+        if self.action == SalesChannelFeedItem.ACTION_DELETE:
+            return "DELETE"
+        return "UPDATE"
+
+    def _resolve_create_quantity(self, *, product_context: dict[str, Any]) -> str:
+        row_remote_product = product_context.get("remote_product") or self.remote_product
+        remote_sku = str(getattr(row_remote_product, "remote_sku", "") or "").strip()
         if remote_sku:
             return ""
+
         starting_stock = getattr(self.sales_channel, "starting_stock", None)
         if starting_stock in (None, ""):
             return ""
@@ -1882,6 +1924,39 @@ class MiraklProductBaseFactory(GetMiraklAPIMixin, _MiraklFeedPersistenceMixin):
         self.force_validation_only = force_validation_only
         self.force_full_update = force_full_update
         super().__init__(*args, **kwargs)
+
+    def initialize_remote_product(self):
+        if self.is_variation and self.remote_parent_product is None:
+            self.remote_parent_product = self.remote_model_class.objects.get(
+                local_instance=self.parent_local_instance,
+                sales_channel=self.sales_channel,
+            )
+
+        self.remote_instance, _created = self.remote_model_class.objects.get_or_create(
+            local_instance=self.local_instance,
+            remote_parent_product=self.remote_parent_product,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            defaults={
+                "is_variation": self.is_variation,
+            },
+        )
+
+        update_fields: list[str] = []
+        if self.remote_instance.is_variation != self.is_variation:
+            self.remote_instance.is_variation = self.is_variation
+            update_fields.append("is_variation")
+        desired_parent_id = getattr(self.remote_parent_product, "id", None)
+        if self.remote_instance.remote_parent_product_id != desired_parent_id:
+            self.remote_instance.remote_parent_product = self.remote_parent_product
+            update_fields.append("remote_parent_product")
+        if update_fields:
+            self.remote_instance.save(update_fields=update_fields)
+
+        if getattr(self.remote_instance, "remote_sku", None):
+            raise SwitchedToSyncException(
+                f"RemoteProduct already exists with remote_sku: {self.remote_instance.remote_sku}. Switching to sync mode..."
+            )
 
     def get_identifiers(self, *, fixing_caller: str = "run"):
         frame = inspect.currentframe()
