@@ -381,6 +381,10 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             local_instance=parent_product,
             remote_sku=None,
         )
+        parent_rule = self._assign_product_rule(
+            product=parent_product,
+            sales_channel=self.sales_channel,
+        )
         category = baker.make(
             MiraklCategory,
             multi_tenant_company=self.multi_tenant_company,
@@ -396,6 +400,13 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=self.sales_channel,
             local_instance=None,
             remote_id="cat-1",
+        )
+        baker.make(
+            MiraklProductType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent_rule,
+            remote_id="parent-cat",
         )
         baker.make(
             MiraklProductCategory,
