@@ -9,7 +9,7 @@ LANGUAGE_MAX_LENGTH = 16
 
 CANONICAL_LANGUAGES = (
     ("en-gb", _("English (United Kingdom)")),
-    ("en-us", _("English (United States)")),
+    # ("en-us", _("English (United States)")),
     ("fr-fr", _("French (France)")),
     ("nl-nl", _("Dutch (Netherlands)")),
     ("de-de", _("German (Germany)")),

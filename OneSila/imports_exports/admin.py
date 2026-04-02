@@ -1,5 +1,5 @@
 from django.contrib import admin
-from imports_exports.models import MappedImport, ImportReport, ImportBrokenRecord
+from imports_exports.models import Export, ImportBrokenRecord, ImportReport, MappedImport
 from django.utils.safestring import mark_safe
 import json
 from pygments import highlight
@@ -23,6 +23,70 @@ class MappedImportAdmin(admin.ModelAdmin):
         return mark_safe(style + highlighted.replace('\\n', '<br/>'))
 
     formatted_broken_records.short_description = 'Broken Records'
+
+
+@admin.register(Export)
+class ExportAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "kind",
+        "type",
+        "status",
+        "percentage",
+        "is_periodic",
+        "last_run_at",
+        "created_at",
+    )
+    list_filter = ("kind", "type", "status", "is_periodic")
+    search_fields = ("name", "feed_key", "kind", "type")
+    readonly_fields = (
+        "feed_key",
+        "error_traceback",
+        "file",
+        "created_at",
+        "updated_at",
+        "feed_url",
+        "formatted_parameters",
+        "formatted_columns",
+        # "formatted_raw_data",
+    )
+    exclude = ('raw_data',)
+    actions = ("run_selected_exports", "regenerate_feed_keys")
+
+    def feed_url(self, instance):
+        if not instance.feed_key:
+            return "—"
+        return mark_safe(f'<a href="/direct/export/{instance.feed_key}/">/direct/export/{instance.feed_key}/</a>')
+
+    feed_url.short_description = "Feed URL"
+
+    def formatted_raw_data(self, instance):
+        return _format_json(instance.raw_data)
+
+    formatted_raw_data.short_description = "Raw Data"
+
+    def formatted_parameters(self, instance):
+        return _format_json(instance.parameters)
+
+    formatted_parameters.short_description = "Parameters"
+
+    def formatted_columns(self, instance):
+        return _format_json(instance.columns)
+
+    formatted_columns.short_description = "Columns"
+
+    @admin.action(description="Run selected exports")
+    def run_selected_exports(self, request, queryset):
+        for export in queryset:
+            export.status = Export.STATUS_PENDING
+            export.error_traceback = ""
+            export.save(update_fields=["status", "error_traceback"])
+
+    @admin.action(description="Regenerate selected feed keys")
+    def regenerate_feed_keys(self, request, queryset):
+        for export in queryset.filter(type=Export.TYPE_JSON_FEED):
+            export.feed_key = export._generate_feed_key()
+            export.save(update_fields=["feed_key"])
 
 
 @admin.register(ImportReport)
@@ -72,14 +136,17 @@ class ImportBrokenRecordAdmin(admin.ModelAdmin):
     record_summary.short_description = 'Summary'
 
     def formatted_record(self, instance):
-        if not instance.record:
-            return "—"
-
-        response = json.dumps(instance.record, sort_keys=True, indent=2, ensure_ascii=False)
-        formatter = HtmlFormatter(style='colorful')
-        highlighted = highlight(response, JsonLexer(), formatter)
-
-        style = f"<style>{formatter.get_style_defs()}</style><br>"
-        return mark_safe(style + highlighted.replace('\\n', '<br/>'))
+        return _format_json(instance.record)
 
     formatted_record.short_description = 'Broken Record'
+
+
+def _format_json(payload):
+    if not payload:
+        return "—"
+
+    response = json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False)
+    formatter = HtmlFormatter(style="colorful")
+    highlighted = highlight(response, JsonLexer(), formatter)
+    style = f"<style>{formatter.get_style_defs()}</style><br>"
+    return mark_safe(style + highlighted.replace("\\n", "<br/>"))
