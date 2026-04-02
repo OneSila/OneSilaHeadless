@@ -17,6 +17,7 @@ class MappedImportRunner(ImportMixin):
         self.import_select_values = import_process.type == TypedImport.TYPE_PROPERTY_SELECT_VALUE
         self.import_rules = import_process.type == TypedImport.TYPE_PROPERTY_RULE
         self.import_products = import_process.type == TypedImport.TYPE_PRODUCT
+        self.import_ean_codes = import_process.type == TypedImport.TYPE_EAN_CODE
         self.multi_tenant_company = import_process.multi_tenant_company
         self.data = None
 
@@ -106,3 +107,12 @@ class MappedImportRunner(ImportMixin):
 
     def get_structured_rule_data(self, rule_data):
         return rule_data
+
+    # --------------
+    # EAN CODES
+    # --------------
+    def get_ean_codes_data(self):
+        return [self.data] if self.get_total_instances() == 1 else self.data
+
+    def get_structured_ean_code_data(self, ean_code_data):
+        return ean_code_data

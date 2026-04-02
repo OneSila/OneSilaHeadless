@@ -5,6 +5,7 @@ from model_bakery import baker
 
 from core.tests import TestCase
 from integrations.models import IntegrationLog
+from products.models import ConfigurableVariation
 from sales_channels.exceptions import MiraklNewProductReportLookupError
 from sales_channels.integrations.mirakl.factories.feeds import MiraklNewProductReportSyncFactory
 from sales_channels.integrations.mirakl.models import (
@@ -147,6 +148,95 @@ class MiraklNewProductReportSyncFactoryTests(DisableMiraklConnectionMixin, TestC
                 remote_product=self.remote_product,
                 identifier=MiraklNewProductReportSyncFactory.LOG_FIX_IDENTIFIER,
                 status=IntegrationLog.STATUS_SUCCESS,
+            ).exists()
+        )
+
+    @patch.object(MiraklNewProductReportSyncFactory, "mirakl_get")
+    def test_run_syncs_configurable_added_product_to_variation_mirror(self, mirakl_get_mock):
+        parent_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+            sku="PARENT-1",
+        )
+        child_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="CHILD-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=parent_product,
+            variation=child_product,
+        )
+        self.remote_product.local_instance = parent_product
+        self.remote_product.remote_sku = ""
+        self.remote_product.save(update_fields=["local_instance", "remote_sku"])
+        child_remote = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=child_product,
+            remote_parent_product=self.remote_product,
+            is_variation=True,
+            remote_sku="",
+            remote_id="",
+        )
+        self.feed.items.all().delete()
+        baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=self.feed,
+            remote_product=self.remote_product,
+            sales_channel_view=self.view,
+            payload_data=[
+                {
+                    "sku": "CHILD-1",
+                    "product_id": "CHILD-1",
+                    "ean": "5056863153495",
+                    "product_title": "Dog Ballerina Costume",
+                }
+            ],
+        )
+        self.feed.new_product_report_file.save(
+            "mirakl-added-products.csv",
+            ContentFile(
+                "\n".join(
+                    [
+                        '"product_category","product_id","ean","errors"',
+                        '"toys-dress_up_and_role_play","CHILD-1","5056863153495",""',
+                    ]
+                )
+            ),
+            save=True,
+        )
+        mirakl_get_mock.return_value = {
+            "products": [
+                {
+                    "category_code": "5110114",
+                    "category_label": "Coffee Machines",
+                    "product_id": "5056863153495",
+                    "product_id_type": "EAN",
+                    "product_sku": "MKP100000000037254",
+                    "product_title": "Dog Ballerina Costume",
+                }
+            ]
+        }
+
+        synced_count = MiraklNewProductReportSyncFactory(feed=self.feed).run()
+
+        self.assertEqual(synced_count, 1)
+        self.remote_product.refresh_from_db()
+        child_remote.refresh_from_db()
+        self.assertEqual(self.remote_product.remote_sku, "")
+        self.assertEqual(child_remote.remote_sku, "MKP100000000037254")
+        self.assertEqual(child_remote.remote_id, "5056863153495")
+        self.assertTrue(
+            MiraklEanCode.objects.filter(
+                remote_product=child_remote,
+                ean_code="5056863153495",
             ).exists()
         )
 

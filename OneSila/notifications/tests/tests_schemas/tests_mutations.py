@@ -15,6 +15,16 @@ mutation($id: GlobalID!) {
 }
 """
 
+MARK_NOTIFICATION_AS_UNREAD_MUTATION = """
+mutation($id: GlobalID!) {
+  markNotificationAsUnread(data: {id: $id}) {
+    id
+    opened
+    url
+  }
+}
+"""
+
 MARK_ALL_NOTIFICATIONS_AS_VIEW_MUTATION = """
 mutation {
   markAllNotificationsAsView
@@ -96,6 +106,51 @@ class NotificationsMutationTestCase(TransactionTestCaseMixin, TransactionTestCas
 
         response = self.strawberry_test_client(
             query=OPEN_NOTIFICATION_MUTATION,
+            variables={"id": self.to_global_id(notification)},
+            asserts_errors=False,
+        )
+
+        self.assertIsNotNone(response.errors)
+
+    def test_mark_notification_as_unread_marks_notification_unopened(self):
+        notification = baker.make(
+            Notification,
+            multi_tenant_company=self.multi_tenant_company,
+            user=self.user,
+            type="GENERIC",
+            title="Sync done",
+            url="/redirect",
+            opened=True,
+        )
+
+        response = self.strawberry_test_client(
+            query=MARK_NOTIFICATION_AS_UNREAD_MUTATION,
+            variables={"id": self.to_global_id(notification)},
+            asserts_errors=False,
+        )
+
+        self.assertIsNone(response.errors)
+        notification.refresh_from_db()
+        self.assertFalse(notification.opened)
+        self.assertFalse(response.data["markNotificationAsUnread"]["opened"])
+        self.assertEqual(response.data["markNotificationAsUnread"]["url"], "/redirect")
+
+    def test_mark_notification_as_unread_rejects_other_users_notification(self):
+        other_user = baker.make(
+            "core.MultiTenantUser",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        notification = baker.make(
+            Notification,
+            multi_tenant_company=self.multi_tenant_company,
+            user=other_user,
+            type="GENERIC",
+            title="Private",
+            opened=True,
+        )
+
+        response = self.strawberry_test_client(
+            query=MARK_NOTIFICATION_AS_UNREAD_MUTATION,
             variables={"id": self.to_global_id(notification)},
             asserts_errors=False,
         )

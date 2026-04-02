@@ -12,7 +12,7 @@ from properties.models import Property, ProductProperty, PropertySelectValue
 from properties.models import ProductPropertiesRule, PropertySelectValueTranslation, PropertyTranslation
 from properties.models import ProductPropertyTextTranslation
 from products.models import ProductTranslation, ProductTranslationBulletPoint
-from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError
+from sales_channels.exceptions import MiraklPayloadValidationError, MissingMappingError, PreFlightCheckError, SwitchedToSyncException
 from sales_channels.integrations.mirakl.factories.feeds.product_payloads import (
     MiraklProductCreateFactory,
     MiraklProductPayloadBuilder,
@@ -251,7 +251,10 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         )
         builder.remote_product.remote_sku = ""
 
-        self.assertEqual(builder._resolve_create_quantity(), "7")
+        self.assertEqual(
+            builder._resolve_create_quantity(product_context={"remote_product": builder.remote_product}),
+            "7",
+        )
 
     def test_create_quantity_is_blank_once_remote_sku_exists(self):
         self.sales_channel.starting_stock = 7
@@ -269,7 +272,250 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         )
         builder.remote_product.remote_sku = "MKP-REMOTE-1"
 
-        self.assertEqual(builder._resolve_create_quantity(), "")
+        self.assertEqual(
+            builder._resolve_create_quantity(product_context={"remote_product": builder.remote_product}),
+            "",
+        )
+
+    def test_create_factory_initialize_remote_product_does_not_seed_remote_sku(self):
+        product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="SKU-1",
+        )
+        factory = MiraklProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            view=self.view,
+        )
+
+        factory.initialize_remote_product()
+
+        self.assertIsNone(factory.remote_instance.remote_sku)
+
+    def test_create_factory_initialize_remote_product_switches_to_sync_when_remote_sku_exists(self):
+        product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="SKU-1",
+        )
+        baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku="MKP-REMOTE-1",
+            remote_id="",
+        )
+        factory = MiraklProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            view=self.view,
+        )
+
+        with self.assertRaisesMessage(
+            SwitchedToSyncException,
+            "RemoteProduct already exists with remote_sku: MKP-REMOTE-1. Switching to sync mode...",
+        ):
+            factory.initialize_remote_product()
+
+    def test_create_action_uses_update_marker_in_offer_row(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, _ = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+            action=SalesChannelFeedItem.ACTION_CREATE,
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["update-delete"], "UPDATE")
+
+    def test_delete_action_uses_delete_marker_in_offer_row(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, _ = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+            action=SalesChannelFeedItem.ACTION_DELETE,
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["update-delete"], "DELETE")
+
+    def test_configurable_build_creates_variation_mirror_without_remote_sku(self):
+        parent_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+            sku="PARENT-1",
+        )
+        child_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="CHILD-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=parent_product,
+            variation=child_product,
+        )
+        remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent_product,
+            remote_sku=None,
+        )
+        parent_rule = self._assign_product_rule(
+            product=parent_product,
+            sales_channel=self.sales_channel,
+        )
+        category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="cat-1",
+            name="Category 1",
+            is_leaf=True,
+        )
+        product_type = baker.make(
+            MiraklProductType,
+            category=category,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            remote_id="cat-1",
+        )
+        baker.make(
+            MiraklProductType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent_rule,
+            remote_id="parent-cat",
+        )
+        baker.make(
+            MiraklProductCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=child_product,
+            remote_id="cat-1",
+        )
+        title_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="title_field",
+            local_instance=None,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+        )
+        baker.make(
+            MiraklPropertyApplicability,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            property=title_property,
+            view=self.view,
+        )
+        baker.make(
+            MiraklProductTypeItem,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=product_type,
+            remote_property=title_property,
+            required=False,
+        )
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=parent_product,
+            language=self.multi_tenant_company.language,
+            sales_channel=None,
+            name="Parent Name",
+        )
+
+        _, rows = MiraklProductPayloadBuilder(
+            remote_product=remote_product,
+            sales_channel_view=self.view,
+            action=SalesChannelFeedItem.ACTION_CREATE,
+        ).build()
+
+        variation_remote = MiraklProduct.objects.get(
+            sales_channel=self.sales_channel,
+            local_instance=child_product,
+            remote_parent_product=remote_product,
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(variation_remote.is_variation)
+        self.assertIsNone(variation_remote.remote_sku)
+
+    def test_configurable_create_quantity_uses_variation_remote_sku_not_parent_remote_sku(self):
+        self.sales_channel.starting_stock = 7
+        self.sales_channel.save(update_fields=["starting_stock"])
+        parent_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+            sku="PARENT-1",
+        )
+        child_product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="CHILD-1",
+        )
+        baker.make(
+            ConfigurableVariation,
+            multi_tenant_company=self.multi_tenant_company,
+            parent=parent_product,
+            variation=child_product,
+        )
+        remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent_product,
+            remote_sku="PARENT-REMOTE",
+        )
+        variation_remote = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=child_product,
+            remote_parent_product=remote_product,
+            is_variation=True,
+            remote_sku="",
+        )
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, _ = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+            action=SalesChannelFeedItem.ACTION_CREATE,
+        )
+        builder.remote_product = remote_product
+        builder.local_product = parent_product
+
+        self.assertEqual(
+            builder._resolve_create_quantity(product_context={"remote_product": variation_remote}),
+            "7",
+        )
 
     def test_required_mapped_field_for_variation_mentions_variation_product(self):
         local_property = baker.make(

@@ -1,118 +1,63 @@
-## 🧱 ImportPropertyInstance
+# `imports_exports.factories` payload contracts
 
-Handles the creation or update of a `Property` object and its `PropertyTranslation`.
+This file documents the payloads that the current factories actually accept or emit in this repo.
+The goal is practical accuracy. If a field is listed here, the current code reads or writes it.
 
-### 🔑 Required Fields
+## Import Factories
 
-At least one of:
-- `name`: `str` — Human-readable name of the property.
-- `internal_name`: `str` — Technical/internal name of the property (snake_case recommended).
+## `ImportPropertyInstance`
 
-> If `type` is not provided, it will be **auto-detected** using LLM-based heuristics.
+Creates or updates a `Property`.
 
-### ⚙️ Optional Fields
+Required:
+- one of `name` or `internal_name`
 
-| Field                   | Type   | Default  | Description                                      |
-|-------------------------|--------|----------|--------------------------------------------------|
-| `type`                  | `str`  | auto     | One of the allowed types (see below).            |
-| `is_public_information` | `bool` | `True`   | Whether the property is visible to the customer. |
-| `add_to_filters`        | `bool` | `True`   | Whether the property appears in filters.         |
-| `has_image`             | `bool` | `False`  | Whether the property has images per value.      |
-| `translations`          | `list` | `[]`     | Language and name list to create translations.   |
-
-### 🔄 Updatable Fields
-
-These fields are updated **only if the value differs**:
+Optional:
+- `type`
 - `is_public_information`
 - `add_to_filters`
 - `has_image`
+- `is_product_type`
+- `translations`
 
-### 🧪 Allowed `type` Values
+Notes:
+- if `type` is missing, it is auto-detected
+- `translations` is a list of `{language, name}`
+- updatable scalar flags are `is_public_information`, `add_to_filters`, `has_image`
 
-```python
-Property.TYPES.ALL
-# example: ['TEXT', 'DESCRIPTION', 'INT', 'FLOAT', 'BOOLEAN', 'DATE', 'DATETIME', 'SELECT', 'MULTISELECT']
-```
-
-### 📥 Example Payloads
-
-<details>
-<summary><strong>1. Fully specified data</strong></summary>
+Example:
 
 ```json
 {
   "name": "Color",
   "internal_name": "color",
-  "type": "TEXT",
+  "type": "SELECT",
   "is_public_information": true,
   "add_to_filters": true,
-  "has_image": false
+  "has_image": false,
+  "translations": [
+    {"language": "en", "name": "Color"},
+    {"language": "nl", "name": "Kleur"}
+  ]
 }
 ```
 
-</details>
+## `ImportPropertySelectValueInstance`
 
-<details>
-<summary><strong>2. Minimal data with type provided</strong></summary>
+Creates or updates a `PropertySelectValue`.
 
-```json
-{
-  "name": "Size"
-}
-```
+Required:
+- `value`
+- one of `property` or `property_data`
 
-or
+Optional:
+- `translations`
 
-```json
-{
-  "internal_name": "size"
-}
-```
+Notes:
+- `property_data` is passed to `ImportPropertyInstance`
+- `translations` is a list of `{language, value}`
 
-</details>
-
-<details>
-<summary><strong>3. Auto-detected type (via LLM)</strong></summary>
-
-```json
-{
-  "internal_name": "weight",
-  "is_public_information": false,
-  "add_to_filters": false,
-  "has_image": false
-}
-```
-
-</details>
-
-
-## 🎯 ImportPropertySelectValueInstance
-
-Handles the creation or update of a `PropertySelectValue` and its `PropertySelectValueTranslation`.
-
-### 🔑 Required Fields
-
-- `value`: `str` — The select value to import (e.g., `"Red"` or `"XL"`).
-
-And **one of**:
-- `property`: A reference to an existing `Property` object directly in the class.
-- `property_data`: A dictionary to create the property inline using [ImportPropertyInstance](#-importpropertyinstance).
-
-### ⚙️ Optional Fields
-
-| Field          | Type   | Description |
-|----------------|--------|------------|
-| `property_data`| `dict` | See [ImportPropertyInstance](#-importpropertyinstance) for full structure. |
-| `translations` | `list` | Language and name list to create translations.   |
-
-
-### ✅ Behavior
-
-- If `property_data` is provided, the property will be created or fetched using `ImportPropertyInstance`.
-- The system uses a translation-aware factory to store the translated value (`value`) for the current language.
-
-
-### 💡 Example
+Example:
 
 ```json
 {
@@ -121,64 +66,38 @@ And **one of**:
     "name": "Color",
     "internal_name": "color",
     "type": "SELECT"
-  }
+  },
+  "translations": [
+    {"language": "en", "value": "Red"},
+    {"language": "nl", "value": "Rood"}
+  ]
 }
 ```
 
-## 📦 ImportProductPropertiesRuleInstance
+## `ImportProductPropertiesRuleInstance`
 
-Handles the creation of a `ProductPropertiesRule`, optionally with nested `ProductPropertiesRuleItem` entries.
+Creates or updates a `ProductPropertiesRule`.
 
-### 🔑 Required Fields
+Required:
+- `value`
 
-- `value`: `str` — The value for the product type (used to identify or create a PropertySelectValue).
-
-### ⚙️ Optional Fields
-
-| Field              | Type       | Default | Description |
-|--------------------|------------|---------|-------------|
-| `require_ean_code` | `bool`     | `False` | Whether products of this rule require an EAN code. |
-| `items`            | `list`     | `[]`    | List of rule item dicts (see below for structure). |
-
-### 🔄 Updatable Fields
-
+Optional:
 - `require_ean_code`
+- `items`
 
-### 🔁 Nested Rule Items (optional)
+`items` entries are handled by `ImportProductPropertiesRuleItemInstance` and accept:
+- one of `property` or `property_data`
+- one of `rule` or `rule_data`
+- optional `type`
+- optional `sort_order`
 
-Each item is passed to `ImportProductPropertiesRuleItemInstance`. See below for the expected structure.
+Rule item `type` values:
+- `REQUIRED_IN_CONFIGURATOR`
+- `OPTIONAL_IN_CONFIGURATOR`
+- `REQUIRED`
+- `OPTIONAL`
 
----
-
-## 🧩 ImportProductPropertiesRuleItemInstance
-
-Handles the creation of a `ProductPropertiesRuleItem`, linking a `Property` to a rule with a specific behavior.
-
-### 🔑 Required Fields
-
-One of:
-- `property`: an existing `Property` object
-**OR**
-- `property_data`: `dict` (used to import a Property)
-
-One of:
-- `rule`: an existing `ProductPropertiesRule` object
-**OR**
-- `rule_data`: `dict` (used to import a ProductPropertiesRule)
-
-### ⚙️ Optional Fields
-
-| Field         | Type   | Default                  | Description |
-|---------------|--------|--------------------------|-------------|
-| `type`        | `str`  | `OPTIONAL`               | One of: `REQUIRED`, `OPTIONAL`, `REQUIRED_IN_CONFIGURATOR`, `OPTIONAL_IN_CONFIGURATOR`. |
-| `sort_order`  | `int`  | `None`                   | Optional numeric sort order. |
-
-### 🔄 Updatable Fields
-
-- `type`
-- `sort_order`
-
-### 🧱 Example (Full Rule with Items)
+Example:
 
 ```json
 {
@@ -186,338 +105,673 @@ One of:
   "require_ean_code": true,
   "items": [
     {
-      "type": "REQUIRED_IN_CONFIGURATOR",
-      "sort_order": 1,
       "property_data": {
         "name": "Color",
         "internal_name": "color",
         "type": "SELECT"
-      }
-    },
-    {
-      "type": "OPTIONAL",
-      "property_data": {
-        "name": "Material",
-        "type": "TEXT"
-      }
+      },
+      "type": "REQUIRED_IN_CONFIGURATOR",
+      "sort_order": 1
     }
   ]
 }
 ```
 
-🔗 See [ImportPropertyInstance](#-importpropertyinstance) and [ImportPropertySelectValueInstance](#-importpropertyselectvalueinstance) for nested structures.
+## `ImportProductPropertyInstance`
 
+Creates or updates a `ProductProperty`.
 
-### 🔑 Required Fields
-- `name`: `str`
-- If `type` is provided, must be either `SIMPLE` or `CONFIGURABLE`
+Required:
+- `value`
+- one of `property` or `property_data`
+- one of `product` or `product_data`
 
-### ⚙️ Optional Fields
+Optional:
+- `value_is_id`
+- `translations`
 
-| Field                        | Type     | Default       | Description |
-|------------------------------|----------|---------------|-------------|
-| `sku`                        | `str`    | auto-generated | Unique SKU code for the product |
-| `type`                       | `str`    | `SIMPLE`      | Either `SIMPLE` or `CONFIGURABLE` |
-| `active`                     | `bool`   | None          | Whether the product is active |
-| `vat_rate`                   | `int`    | None          | VAT rate as an integer (e.g. 19) |
-| `ean_code`                   | `str`    | None          | EAN code for barcoding |
-| `allow_backorder`            | `bool`   | None          | Allow backorders if out of stock |
-| `product_type`               | `str`    | None          | Category/type (used in rule) |
-| `attributes`                 | `list`   | []            | Attribute values for the rule |
-| `translations`               | `list`   | []            | Localized product content |
-| `images`                     | `list`   | []            | List of image dicts |
-| `prices`                     | `list`   | []            | List of price dicts |
-| `variations`                 | `list`   | []            | List of variation data (for configurable) |
-| `configurator_select_values` | `list` | []            | Used to auto-generate variations |
+Current reverse value rules used by the code:
+- `INT` -> integer
+- `FLOAT` -> float
+- `BOOLEAN` -> boolean
+- `DATE` / `DATETIME` -> parsed with `dateutil`
+- `TEXT` -> stored in `value_text`
+- `DESCRIPTION` -> stored in `value_description`
+- `SELECT`:
+  - `value_is_id=true` -> treat `value` as select value ID
+  - otherwise resolve by translated value
+- `MULTISELECT`:
+  - `value_is_id=true` -> treat `value` as a list of IDs
+  - otherwise resolve each entry by translated value
 
-### 🔄 Updatable Fields
+Export compatibility target:
+
+```json
+{
+  "property": {
+    "name": "Color",
+    "internal_name": "color",
+    "type": "SELECT"
+  },
+  "value": "Red",
+  "values": [
+    {"value": "Red"}
+  ],
+  "requirement": "OPTIONAL"
+}
+```
+
+When exporting IDs instead of translated values:
+
+```json
+{
+  "property": {
+    "name": "Color",
+    "internal_name": "color",
+    "type": "SELECT"
+  },
+  "value": 12,
+  "values": [
+    {"value": 12}
+  ]
+}
+```
+
+## `ImportProductInstance`
+
+Creates or updates a `Product`.
+
+Required:
+- no hard required keys if an existing `instance` is provided
+- for normal creation the practical minimum is `name` or `sku`
+- if `type` is supplied it must be one of `SIMPLE`, `CONFIGURABLE`, `BUNDLE`, `ALIAS`
+
+Optional top-level fields read by the factory:
+- `name`
+- `sku`
+- `type`
 - `active`
-- `allow_backorder`
 - `vat_rate`
+- `use_vat_rate_name`
 - `ean_code`
+- `allow_backorder`
+- `alias_parent_product`
+- `alias_parent_sku`
+- `product_type`
+- `properties`
+- `translations`
+- `images`
+- `documents`
+- `prices`
+- `sales_pricelist_items`
+- `variations`
+- `bundle_variations`
+- `alias_variations`
+- `configurator_select_values`
+- `skip_rule_item_sync`
 
-### ✅ Examples
+Nested payloads the factory supports:
+- `translations` -> `ImportProductTranslationInstance`
+- `images` -> `ImportImageInstance`
+- `documents` -> `ImportDocumentInstance`
+- `prices` -> `ImportSalesPriceInstance`
+- `sales_pricelist_items` -> `ImportSalesPriceListItemInstance`
+- `properties` -> `ImportProductPropertyInstance`
+- `variations` -> `ImportConfigurableVariationInstance`
+- `bundle_variations` -> `ImportBundleVariationInstance`
+- `alias_variations` -> `ImportAliasVariationInstance`
+- `configurator_select_values` -> used by `ImportConfiguratorVariationsInstance`
 
-#### 1. Simple product with price and translation
+Example:
+
 ```json
 {
   "name": "Plain T-Shirt",
   "sku": "plain-ts",
   "type": "SIMPLE",
+  "active": true,
   "vat_rate": 19,
   "ean_code": "1234567890123",
+  "allow_backorder": false,
+  "product_type": "T-Shirt",
+  "translations": [
+    {
+      "language": "en",
+      "name": "Plain T-Shirt",
+      "subtitle": "Soft cotton basic",
+      "sales_channel": null,
+      "short_description": "Very nice T-Shirt",
+      "description": "Long description",
+      "url_key": "plain-t-shirt",
+      "bullet_points": [
+        "100% cotton"
+      ]
+    }
+  ],
+  "properties": [
+    {
+      "property_data": {
+        "name": "Color",
+        "internal_name": "color",
+        "type": "SELECT"
+      },
+      "value": "Red"
+    }
+  ],
+  "images": [
+    {
+      "image_url": "https://example.com/image.jpg",
+      "type": "PACK",
+      "title": "Front",
+      "description": "Front image",
+      "is_main_image": true,
+      "sort_order": 10
+    }
+  ],
+  "documents": [
+    {
+      "document_url": "https://example.com/manual.pdf",
+      "title": "Manual",
+      "description": "Product manual",
+      "document_type": "MANUAL",
+      "document_language": "en",
+      "sort_order": 10
+    }
+  ],
   "prices": [
     {
       "price": 49.99,
       "rrp": 59.99,
       "currency": "EUR"
     }
-  ],
-  "translation_data": [
-    {
-      "name": "Plain T-Shirt",
-      "short_description": "Very nice T-Shirt"
-    }
   ]
 }
 ```
 
-#### 2. Configurable product with variations and rule
+## `ImportProductTranslationInstance`
+
+Creates or updates a `ProductTranslation`.
+
+Required:
+- `name`
+- one of `product` or `product_data`
+
+Optional:
+- `subtitle`
+- `short_description`
+- `description`
+- `url_key`
+- `language`
+- `bullet_points`
+- `sales_channel`
+
+Example:
+
 ```json
 {
-  "name": "T-Shirt",
-  "type": "CONFIGURABLE",
-  "product_type": "T-Shirt",
-  "attributes": [
-    {
-      "value": "Red",
-      "property_data": { "name": "Color" }
-    },
-    {
-      "value": "L",
-      "property_data": { "name": "Size" }
-    }
-  ],
-  "configurator_select_values": [
-    {
-      "value": "Red",
-      "property_data": { "name": "Color" }
-    },
-    {
-      "value": "L",
-      "property_data": { "name": "Size" }
-    }
-  ],
-  "variations": [
-    {
-      "name": "Red T-Shirt - L",
-      "sku": "tshirt-red-l"
-    }
-  ]
+  "language": "en",
+  "name": "Export Product",
+  "subtitle": "Small subtitle",
+  "short_description": "Short text",
+  "description": "Long text",
+  "url_key": "export-product",
+  "bullet_points": ["Point one", "Point two"],
+  "product_data": {"sku": "EXPORT-001"}
 }
 ```
 
----
+## `ImportImageInstance`
 
-## 🌍 ImportProductTranslationInstance
+Creates or links an `Image` and optionally assigns it to a product.
 
-Handles translations for a Product's name and content.
+Required:
+- one of `image_url` or `image_content`
 
-### 🔑 Required Fields
-- `name`: `str`
-- Either `product` or `product_data` must be provided
+Optional:
+- `type`
+- `title`
+- `description`
+- `product_data`
+- `is_main_image`
+- `sort_order`
 
-### ⚙️ Optional Fields
+Notes:
+- `image_content` takes priority over `image_url`
+- `image_url` must be HTTPS
+- `type` defaults to `Image.PACK_SHOT`
 
-| Field               | Type   | Default |
-|--------------------|--------|---------|
-| `short_description`| `str`  | None    |
-| `description`      | `str`  | None    |
-| `url_key`          | `str`  | None    |
+## `ImportDocumentInstance`
 
+Creates or links a document/file and optionally assigns it to a product.
 
-## 💰 ImportSalesPriceInstance
+Required:
+- `document_url`
 
-Handles creation of a sales price for a product.
+Optional:
+- `title`
+- `description`
+- `document_type`
+- `document_language`
+- `product_data`
+- `sort_order`
 
-### 🔑 Required Fields
-- At least one of `rrp` or `price`
-- `product` or `product_data` must be provided
+Notes:
+- only HTTPS URLs are allowed
+- file type is inferred from the URL extension
+- image-like documents are also marked as document images
 
-### ⚙️ Optional Fields
-| Field     | Type   | Default | Description |
-|-----------|--------|---------|-------------|
-| `currency` | `str` | system default | 3-letter ISO code (e.g., "EUR", "USD"). Must be supported and present in your system. |
+## Variation imports
 
-### 💡 Examples
+### `ImportConfigurableVariationInstance`
+
+Required:
+- one of `config_product` or `config_product_data`
+- one of `variation_product` or `variation_data`
+
+Payload shape:
 
 ```json
 {
-  "product_data": { "name": "Black Hoodie" },
-  "price": 29.99,
-  "currency": "EUR"
+  "variation_data": {
+    "sku": "variant-red-l",
+    "name": "Red / L"
+  }
 }
 ```
 
----
+### `ImportConfiguratorVariationsInstance`
 
-## 🧱 ImportProductPropertyInstance
+Required:
+- one of `config_product` or `config_product_data`
+- one of `rule` or `rule_data`
+- one of `select_values` or `values`
 
-Handles setting a property on a product, with flexible value handling based on the property type.
-
-### 🔑 Required Fields
-- `value`: Depends on the property's type (e.g., number, text, boolean, list of values, etc.)
-- Either `product` or `product_data`
-- Either `property` or `property_data`
-
-### ⚙️ Optional Fields
-| Field         | Type  | Default |
-|---------------|-------|--------|
-| `value_is_id` | `bool`| `False` |
-| `translations` | `list` | []     |
-
-
-### 🔄 Updatable Fields
-- `value_boolean`
-- `value_int`
-- `value_float`
-- `value_date`
-- `value_datetime`
-- `value_select`
-- `value_multi_select`
-- `value_text`
-- `value_description`
-
-### 💡 Examples
+`values` entries look like:
 
 ```json
 {
-  "product_data": { "name": "Sneakers" },
-  "property_data": { "name": "Color", "type": "SELECT" },
+  "property_data": {"name": "Color", "type": "SELECT"},
   "value": "Red"
 }
 ```
 
----
+### `ImportBundleVariationInstance`
 
-## 🖼️ ImportImageInstance
+Required:
+- one of `bundle_product` or `bundle_product_data`
+- one of `variation_product` or `variation_data`
+- `quantity` or `qty`
 
-Handles attaching an image to a product.
+### `ImportAliasVariationInstance`
 
-### 🔑 Required Fields
-- Either `image_url` (must start with `https://`) or `image_content` (a base64-encoded image string)
+Required:
+- one of `parent_product` or `parent_product_data`
+- one of `alias_product` or `variation_data`
 
-### ⚙️ Optional Fields
-| Field           | Type    | Default            | Description |
-|------------------|---------|--------------------|-------------|
-| `type`           | `str`   | `Image.PACK_SHOT`  | Type of the image (e.g., pack shot, gallery, etc.) |
-| `product_data`   | `dict`  | None               | Used to associate the image with a product if `product` is not given |
-| `is_main_image`  | `bool`  | `False`            | Only relevant if product is provided or imported |
-| `sort_order`     | `int`   | `10`               | Only relevant if product is provided or imported |
+Optional:
+- `alias_copy_images`
+- `alias_copy_product_properties`
+- `alias_copy_content`
 
-### 💡 Notes
-- If both `image_url` and `image_content` are provided, `image_content` takes priority.
-- If assigning to a product, only HTTPS images are accepted via URL.
-- `is_main_image` and `sort_order` are only applied when a product is present.
+`variation_data.type` is forced to `ALIAS`.
 
-### 💡 Examples
+## Sales price imports
+
+## `ImportEanCodeInstance`
+
+Creates or updates an `EanCode`.
+
+Required:
+- `ean_code`
+- one of `product`, `product_sku`, or `product_data.sku`
+
+Optional:
+- `internal`
+- `already_used`
+
+Notes:
+- if the product cannot be resolved by SKU, the importer skips the row without creating an EAN code
+
+### `ImportSalesPriceInstance`
+
+Required:
+- one of `rrp` or `price`
+- `currency`
+- one of `product` or `product_data`
+
+Notes:
+- if only one of `rrp` or `price` is provided, the factory normalizes it
+- `currency` must be a supported ISO code
+
+### `ImportSalesPriceListInstance`
+
+Required:
+- `name`
+- `currency`
+
+Optional:
+- `start_date`
+- `end_date`
+- `vat_included`
+- `auto_update_prices`
+- `auto_add_products`
+- `price_change_pcnt`
+- `discount_pcnt`
+- `notes`
+- `sales_pricelist_items`
+
+### `ImportSalesPriceListItemInstance`
+
+Required:
+- one of `salespricelist` or `salespricelist_data`
+- one of `product` or `product_data`
+
+Optional:
+- `price_auto`
+- `discount_auto`
+- `price_override`
+- `discount_override`
+- `disable_auto_update`
+
+Example:
 
 ```json
 {
-  "product_data": { "name": "Watch" },
-  "image_url": "https://example.com/watch.jpg",
-  "is_main_image": true,
-  "sort_order": 1
-}
-```
-
-```json
-{
-  "image_content": "<base64-encoded-image>",
-  "type": "GALLERY"
-}
-```
-
----
-
-## 🔁 ImportConfigurableVariationInstance
-
-Assigns a single variation to a configurable product.
-
-### 🔑 Required Fields
-- `config_product` or `config_product_data`
-- `variation_product` or `variation_data`
-
-### 💡 Example
-
-```json
-{
-  "config_product_data": { "name": "T-Shirt" },
-  "variation_data": { "name": "T-Shirt Red - M" }
-}
-```
-
----
-
-## 🔁 ImportConfiguratorVariationsInstance
-
-Auto-generates multiple variations for a configurable product using a rule and value combinations.
-
-### 🔑 Required Fields
-- `config_product` or `config_product_data`
-- `rule` or `rule_data`
-- `select_values` or `values`
-
-### 💡 Example Input
-
-```json
-{
-  "config_product_data": { "name": "T-Shirt" },
-  "rule_data": {
-    "value": "T-Shirt",
-    "require_ean_code": true,
-    "items": [
-      { "type": "REQUIRED", "property_data": { "name": "Size" } }
-    ]
+  "salespricelist_data": {
+    "name": "Wholesale EUR",
+    "currency": "EUR"
   },
-  "values": [
-    { "property_data": { "name": "Color" }, "value": "Red" },
-    { "property_data": { "name": "Size" }, "value": "Large" }
+  "product_data": {
+    "sku": "EXPORT-001"
+  },
+  "price_override": 39.99
+}
+```
+
+## Export Factories
+
+## General export rules
+
+- Export `raw_data` should stay import-compatible whenever possible.
+- Export kind uses `property_select_values`. Do not split this into separate `property_values` and `select_values`.
+- Media exports are split by kind: `images`, `documents`, and `videos`.
+- If export `columns` is empty or omitted, exporters emit all supported columns.
+- Export `parameters` carries behavior flags and filters such as `flat`, `active_only`, `sales_channel`, `ids`, or nested config like `product_properties: {add_value_ids: true}`.
+- Export processing sets `total_records` from `queryset.count()`, iterates top-level rows with `.iterator()`, and updates `percentage` in 10% steps while building `raw_data`.
+- Output `type` controls transport only:
+  - `json_feed` serves stored `raw_data`
+  - `json` writes a file from `raw_data`
+  - `csv` and `excel` currently generate `raw_data` first and then raise not implemented during file generation
+
+## `products`
+
+Supported columns:
+- `name`
+- `sku`
+- `type`
+- `active`
+- `vat_rate`
+- `ean_code`
+- `allow_backorder`
+- `product_type`
+- `translations`
+- `sales_channels`
+- `properties`
+- `images`
+- `documents`
+- `prices`
+- `sales_pricelist_items`
+- `variations`
+- `bundle_variations`
+- `alias_variations`
+- `configurator_select_values`
+- `configurable_products_skus`
+- `bundle_products_skus`
+- `alias_products_skus`
+
+Important parameters:
+- `language`
+- `sales_channel`
+- `active` or `active_only`
+- `ids`, `product_ids`, or `products_ids`
+- `flat`
+- nested `product_properties.add_value_ids`
+
+Notes:
+- `translations` contain all product translations, both default and sales-channel-specific
+- each translation emits `sales_channel` as the sales channel ID, or `null` for default translations
+- translation payload includes `name`, `subtitle`, `short_description`, `description`, `url_key`, and `bullet_points` when present
+- `sales_channels` emits assigned channels as `{id, hostname, type, subtype}`
+- `sales_channel` filtering includes products directly assigned by `SalesChannelViewAssign` and variations inherited from assigned parent products
+- `configurable_products_skus`, `bundle_products_skus`, and `alias_products_skus` are only emitted when `flat=true`
+
+Example:
+
+```json
+{
+  "sku": "plain-ts",
+  "translations": [
+    {
+      "language": "en",
+      "name": "Plain T-Shirt",
+      "subtitle": "Soft cotton basic",
+      "sales_channel": null,
+      "bullet_points": ["100% cotton"]
+    },
+    {
+      "language": "en",
+      "name": "Plain T-Shirt Amazon",
+      "sales_channel": 12
+    }
+  ],
+  "sales_channels": [
+    {
+      "id": 12,
+      "hostname": "https://amazon.example.com",
+      "type": "amazon",
+      "subtype": null
+    }
   ]
 }
 ```
 
-Or a full example when creating a configurable product:
+## `product_properties`
+
+Supported columns:
+- `product_data`
+- `product_sku`
+- `properties`
+
+Important parameters:
+- `product` or `product_ids`
+- `ids`
+- `sales_channel`
+- `add_translations`
+- `values_are_ids`
+- `add_value_ids`
+- nested `product_properties.add_value_ids`
+
+Notes:
+- each entry in `properties` emits `property`, `value`, `values`, and optional `requirement`
+- `value` is the singular import-friendly representation
+- `values` is the list form used for select and multiselect compatibility
+
+## `properties`
+
+Supported columns:
+- `id`
+- `name`
+- `internal_name`
+- `type`
+- `is_public_information`
+- `add_to_filters`
+- `has_image`
+- `is_product_type`
+- `translations`
+- `property_select_values`
+
+Important parameters:
+- `ids`
+- nested `property_select_values.add_value_ids`
+
+## `property_select_values`
+
+Supported columns:
+- `id`
+- `value`
+- `property_data`
+- `translations`
+
+Important parameters:
+- `ids`
+- `property`
+- `add_value_ids` or `values_are_ids`
+
+Notes:
+- this is the only select-value export kind
+
+## `rules`
+
+Supported columns:
+- `value`
+- `require_ean_code`
+- `items`
+
+Important parameters:
+- `ids`
+- `sales_channel`
+
+## `images`
+
+Supported columns:
+- `image_url`
+- `type`
+- `title`
+- `description`
+- `product_data`
+- `product_sku`
+- `sort_order`
+- `is_main_image`
+
+Important parameters:
+- `ids`
+- `product`
+- `sales_channel`
+- `add_product_sku`
+- `add_title`
+- `add_description`
+
+## `documents`
+
+Supported columns:
+- `document_url`
+- `type`
+- `title`
+- `description`
+- `product_data`
+- `product_sku`
+- `sort_order`
+- `document_type`
+- `document_language`
+- `thumbnail_image`
+- `is_document_image`
+
+Important parameters:
+- `ids`
+- `product`
+- `sales_channel`
+- `add_product_sku`
+- `add_title`
+- `add_description`
+
+## `videos`
+
+Supported columns:
+- `video_url`
+- `type`
+- `title`
+- `description`
+- `product_data`
+- `product_sku`
+- `sort_order`
+
+Important parameters:
+- `ids`
+- `product`
+- `sales_channel`
+- `add_product_sku`
+- `add_title`
+- `add_description`
+
+## `sales_prices`
+
+Supported columns:
+- `rrp`
+- `price`
+- `currency`
+- `product_data`
+- `product_sku`
+
+Important parameters:
+- `ids`
+- `product`
+- `add_product_sku`
+
+## `price_lists`
+
+Supported columns:
+- `name`
+- `start_date`
+- `end_date`
+- `currency`
+- `vat_included`
+- `auto_update_prices`
+- `auto_add_products`
+- `price_change_pcnt`
+- `discount_pcnt`
+- `notes`
+- `sales_pricelist_items`
+
+Important parameters:
+- `ids`
+
+## `price_list_prices`
+
+Supported columns:
+- `price_auto`
+- `discount_auto`
+- `price_override`
+- `discount_override`
+- `product_data`
+- `product_sku`
+- `salespricelist_data`
+- `salespricelist_name`
+
+Important parameters:
+- `ids`
+- `product`
+- `salespricelist`
+- `add_product_sku`
+
+## `ean_codes`
+
+Supported columns:
+- `ean_code`
+- `product_sku`
+
+Important parameters:
+- `ids`
+- `product`
+- `add_product_sku`
+
+Notes:
+- the payload is intentionally simple so it can be fed directly into `ImportEanCodeInstance`
+
+Example:
 
 ```json
-data = {
-    "name": "Fancy Flying Product",
-    "sku": "SKU9221AF",
-    "type": "CONFIGURABLE",
-    "active": True,
-    "vat_rate": 19,
-    "ean_code": "1234567890123",
-    "allow_backorder": False,
-    "product_type": "Chair",
-    "properties": [
-        {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"},
-        {"property_data": {"name": "Material", "type": "SELECT", "value": "Metal"}},
-    ],
-    "translations": [
-        {
-            "name": "Fancy Product",
-            "short_description": "Short desc",
-            "description": "Longer description",
-            "url_key": "fancy-product"
-        }
-    ],
-    "images": [
-        {
-          "image_url": "https://2.com/img-.jpeg",
-          "is_main_image": true
-        }
-    ],
-    "prices": [
-        {"price": 12.99, "currency": "EUR"},
-        {"price": 12.99, "currency": "USD"},
-    ],
-    "variations": [
-        {
-            'variation_data': {"name": "Variant 1"}
-        },
-        {
-            'variation_data': {"name": "Variant 2"}
-        }
-    ],
-    "configurator_select_values": [
-        {"property_data": {"name": "Size"}, "value": "Large"},
-        {"property_data": {"name": "Color"}, "value": "Blue"},
-    ]
+{
+  "ean_code": "1234567890123",
+  "product_sku": "EXPORT-001"
 }
 ```
-
-### 💡 Notes
-- If using `values`, each must contain both `property_data` and `value`.
-- If using `select_values`, these must be existing `PropertySelectValue` objects.
-
----

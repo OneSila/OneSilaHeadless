@@ -844,6 +844,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         self.sales_channel = sales_channel
 
         self.set_field_if_exists('name')
+        self.set_field_if_exists('subtitle')
         self.set_field_if_exists('short_description')
         self.set_field_if_exists('description')
         self.set_field_if_exists('url_key')
@@ -860,7 +861,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
 
     @property
     def updatable_fields(self):
-        return ['name', 'short_description', 'description', 'url_key']
+        return ['name', 'subtitle', 'short_description', 'description', 'url_key']
 
     def validate(self):
         """
@@ -914,6 +915,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
                         product=self.product,
                         language=self.language,
                         name=self.instance.name,
+                        subtitle=self.instance.subtitle,
                         short_description=self.instance.short_description,
                         description=self.instance.description,
                         url_key=self.instance.url_key,
@@ -926,6 +928,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
                             product=self.product,
                             language=self.language,
                             name=self.instance.name,
+                            subtitle=self.instance.subtitle,
                             short_description=self.instance.short_description,
                             description=self.instance.description,
                             url_key=None,

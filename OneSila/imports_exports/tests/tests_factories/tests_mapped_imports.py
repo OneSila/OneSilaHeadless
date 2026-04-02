@@ -1,10 +1,14 @@
 import json
 import tempfile
+from unittest.mock import patch
+
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from core.tests import TestCase
+from eancodes.models import EanCode
 from imports_exports.factories.importers.mapped import MappedImportRunner
 from imports_exports.models import MappedImport
+from products.models import Product
 
 
 class MappedImportSkipBrokenRecordsTest(TestCase):
@@ -123,3 +127,61 @@ class MappedImportRemoteJsonValidationTest(TestCase):
             runner.prepare_import_process()
 
         self.assertIn('standard HTTPS ports', str(cm.exception))
+
+
+class MappedImportEanCodesTest(TestCase):
+    def create_import_file(self, data):
+        json_content = json.dumps(data, ensure_ascii=False, indent=2)
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json", mode="w+")
+        tmp_file.write(json_content)
+        tmp_file.flush()
+        tmp_file.seek(0)
+        return ContentFile(tmp_file.read().encode("utf-8"), name="test_ean_codes.json")
+
+    def test_ean_code_import_skips_missing_product(self):
+        product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sku="EAN-001",
+            type=Product.SIMPLE,
+        )
+        payload = [
+            {"ean_code": "1234567890123", "product_sku": "EAN-001"},
+            {"ean_code": "9999999999999", "product_sku": "MISSING-SKU"},
+        ]
+
+        mapped_import = MappedImport.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=MappedImport.TYPE_EAN_CODE,
+        )
+        mapped_import.json_file.save("ean_codes.json", self.create_import_file(payload), save=True)
+
+        mapped_import.run()
+
+        self.assertEqual(EanCode.objects.filter(product=product).count(), 1)
+        self.assertFalse(
+            EanCode.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                ean_code="9999999999999",
+            ).exists()
+        )
+
+    @patch("imports_exports.models.safe_run_task")
+    def test_run_async_dispatches_mapped_import_task(self, mocked_safe_run_task):
+        mapped_import = MappedImport.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=MappedImport.TYPE_PRODUCT,
+        )
+
+        mapped_import.run(run_async=True)
+
+        mocked_safe_run_task.assert_called_once()
+
+    @patch("imports_exports.models.safe_run_task")
+    def test_pending_mapped_import_queues_task_on_create(self, mocked_safe_run_task):
+        MappedImport.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=MappedImport.TYPE_PRODUCT,
+            status=MappedImport.STATUS_PENDING,
+        )
+
+        mocked_safe_run_task.assert_called_once()
