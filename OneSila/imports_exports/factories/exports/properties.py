@@ -57,6 +57,7 @@ class PropertiesExportFactory(AbstractExportFactory):
         base_payload = serialize_property_data(
             property_instance=property_instance,
             include_translations=include_translations,
+            language=self.language,
         )
 
         for key in (
@@ -204,6 +205,7 @@ class RulesExportFactory(AbstractExportFactory):
         payload["property_data"] = serialize_property_data(
             property_instance=item.property,
             include_translations=True,
+            language=self.language,
         )
         return payload
 

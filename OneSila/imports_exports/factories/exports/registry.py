@@ -2,7 +2,6 @@ from imports_exports.models import Export
 
 from .ean_codes import EanCodesExportFactory
 from .media import DocumentsExportFactory, ImagesExportFactory, VideosExportFactory
-from .product_properties import ProductPropertiesExportFactory
 from .products import ProductsExportFactory
 from .properties import (
     PropertiesExportFactory,
@@ -18,7 +17,6 @@ from .sales_prices import (
 
 EXPORT_FACTORY_REGISTRY = {
     Export.KIND_PRODUCTS: ProductsExportFactory,
-    Export.KIND_PRODUCT_PROPERTIES: ProductPropertiesExportFactory,
     Export.KIND_PROPERTIES: PropertiesExportFactory,
     Export.KIND_PROPERTY_SELECT_VALUES: PropertySelectValuesExportFactory,
     Export.KIND_IMAGES: ImagesExportFactory,

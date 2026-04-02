@@ -16,13 +16,14 @@ def build_product_stub(*, product):
     }
 
 
-def serialize_property_translations(*, property_instance):
+def serialize_property_translations(*, property_instance, language=None):
     return [
         {
             "language": translation.language,
             "name": translation.name,
         }
         for translation in property_instance.propertytranslation_set.all().order_by("language")
+        if language in (None, translation.language)
     ]
 
 
@@ -30,6 +31,7 @@ def serialize_property_data(
     *,
     property_instance,
     include_translations=True,
+    language=None,
 ):
     data = {
         "name": property_instance.name,
@@ -43,17 +45,19 @@ def serialize_property_data(
     if include_translations:
         data["translations"] = serialize_property_translations(
             property_instance=property_instance,
+            language=language,
         )
     return data
 
 
-def serialize_select_value_translations(*, select_value):
+def serialize_select_value_translations(*, select_value, language=None):
     return [
         {
             "language": translation.language,
             "value": translation.value,
         }
         for translation in select_value.propertyselectvaluetranslation_set.all().order_by("language")
+        if language in (None, translation.language)
     ]
 
 
@@ -78,11 +82,13 @@ def serialize_property_select_value_data(
         data["property_data"] = serialize_property_data(
             property_instance=select_value.property,
             include_translations=include_translations,
+            language=language,
         )
 
     if include_translations:
         data["translations"] = serialize_select_value_translations(
             select_value=select_value,
+            language=language,
         )
 
     return data
@@ -134,8 +140,32 @@ def serialize_sales_channel_payload(*, sales_channel):
 def get_product_translation_payloads(
     *,
     product,
+    language=None,
+    sales_channel=None,
 ):
     selected = list(product.translations.all())
+    if language is not None:
+        selected = [
+            translation
+            for translation in selected
+            if translation.language == language
+        ]
+
+    if language is not None and sales_channel is not None:
+        selected_for_channel = [
+            translation
+            for translation in selected
+            if translation.sales_channel_id == sales_channel.id
+        ]
+        if selected_for_channel:
+            selected = selected_for_channel
+        else:
+            selected = [
+                translation
+                for translation in selected
+                if translation.sales_channel_id is None
+            ]
+
     selected.sort(
         key=lambda translation: (
             translation.language,
@@ -213,6 +243,7 @@ def serialize_product_property_value(
                     "value": getattr(item, field_name, None),
                 }
                 for item in translation_map.values()
+                if language in (None, item.language)
                 if getattr(item, field_name, None) not in (None, "")
             ]
 

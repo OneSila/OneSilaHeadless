@@ -102,6 +102,15 @@ def build_import_tab_url(*, import_process) -> str | None:
     return build_sales_channel_tab_url(sales_channel=sales_channel, tab="imports")
 
 
+def build_export_url(*, export_process) -> str | None:
+    if export_process is None or not getattr(export_process, "global_id", None):
+        return None
+
+    return _build_frontend_url(
+        path=f"/imports_exports/exports/{export_process.global_id}",
+    )
+
+
 def create_user_notification(
     *,
     user,

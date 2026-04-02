@@ -17,6 +17,11 @@ from core.helpers import get_languages
 from core.helpers import safe_run_task
 from core.locales import LANGUAGE_MAX_LENGTH
 from core.upload_paths import tenant_upload_to
+from imports_exports.managers import ImportManager
+
+
+def build_default_process_name():
+    return timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M:%S")
 
 
 class Import(PolymorphicModel, models.Model):
@@ -88,6 +93,7 @@ class Import(PolymorphicModel, models.Model):
         default=0,
         help_text="How many items have been processed so far in async imports.",
     )
+    objects = ImportManager()
 
     def get_cleaned_errors_from_broken_records(self):
         import re
@@ -171,6 +177,7 @@ class Import(PolymorphicModel, models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        search_terms = ['name']
 
 
 class ImportBrokenRecord(models.Model):
@@ -299,6 +306,8 @@ class TypedImport(Import):
     def save(self, *args, **kwargs):
         if not self.pk and self.language is None and hasattr(self, "multi_tenant_company"):
             self.language = getattr(self.multi_tenant_company, "language", None)
+        if not (self.name or "").strip():
+            self.name = build_default_process_name()
 
         super().save(*args, **kwargs)
 
@@ -339,6 +348,10 @@ class MappedImport(TypedImport):
 
         if self.is_periodic:
             self.mark_as_run()
+
+    class Meta:
+        ordering = ['-created_at']
+        search_terms = ['name']
 
 
 class ImportReport(models.Model):
@@ -399,7 +412,6 @@ class Export(models.Model):
     ]
 
     KIND_PRODUCTS = "products"
-    KIND_PRODUCT_PROPERTIES = "product_properties"
     KIND_PROPERTIES = "properties"
     KIND_PROPERTY_SELECT_VALUES = "property_select_values"
     KIND_IMAGES = "images"
@@ -413,7 +425,6 @@ class Export(models.Model):
 
     KIND_CHOICES = [
         (KIND_PRODUCTS, "Products"),
-        (KIND_PRODUCT_PROPERTIES, "Product Properties"),
         (KIND_PROPERTIES, "Properties"),
         (KIND_PROPERTY_SELECT_VALUES, "Property Select Values"),
         (KIND_IMAGES, "Images"),
@@ -510,6 +521,7 @@ class Export(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        search_terms = ['name']
 
     def __str__(self):
         base = f"{self.get_status_display()} ({self.percentage}%)"
@@ -537,6 +549,8 @@ class Export(models.Model):
     def save(self, *args, **kwargs):
         if not self.pk and self.language is None and hasattr(self, "multi_tenant_company"):
             self.language = getattr(self.multi_tenant_company, "language", None)
+        if not (self.name or "").strip():
+            self.name = build_default_process_name()
 
         if self.type == self.TYPE_JSON_FEED and not self.feed_key:
             self.feed_key = self._generate_feed_key()
@@ -586,10 +600,20 @@ class Export(models.Model):
         return self.file
 
     def generate_csv(self):
-        raise NotImplementedError("CSV file generation is not implemented yet.")
+        from imports_exports.factories.exports.tabular import build_csv_export_content
+
+        payload = build_csv_export_content(export_process=self)
+        filename = f"{self.kind}-{self.id or 'export'}.csv"
+        self.file.save(filename, ContentFile(payload), save=False)
+        return self.file
 
     def generate_excel(self):
-        raise NotImplementedError("Excel file generation is not implemented yet.")
+        from imports_exports.factories.exports.tabular import build_excel_export_content
+
+        payload = build_excel_export_content(export_process=self)
+        filename = f"{self.kind}-{self.id or 'export'}.xlsx"
+        self.file.save(filename, ContentFile(payload), save=False)
+        return self.file
 
     def run(self, *, run_async=False):
         if run_async:
