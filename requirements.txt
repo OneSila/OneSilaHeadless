@@ -65,3 +65,6 @@ spacy>=3.8.11
 # For shein
 pycryptodome==3.23.0
 pycryptodomex==3.23.0
+
+# For Mcp server
+fastmcp==3.1.0

@@ -3,6 +3,7 @@ import json
 import strawberry_django
 from strawberry import Info
 from core.schema.core.extensions import default_extensions
+from core.schema.multi_tenant.extensions import IsMultiTenantCompanyOwner
 from sales_channels.schema.types.input import SalesChannelPartialInput
 from .types.types import AiContent, AiTaskResponse, AiBulletPoints, BulletPoint, AiBulkContentResponse
 from .types.input import (
@@ -13,7 +14,7 @@ from .types.input import (
     AdvancedContentGeneratorInput,
 )
 from core.schema.core.mutations import type, create, update, delete, List
-from .types.types import BrandCustomPromptType, ChatGptProductFeedConfigType
+from .types.types import BrandCustomPromptType, ChatGptProductFeedConfigType, McpApiKeyType
 from .types.input import (
     BrandCustomPromptInput,
     BrandCustomPromptPartialInput,
@@ -24,6 +25,14 @@ from core.schema.core.helpers import get_current_user, get_multi_tenant_company
 from products.models import Product
 from sales_channels.models import SalesChannel
 from django.core.exceptions import ValidationError
+from llm.models import McpApiKey
+
+
+def _get_or_create_mcp_api_key(*, multi_tenant_company):
+    mcp_api_key, _ = McpApiKey.objects.get_or_create(
+        multi_tenant_company=multi_tenant_company,
+    )
+    return mcp_api_key
 
 
 @type(name="Mutation")
@@ -34,6 +43,38 @@ class LlmMutation:
     delete_brand_custom_prompt: BrandCustomPromptType = delete()
     delete_brand_custom_prompts: List[BrandCustomPromptType] = delete(is_bulk=True)
     update_chat_gpt_product_feed_config: ChatGptProductFeedConfigType = update(ChatGptProductFeedConfigPartialInput)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=[*default_extensions, IsMultiTenantCompanyOwner()])
+    def create_mcp_api_key(self, info: Info) -> McpApiKeyType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        mcp_api_key = _get_or_create_mcp_api_key(multi_tenant_company=multi_tenant_company)
+
+        if not mcp_api_key.key:
+            mcp_api_key.regenerate_key(save=True)
+
+        return mcp_api_key
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=[*default_extensions, IsMultiTenantCompanyOwner()])
+    def regenerate_mcp_api_key(self, info: Info) -> McpApiKeyType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        mcp_api_key = _get_or_create_mcp_api_key(multi_tenant_company=multi_tenant_company)
+        mcp_api_key.regenerate_key(save=True)
+
+        return mcp_api_key
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=[*default_extensions, IsMultiTenantCompanyOwner()])
+    def activate_mcp_api_key(self, info: Info) -> McpApiKeyType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        mcp_api_key = _get_or_create_mcp_api_key(multi_tenant_company=multi_tenant_company)
+        mcp_api_key.activate(save=True)
+        return mcp_api_key
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=[*default_extensions, IsMultiTenantCompanyOwner()])
+    def deactivate_mcp_api_key(self, info: Info) -> McpApiKeyType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        mcp_api_key = _get_or_create_mcp_api_key(multi_tenant_company=multi_tenant_company)
+        mcp_api_key.deactivate(save=True)
+        return mcp_api_key
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def generate_product_ai_content(self, instance: ProductAiContentInput, info: Info) -> AiContent:

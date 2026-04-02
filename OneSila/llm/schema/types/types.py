@@ -1,12 +1,12 @@
 from typing import Annotated, List, Optional
 
-from core.schema.core.types.types import relay, type, strawberry_type, GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import relay, type, strawberry_type, GetQuerysetMultiTenantMixin, field
 from strawberry import lazy
 
 from .filters import BrandCustomPromptFilter
 from .ordering import BrandCustomPromptOrder
 from properties.schema.types.types import PropertySelectValueType
-from llm.models import BrandCustomPrompt, ChatGptProductFeedConfig
+from llm.models import BrandCustomPrompt, ChatGptProductFeedConfig, McpApiKey
 
 
 @strawberry_type
@@ -48,6 +48,18 @@ class AiBulletPoints:
 )
 class BrandCustomPromptType(relay.Node, GetQuerysetMultiTenantMixin):
     brand_value: PropertySelectValueType
+
+
+@type(
+    McpApiKey,
+    fields="__all__",
+)
+class McpApiKeyType(relay.Node, GetQuerysetMultiTenantMixin):
+    multi_tenant_company: Annotated["MultiTenantCompanyType", lazy("core.schema.multi_tenant.types.types")]
+
+    @field()
+    def masked_key(self, info) -> str:
+        return McpApiKey.masked_key.fget(self)
 
 
 @type(

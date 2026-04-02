@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
@@ -5,6 +7,55 @@ from django.utils.translation import gettext_lazy as _
 from core import models
 from core.helpers import get_languages
 from core.locales import LANGUAGE_MAX_LENGTH
+
+
+class McpApiKey(models.SharedModel):
+    multi_tenant_company = models.OneToOneField(
+        "core.MultiTenantCompany",
+        on_delete=models.CASCADE,
+        related_name="mcp_api_key",
+    )
+    key = models.CharField(max_length=64, unique=True, db_index=True, editable=False)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "MCP API Key"
+        verbose_name_plural = "MCP API Keys"
+
+    def __str__(self):
+        return f"MCP API Key ({self.multi_tenant_company})"
+
+    @staticmethod
+    def generate_key() -> str:
+        return secrets.token_hex(32)
+
+    @property
+    def masked_key(self) -> str:
+        if not self.key:
+            return ""
+        return f"{self.key[:4]}...{self.key[-4:]}"
+
+    def regenerate_key(self, *, save=True) -> str:
+        self.key = self.generate_key()
+        if save:
+            self.save(update_fields=["key", "updated_at"])
+        return self.key
+
+    def activate(self, *, save=True) -> None:
+        self.is_active = True
+        if save:
+            self.save(update_fields=["is_active", "updated_at"])
+
+    def deactivate(self, *, save=True) -> None:
+        self.is_active = False
+        if save:
+            self.save(update_fields=["is_active", "updated_at"])
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        super().save(*args, **kwargs)
 
 
 class AbstractAiProcess(models.Model):
