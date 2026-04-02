@@ -140,6 +140,7 @@ class ProductPropertiesExportFactory(AbstractExportFactory):
                 "property": serialize_property_data(
                     property_instance=product_property.property,
                     include_translations=include_translations,
+                    language=self.language,
                 ),
                 "value": value,
                 "values": values,

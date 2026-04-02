@@ -7,8 +7,13 @@ from core.signals import registered, invited, \
     invite_accepted, disabled, enabled, login_token_requested, \
     recovery_token_created, password_changed, post_create, post_update
 
-from imports_exports.models import Import
-from notifications.helpers import build_import_tab_url, build_product_tab_url, create_user_notification
+from imports_exports.models import Export, Import
+from notifications.helpers import (
+    build_export_url,
+    build_import_tab_url,
+    build_product_tab_url,
+    create_user_notification,
+)
 from notifications.models import CollaborationMention, Notification
 from notifications.flows.email import send_welcome_email_flow, \
     send_user_invite_email_flow, send_user_login_link_email_flow, \
@@ -181,6 +186,46 @@ def notifications__import__create_status_notification(sender, instance, **kwargs
         multi_tenant_company=instance.multi_tenant_company,
         metadata={
             "import_id": instance.id,
+            "status": instance.status,
+            "previous_status": previous_status,
+        },
+    )
+
+
+@receiver(post_update, sender="imports_exports.Export")
+def notifications__export__create_status_notification(sender, instance, **kwargs):
+    if not instance.created_by_multi_tenant_user_id:
+        return
+
+    if not instance.is_dirty_field("status"):
+        return
+
+    previous_status = instance.get_dirty_fields().get("status")
+    if previous_status == instance.status:
+        return
+
+    if instance.status not in {Export.STATUS_SUCCESS, Export.STATUS_FAILED}:
+        return
+
+    notification_type = (
+        Notification.TYPE_IMPORT_FINISHED
+        if instance.status == Export.STATUS_SUCCESS
+        else Notification.TYPE_IMPORT_FAILED
+    )
+    title = "Export finished" if instance.status == Export.STATUS_SUCCESS else "Export failed"
+    export_name = instance.name or instance.__class__.__name__
+    current_status_display = instance.get_status_display()
+
+    create_user_notification(
+        user=instance.created_by_multi_tenant_user,
+        notification_type=notification_type,
+        title=title,
+        message=f"{export_name} is {current_status_display}.",
+        url=build_export_url(export_process=instance),
+        actor=instance.last_update_by_multi_tenant_user or instance.created_by_multi_tenant_user,
+        multi_tenant_company=instance.multi_tenant_company,
+        metadata={
+            "export_id": instance.id,
             "status": instance.status,
             "previous_status": previous_status,
         },

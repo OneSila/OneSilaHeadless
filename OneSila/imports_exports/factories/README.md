@@ -575,27 +575,6 @@ Example:
 }
 ```
 
-## `product_properties`
-
-Supported columns:
-- `product_data`
-- `product_sku`
-- `properties`
-
-Important parameters:
-- `product` or `product_ids`
-- `ids`
-- `sales_channel`
-- `add_translations`
-- `values_are_ids`
-- `add_value_ids`
-- nested `product_properties.add_value_ids`
-
-Notes:
-- each entry in `properties` emits `property`, `value`, `values`, and optional `requirement`
-- `value` is the singular import-friendly representation
-- `values` is the list form used for select and multiselect compatibility
-
 ## `properties`
 
 Supported columns:

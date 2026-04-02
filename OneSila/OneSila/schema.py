@@ -39,6 +39,7 @@ from sales_channels.integrations.amazon.schema import AmazonSalesChannelMutation
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
+from imports_exports.schema import ImportsExportsMutation, ImportsExportsQuery, ImportsExportsSubscription
 from llm.schema import LlmMutation, LlmQuery
 from webhooks.schema import WebhooksQuery, WebhooksMutation
 
@@ -54,6 +55,7 @@ class Query(
         CountryQuery,
         EanCodesQuery,
         IntegrationsQuery,
+        ImportsExportsQuery,
         LanguageQuery,
         LeadTimesQuery,
         MediaQuery,
@@ -95,6 +97,7 @@ class Mutation(
         ProductsMutation,
         PropertiesMutation,
         IntegrationsMutation,
+        ImportsExportsMutation,
         LlmMutation,
         SalesPricesMutation,
         SalesChannelsMutation,
@@ -124,6 +127,7 @@ class Subscription(
         MiraklSalesChannelsSubscription,
         WoocommerceSalesChannelsSubscription,
         EbaySalesChannelsSubscription,
+        ImportsExportsSubscription,
 ):
     pass
 

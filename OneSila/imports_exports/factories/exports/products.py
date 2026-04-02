@@ -8,7 +8,6 @@ from sales_channels.models import SalesChannelViewAssign
 from sales_prices.models import SalesPrice, SalesPriceListItem
 
 from .helpers import (
-    filter_queryset_by_ids,
     get_product_translation_payloads,
     serialize_sales_channel_payload,
     serialize_property_data,
@@ -176,12 +175,15 @@ class ProductsExportFactory(AbstractExportFactory):
 
         return queryset.order_by("id")
 
-    def build_rule_cache(self, *, products):
-        product_type_ids = set()
-        for product in products:
-            for product_property in product.productproperty_set.all():
-                if product_property.property.is_product_type and product_property.value_select_id:
-                    product_type_ids.add(product_property.value_select_id)
+    def build_rule_cache(self, *, queryset):
+        product_type_ids = set(
+            ProductProperty.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                product__in=queryset.values("id"),
+                property__is_product_type=True,
+                value_select_id__isnull=False,
+            ).values_list("value_select_id", flat=True).distinct()
+        )
 
         if not product_type_ids:
             return {}
@@ -211,6 +213,12 @@ class ProductsExportFactory(AbstractExportFactory):
             cache[product_type_id] = preferred_rule or fallback_rule
         return cache
 
+    def get_prefetched_related_objects(self, *, instance, relation_name):
+        prefetched = getattr(instance, "_prefetched_objects_cache", {})
+        if relation_name in prefetched:
+            return prefetched[relation_name]
+        return list(getattr(instance, relation_name).all())
+
     def get_product_rule(self, *, product, rule_cache):
         for product_property in product.productproperty_set.all():
             if product_property.property.is_product_type and product_property.value_select_id:
@@ -225,7 +233,10 @@ class ProductsExportFactory(AbstractExportFactory):
         return exporter.serialize_product_properties(product=product, rule=rule)
 
     def get_ean_code(self, *, product):
-        ean_codes = list(product.eancode_set.all())
+        ean_codes = self.get_prefetched_related_objects(
+            instance=product,
+            relation_name="eancode_set",
+        )
         if not ean_codes:
             return None
         return ean_codes[0].ean_code
@@ -366,10 +377,13 @@ class ProductsExportFactory(AbstractExportFactory):
         values = []
         seen = set()
         for variation in product.get_unique_configurable_variations():
-            for product_property in variation.productproperty_set.filter(property_id__in=property_ids).select_related(
-                "property",
-                "value_select",
-            ):
+            variation_properties = self.get_prefetched_related_objects(
+                instance=variation,
+                relation_name="productproperty_set",
+            )
+            for product_property in variation_properties:
+                if product_property.property_id not in property_ids:
+                    continue
                 if not product_property.value_select_id:
                     continue
                 key = (product_property.property_id, product_property.value_select_id)
@@ -381,6 +395,7 @@ class ProductsExportFactory(AbstractExportFactory):
                         "property_data": serialize_property_data(
                             property_instance=product_property.property,
                             include_translations=True,
+                            language=self.language,
                         ),
                         "value": product_property.value_select.value_by_language_code(language=self.language),
                     }
@@ -407,6 +422,8 @@ class ProductsExportFactory(AbstractExportFactory):
 
         translations = get_product_translation_payloads(
             product=variation,
+            language=self.language,
+            sales_channel=self.resolve_sales_channel(),
         )
         if translations:
             payload["translations"] = translations
@@ -424,6 +441,8 @@ class ProductsExportFactory(AbstractExportFactory):
         row = {}
         translations = get_product_translation_payloads(
             product=product,
+            language=self.language,
+            sales_channel=self.resolve_sales_channel(),
         )
 
         if self.include_column(key="name"):
@@ -467,17 +486,29 @@ class ProductsExportFactory(AbstractExportFactory):
 
         if flat:
             if self.include_column(key="configurable_products_skus"):
-                row["configurable_products_skus"] = list(
-                    product.configurable_variations.values_list("sku", flat=True)
-                )
+                row["configurable_products_skus"] = [
+                    variation.sku
+                    for variation in self.get_prefetched_related_objects(
+                        instance=product,
+                        relation_name="configurable_variations",
+                    )
+                ]
             if self.include_column(key="bundle_products_skus"):
-                row["bundle_products_skus"] = list(
-                    product.bundle_variations.values_list("sku", flat=True)
-                )
+                row["bundle_products_skus"] = [
+                    variation.sku
+                    for variation in self.get_prefetched_related_objects(
+                        instance=product,
+                        relation_name="bundle_variations",
+                    )
+                ]
             if self.include_column(key="alias_products_skus"):
-                row["alias_products_skus"] = list(
-                    product.alias_products.values_list("sku", flat=True)
-                )
+                row["alias_products_skus"] = [
+                    alias_product.sku
+                    for alias_product in self.get_prefetched_related_objects(
+                        instance=product,
+                        relation_name="alias_products",
+                    )
+                ]
             return row
 
         if self.include_column(key="variations") and product.is_configurable():
@@ -527,15 +558,14 @@ class ProductsExportFactory(AbstractExportFactory):
     def get_payload(self):
         queryset = self.get_queryset()
         total_records = self.track_queryset(queryset=queryset)
-        products = list(self.iterate_queryset(queryset=queryset))
-        rule_cache = self.build_rule_cache(products=products)
+        rule_cache = self.build_rule_cache(queryset=queryset)
         payload = []
-        for index, product in enumerate(products, start=1):
+        for index, product in enumerate(self.iterate_queryset(queryset=queryset), start=1):
             payload.append(
                 self.serialize_product(
-                product=product,
-                rule=self.get_product_rule(product=product, rule_cache=rule_cache),
-            )
+                    product=product,
+                    rule=self.get_product_rule(product=product, rule_cache=rule_cache),
+                )
             )
             self.update_progress(processed=index, total_records=total_records)
         return payload

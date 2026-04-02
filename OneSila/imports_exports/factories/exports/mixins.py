@@ -1,9 +1,12 @@
 import abc
+import logging
 from traceback import format_exc
 
 from core.helpers import ensure_serializable
 from core.locales import LANGUAGE_MAX_LENGTH
 from sales_channels.models import SalesChannel
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractExportFactory(abc.ABC):
@@ -11,11 +14,15 @@ class AbstractExportFactory(abc.ABC):
     default_columns = ()
     supported_columns = ()
     iterator_chunk_size = 200
+    progress_log_step = 100
 
     def __init__(self, *, export_process, columns=None, parameters=None, language=None):
         self.export_process = export_process
         self.multi_tenant_company = export_process.multi_tenant_company
-        self.language = language or export_process.language or getattr(self.multi_tenant_company, "language", None)
+        if language is not None:
+            self.language = language
+        else:
+            self.language = export_process.language
         self.parameters = parameters if parameters is not None else (export_process.parameters or {})
         if columns is None:
             self.columns = list(export_process.columns or self.supported_columns)
@@ -25,6 +32,7 @@ class AbstractExportFactory(abc.ABC):
         self._sales_channel_resolved = False
         self._progress_step = 0
         self._tracked_total_records = None
+        self._last_logged_processed = 0
 
         self.validate()
 
@@ -89,6 +97,12 @@ class AbstractExportFactory(abc.ABC):
         self._tracked_total_records = total_records
         self.export_process.total_records = total_records
         self.export_process.save(update_fields=["total_records"])
+        logger.info(
+            "Export %s (%s) will build raw_data for %s records.",
+            self.export_process.id,
+            self.kind,
+            total_records,
+        )
         return total_records
 
     def iterate_queryset(self, *, queryset):
@@ -97,6 +111,8 @@ class AbstractExportFactory(abc.ABC):
     def update_progress(self, *, processed, total_records):
         if total_records <= 0:
             return
+
+        self.log_progress(processed=processed, total_records=total_records)
 
         percentage = int((processed * 100) / total_records)
         percentage = min((percentage // 10) * 10, 90)
@@ -107,6 +123,19 @@ class AbstractExportFactory(abc.ABC):
         self._progress_step = percentage
         self.export_process.percentage = percentage
         self.export_process.save(update_fields=["percentage"])
+
+    def log_progress(self, *, processed, total_records):
+        if processed != total_records and processed - self._last_logged_processed < self.progress_log_step:
+            return
+
+        self._last_logged_processed = processed
+        logger.info(
+            "Export %s (%s) built raw_data for %s/%s records.",
+            self.export_process.id,
+            self.kind,
+            processed,
+            total_records,
+        )
 
     def resolve_sales_channel(self):
         if self._sales_channel_resolved:
@@ -155,6 +184,12 @@ class ExportRunner:
         from imports_exports.factories.exports.registry import get_export_factory
 
         export_process = self.export_process
+        logger.info(
+            "Starting export %s (%s, %s).",
+            export_process.id,
+            export_process.kind,
+            export_process.type,
+        )
         export_process.status = export_process.STATUS_PROCESSING
         export_process.percentage = 0
         export_process.error_traceback = ""
@@ -183,6 +218,12 @@ class ExportRunner:
             export_process.percentage = 100
             export_process.error_traceback = ""
             export_process.save(update_fields=update_fields)
+            logger.info(
+                "Export %s (%s) completed successfully with %s records.",
+                export_process.id,
+                export_process.kind,
+                export_process.total_records,
+            )
 
         except Exception:
             export_process.status = export_process.STATUS_FAILED
@@ -193,3 +234,8 @@ class ExportRunner:
             if export_process.file:
                 update_fields.append("file")
             export_process.save(update_fields=update_fields)
+            logger.exception(
+                "Export %s (%s) failed while building raw_data or materializing the file.",
+                export_process.id,
+                export_process.kind,
+            )

@@ -5,8 +5,13 @@ from model_bakery import baker
 from unittest.mock import patch
 
 from core.tests import TestCase
-from imports_exports.models import Import, MappedImport
-from notifications.helpers import build_import_tab_url, build_product_tab_url, create_user_notification
+from imports_exports.models import Export, Import, MappedImport
+from notifications.helpers import (
+    build_export_url,
+    build_import_tab_url,
+    build_product_tab_url,
+    create_user_notification,
+)
 from notifications.models import CollaborationEntry, CollaborationMention, CollaborationThread, Notification
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.products import RemoteProduct
@@ -336,4 +341,54 @@ class NotificationReceiverTestCase(TestCase):
         self.assertNotIn("/integrations/debenhams/", notification.url)
         self.assertEqual(notification.message, "MiraklSalesChannelImport is Failed.")
         self.assertEqual(notification.metadata["status"], Import.STATUS_FAILED)
+        mock_refresh_subscription_receiver.assert_called_once_with(self.user)
+
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_export_success_creates_notification_for_creator(self, mock_refresh_subscription_receiver):
+        export_process = baker.make(
+            Export,
+            multi_tenant_company=self.multi_tenant_company,
+            created_by_multi_tenant_user=self.user,
+            last_update_by_multi_tenant_user=self.user,
+            status=Export.STATUS_PROCESSING,
+            name="Catalog export",
+        )
+
+        export_process.status = Export.STATUS_SUCCESS
+        export_process.save(update_fields=["status"])
+
+        notification = Notification.objects.get(
+            user=self.user,
+            type=Notification.TYPE_IMPORT_FINISHED,
+        )
+        self.assertEqual(notification.title, "Export finished")
+        self.assertEqual(notification.url, build_export_url(export_process=export_process))
+        self.assertEqual(notification.message, "Catalog export is Success.")
+        self.assertEqual(notification.metadata["status"], Export.STATUS_SUCCESS)
+        self.assertEqual(notification.metadata["export_id"], export_process.id)
+        mock_refresh_subscription_receiver.assert_called_once_with(self.user)
+
+    @patch("notifications.receivers.refresh_subscription_receiver")
+    def test_export_failure_creates_notification_for_creator(self, mock_refresh_subscription_receiver):
+        export_process = baker.make(
+            Export,
+            multi_tenant_company=self.multi_tenant_company,
+            created_by_multi_tenant_user=self.user,
+            last_update_by_multi_tenant_user=self.user,
+            status=Export.STATUS_PROCESSING,
+            name="Catalog export",
+        )
+
+        export_process.status = Export.STATUS_FAILED
+        export_process.save(update_fields=["status"])
+
+        notification = Notification.objects.get(
+            user=self.user,
+            type=Notification.TYPE_IMPORT_FAILED,
+        )
+        self.assertEqual(notification.title, "Export failed")
+        self.assertEqual(notification.url, build_export_url(export_process=export_process))
+        self.assertEqual(notification.message, "Catalog export is Failed.")
+        self.assertEqual(notification.metadata["status"], Export.STATUS_FAILED)
+        self.assertEqual(notification.metadata["export_id"], export_process.id)
         mock_refresh_subscription_receiver.assert_called_once_with(self.user)
