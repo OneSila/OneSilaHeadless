@@ -1,4 +1,5 @@
 from imports_exports.decorators import handle_import_exception
+from imports_exports.factories.ean_codes import ImportEanCodeInstance
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportPropertySelectValueInstance, \
     ImportPropertyInstance
@@ -22,6 +23,7 @@ class ImportMixin:
     import_select_values = False
     import_rules = False
     import_products = False
+    import_ean_codes = False
 
     def __init__(self, import_process, language=None):
         self.import_process = import_process
@@ -156,6 +158,21 @@ class ImportMixin:
     def update_rule_log_instance(self, log_instance, import_instance, rule_data):
         pass
 
+    # --------------------
+    # EAN CODES
+    # --------------------
+    def get_ean_codes_data(self):
+        raise NotImplementedError("'get_ean_codes_data' needs to be implemented in the subclass!")
+
+    def get_structured_ean_code_data(self, ean_code_data):
+        raise NotImplementedError("'get_structured_ean_code_data' needs to be implemented in the subclass!")
+
+    def get_final_ean_code_data_from_log(self, log_instance):
+        return log_instance
+
+    def update_ean_code_log_instance(self, log_instance, import_instance):
+        pass
+
     def update_import_instance_before_process(self, import_instance):
         if self.language:
             import_instance.set_language(self.language)
@@ -251,6 +268,17 @@ class ImportMixin:
                 add_data_to_log_method=True
             )
 
+    def import_ean_codes_process(self):
+        for ean_code_data in self.get_ean_codes_data():
+            self.generic_single_process(
+                step_name='import_ean_codes_process',
+                data=ean_code_data,
+                struct_method=self.get_structured_ean_code_data,
+                final_data_method=self.get_final_ean_code_data_from_log,
+                import_cls=ImportEanCodeInstance,
+                log_method=self.update_ean_code_log_instance,
+            )
+
     def prepare_import_process(self):
         """
         Preparation for the import process
@@ -342,6 +370,9 @@ class ImportMixin:
 
             if self.import_products:
                 self.import_products_process()
+
+            if self.import_ean_codes:
+                self.import_ean_codes_process()
 
             self.mark_success()
 

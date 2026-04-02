@@ -7,9 +7,14 @@ from datetime import timedelta
 import json
 import requests
 import mimetypes
+from hashlib import shake_256
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+import shortuuid
 
+from core.helpers import ensure_serializable
 from core.helpers import get_languages
+from core.helpers import safe_run_task
 from core.locales import LANGUAGE_MAX_LENGTH
 from core.upload_paths import tenant_upload_to
 
@@ -243,12 +248,14 @@ class TypedImport(Import):
     TYPE_PROPERTY_SELECT_VALUE = 'property_select_value'
     TYPE_PROPERTY_RULE = 'property_rule'
     TYPE_PRODUCT = 'product'
+    TYPE_EAN_CODE = 'ean_code'
 
     TYPE_CHOICES = [
         (TYPE_PROPERTY, 'Property'),
         (TYPE_PROPERTY_SELECT_VALUE, 'Property Select Value'),
         (TYPE_PROPERTY_RULE, 'Product Property Rule'),
         (TYPE_PRODUCT, 'Product'),
+        (TYPE_EAN_CODE, 'EAN Code'),
     ]
     type = models.CharField(
         max_length=32,
@@ -295,7 +302,7 @@ class TypedImport(Import):
 
         super().save(*args, **kwargs)
 
-    def run(self):
+    def run(self, *, run_async=False):
         raise NotImplementedError("Cannot run a TypedImport directly. Use a concrete subclass like MappedImport.")
 
 
@@ -316,10 +323,16 @@ class MappedImport(TypedImport):
         help_text="URL pointing to mapped JSON data."
     )
 
-    def run(self):
+    def run(self, *, run_async=False):
         """
         Execute the mapped import using the proper runner.
         """
+        if run_async:
+            from imports_exports.tasks import run_mapped_import_task
+
+            safe_run_task(run_mapped_import_task, self.id)
+            return
+
         from imports_exports.factories.importers import MappedImportRunner
         runner = MappedImportRunner(self)
         runner.run()
@@ -362,3 +375,233 @@ class ImportReport(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class Export(models.Model):
+    STATUS_NEW = Import.STATUS_NEW
+    STATUS_PENDING = Import.STATUS_PENDING
+    STATUS_FAILED = Import.STATUS_FAILED
+    STATUS_PROCESSING = Import.STATUS_PROCESSING
+    STATUS_SUCCESS = Import.STATUS_SUCCESS
+
+    STATUS_CHOICES = Import.STATUS_CHOICES
+
+    TYPE_JSON_FEED = "json_feed"
+    TYPE_JSON = "json"
+    TYPE_CSV = "csv"
+    TYPE_EXCEL = "excel"
+
+    TYPE_CHOICES = [
+        (TYPE_JSON_FEED, "JSON Feed"),
+        (TYPE_JSON, "JSON"),
+        (TYPE_CSV, "CSV"),
+        (TYPE_EXCEL, "Excel"),
+    ]
+
+    KIND_PRODUCTS = "products"
+    KIND_PRODUCT_PROPERTIES = "product_properties"
+    KIND_PROPERTIES = "properties"
+    KIND_PROPERTY_SELECT_VALUES = "property_select_values"
+    KIND_IMAGES = "images"
+    KIND_DOCUMENTS = "documents"
+    KIND_VIDEOS = "videos"
+    KIND_SALES_PRICES = "sales_prices"
+    KIND_PRICE_LISTS = "price_lists"
+    KIND_PRICE_LIST_PRICES = "price_list_prices"
+    KIND_RULES = "rules"
+    KIND_EAN_CODES = "ean_codes"
+
+    KIND_CHOICES = [
+        (KIND_PRODUCTS, "Products"),
+        (KIND_PRODUCT_PROPERTIES, "Product Properties"),
+        (KIND_PROPERTIES, "Properties"),
+        (KIND_PROPERTY_SELECT_VALUES, "Property Select Values"),
+        (KIND_IMAGES, "Images"),
+        (KIND_DOCUMENTS, "Documents"),
+        (KIND_VIDEOS, "Videos"),
+        (KIND_SALES_PRICES, "Sales Prices"),
+        (KIND_PRICE_LISTS, "Price Lists"),
+        (KIND_PRICE_LIST_PRICES, "Price List Prices"),
+        (KIND_RULES, "Rules"),
+        (KIND_EAN_CODES, "EAN Codes"),
+    ]
+
+    LANGUAGE_CHOICES = get_languages()
+
+    name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Optional human-readable name for the export process.",
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default=STATUS_NEW,
+    )
+    type = models.CharField(
+        max_length=16,
+        choices=TYPE_CHOICES,
+        default=TYPE_JSON_FEED,
+    )
+    kind = models.CharField(
+        max_length=64,
+        choices=KIND_CHOICES,
+    )
+    percentage = models.PositiveIntegerField(
+        default=0,
+        help_text="Whole integer representing the export progress.",
+    )
+    error_traceback = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Stores the error traceback if the export fails.",
+    )
+    raw_data = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Canonical export data that remains compatible with our import payloads.",
+    )
+    feed_key = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Opaque identifier used by direct feed URLs.",
+    )
+    total_records = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of exported records.",
+    )
+    parameters = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Behavior flags and filters that affect how the export is built.",
+    )
+    columns = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of export fields to include in raw_data.",
+    )
+    file = models.FileField(
+        upload_to=tenant_upload_to("exports"),
+        null=True,
+        blank=True,
+        help_text="Materialized export file when the type requires one.",
+    )
+    language = models.CharField(
+        max_length=LANGUAGE_MAX_LENGTH,
+        choices=LANGUAGE_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Language context for the export when applicable.",
+    )
+    is_periodic = models.BooleanField(default=False)
+    interval_hours = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Repeat interval in hours if this export is periodic.",
+    )
+    last_run_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this export was last executed.",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        base = f"{self.get_status_display()} ({self.percentage}%)"
+        return f"{self.name or 'ExportProcess'} - {base}"
+
+    def clean(self):
+        super().clean()
+
+        if self.is_periodic and self.type != self.TYPE_JSON_FEED:
+            raise ValidationError("Periodic exports are only supported for json_feed exports.")
+
+        if self.interval_hours and self.type != self.TYPE_JSON_FEED:
+            raise ValidationError("interval_hours can only be used for json_feed exports.")
+
+        if self.type == self.TYPE_JSON_FEED and not self.feed_key:
+            self.feed_key = self._generate_feed_key()
+
+        if self.type != self.TYPE_JSON_FEED:
+            self.feed_key = None
+            if self.is_periodic:
+                raise ValidationError("Only json_feed exports can be periodic.")
+            self.interval_hours = None
+            self.last_run_at = None
+
+    def save(self, *args, **kwargs):
+        if not self.pk and self.language is None and hasattr(self, "multi_tenant_company"):
+            self.language = getattr(self.multi_tenant_company, "language", None)
+
+        if self.type == self.TYPE_JSON_FEED and not self.feed_key:
+            self.feed_key = self._generate_feed_key()
+
+        if self.type != self.TYPE_JSON_FEED:
+            self.feed_key = None
+            self.is_periodic = False
+            self.interval_hours = None
+            self.last_run_at = None
+
+        super().save(*args, **kwargs)
+
+    def _generate_feed_key(self):
+        return shake_256(shortuuid.uuid().encode("utf-8")).hexdigest(24)
+
+    def should_run(self) -> bool:
+        if not self.is_periodic or not self.interval_hours:
+            return False
+        if not self.last_run_at:
+            return True
+        return timezone.now() >= self.last_run_at + timedelta(hours=self.interval_hours)
+
+    def mark_as_run(self):
+        self.last_run_at = timezone.now()
+        self.save(update_fields=["last_run_at"])
+
+    def generate_file(self):
+        if self.type == self.TYPE_JSON_FEED:
+            return None
+        if self.type == self.TYPE_JSON:
+            return self.generate_json()
+        if self.type == self.TYPE_CSV:
+            return self.generate_csv()
+        if self.type == self.TYPE_EXCEL:
+            return self.generate_excel()
+        raise ValidationError(f"Unsupported export type: {self.type}")
+
+    def generate_json(self):
+        payload = json.dumps(
+            ensure_serializable(self.raw_data),
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ).encode("utf-8")
+        filename = f"{self.kind}-{self.id or 'export'}.json"
+        self.file.save(filename, ContentFile(payload), save=False)
+        return self.file
+
+    def generate_csv(self):
+        raise NotImplementedError("CSV file generation is not implemented yet.")
+
+    def generate_excel(self):
+        raise NotImplementedError("Excel file generation is not implemented yet.")
+
+    def run(self, *, run_async=False):
+        if run_async:
+            from imports_exports.tasks import run_export_task
+
+            safe_run_task(run_export_task, export_id=self.id)
+            return
+
+        from imports_exports.factories.exports import ExportRunner
+
+        runner = ExportRunner(export_process=self)
+        runner.run()
+
+        if self.is_periodic:
+            self.mark_as_run()
