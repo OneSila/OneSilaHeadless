@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from channels.db import database_sync_to_async
 from fastmcp import Context
 from fastmcp.dependencies import CurrentContext
 from fastmcp.tools.tool import ToolResult
@@ -31,7 +32,7 @@ class GetVatRatesMcpTool(BaseMcpTool):
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
-            response_data: GetVatRatesPayload = get_vat_rates_payload(
+            response_data = await self._get_vat_rates(
                 multi_tenant_company=multi_tenant_company,
             )
             await ctx.info(
@@ -48,3 +49,13 @@ class GetVatRatesMcpTool(BaseMcpTool):
             await ctx.error(f"Get VAT rates failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
+
+    @database_sync_to_async
+    def _get_vat_rates(
+        self,
+        *,
+        multi_tenant_company,
+    ) -> GetVatRatesPayload:
+        return get_vat_rates_payload(
+            multi_tenant_company=multi_tenant_company,
+        )

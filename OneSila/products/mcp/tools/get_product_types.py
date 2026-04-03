@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from channels.db import database_sync_to_async
 from fastmcp import Context
 from fastmcp.dependencies import CurrentContext
 from fastmcp.tools.tool import ToolResult
@@ -32,7 +33,7 @@ class GetProductTypesMcpTool(BaseMcpTool):
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
-            response_data: GetProductTypesPayload = get_product_types_payload(
+            response_data = await self._get_product_types(
                 multi_tenant_company=multi_tenant_company,
             )
             await ctx.info(
@@ -52,3 +53,16 @@ class GetProductTypesMcpTool(BaseMcpTool):
             await ctx.error(f"Get product types failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
+
+    @database_sync_to_async
+    def _get_product_types(
+        self,
+        *,
+        multi_tenant_company,
+    ) -> GetProductTypesPayload:
+        try:
+            return get_product_types_payload(
+                multi_tenant_company=multi_tenant_company,
+            )
+        except ValueError as error:
+            raise McpToolError(str(error)) from error
