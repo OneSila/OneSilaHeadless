@@ -2,12 +2,17 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.core.exceptions import ValidationError
 from django.test import TransactionTestCase
 from model_bakery import baker
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from imports_exports.models import Export, MappedImport
-from imports_exports.schema.mutation_helpers import _build_export_parameters, _merge_parameter_dicts
+from imports_exports.schema.mutation_helpers import (
+    _build_export_parameters,
+    _merge_parameter_dicts,
+    _validate_periodic_export_size,
+)
 from products.models import Product
 from sales_channels.models import SalesChannel
 

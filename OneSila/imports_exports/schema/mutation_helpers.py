@@ -343,6 +343,15 @@ def _validate_export_columns(*, kind: str, columns: list[str] | None):
         )
 
 
+def _validate_periodic_export_size(*, instance: Export):
+    factory_class = get_export_factory(kind=instance.kind)
+    factory = factory_class(export_process=instance)
+    try:
+        factory.validate_periodic_record_limit()
+    except ValueError as exc:
+        raise ValidationError({"is_periodic": str(exc)}) from exc
+
+
 def create_export_instance(*, info: Info, data) -> Export:
     multi_tenant_company, current_user = _get_company_and_user(info=info)
     _validate_export_columns(kind=data.kind, columns=data.columns)
@@ -368,6 +377,7 @@ def create_export_instance(*, info: Info, data) -> Export:
         is_periodic=data.is_periodic,
         interval_hours=data.interval_hours,
     )
+    _validate_periodic_export_size(instance=instance)
     instance.full_clean()
     instance.save()
     return instance
@@ -417,6 +427,7 @@ def update_export_instance(*, info: Info, data) -> Export:
 
     instance.type = type_value
     instance.last_update_by_multi_tenant_user = current_user
+    _validate_periodic_export_size(instance=instance)
     instance.full_clean()
     instance.save()
     return instance
