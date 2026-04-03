@@ -69,6 +69,96 @@ Why:
 - we do not depend on ad-hoc JSON strings
 - we can give both human-readable summaries and structured payloads
 
+For OneSila, the default rule should be:
+
+- every tool defines an explicit `OUTPUT_SCHEMA` constant
+- every tool returns a `ToolResult`
+- `structured_content` must match `OUTPUT_SCHEMA`
+- `content` should be a short human-readable summary, not the primary data container
+
+This means our serializer logic should move toward:
+
+- build typed Python payload
+- validate by contract through `output_schema`
+- return summary text plus structured payload
+
+Not this:
+
+- dump arbitrary JSON string and hope clients parse it consistently
+
+Recommended pattern:
+
+```python
+SEARCH_PROPERTIES_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "has_more": {"type": "boolean"},
+        "offset": {"type": "integer"},
+        "limit": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": ["string", "null"]},
+                    "internal_name": {"type": ["string", "null"]},
+                    "type": {"type": "string"},
+                    "type_label": {"type": ["string", "null"]},
+                },
+                "required": ["id", "name", "type"],
+            },
+        },
+    },
+    "required": ["has_more", "offset", "limit", "results"],
+}
+```
+
+Then:
+
+```python
+@tool(
+    name="search_properties",
+    output_schema=SEARCH_PROPERTIES_OUTPUT_SCHEMA,
+)
+async def execute(...) -> ToolResult:
+    results = [...]
+
+    return ToolResult(
+        content=[
+            TextContent(
+                type="text",
+                text=f"Found {len(results)} matching properties."
+            )
+        ],
+        structured_content={
+            "has_more": has_more,
+            "offset": offset,
+            "limit": limit,
+            "results": results,
+        },
+    )
+```
+
+Benefits:
+
+- better MCP client compatibility
+- easier future resources/prompts/tool chaining
+- cleaner frontend or agent consumption
+- easier regression checking because the output shape is explicit
+
+OneSila-specific recommendation:
+
+- keep `output_schema` next to the tool class in the same file at first
+- if a tool grows large, move schema and payload types into a sibling `schemas.py` or `types.py`
+- return both internal values and business-friendly labels when useful
+
+Examples:
+
+- `type` + `type_label`
+- `language` + `language_label`
+- `status` + `status_label`
+
 For simple read tools, the tool should return a `ToolResult` with:
 
 - `content`: short readable summary
@@ -104,7 +194,47 @@ For example:
 - `search_properties` should say "Use `get_property` for full details on one property."
 - a future `recommend_property_type` tool should explain that the caller should confirm before creating the property.
 
-### 4. Use domain language, not only internal enum language
+### 4. Typing is part of the MCP contract
+
+In FastMCP, typing is not only for Python quality. It directly affects the schema exposed to the client.
+
+This means we should use:
+
+- `Literal[...]` for enums and fixed domain values
+- `Annotated[..., Field(...)]` for limits, ranges, and parameter descriptions
+- typed payload objects for serializer output
+
+Example:
+
+```python
+PropertyTypeValue = Literal[
+    "INT",
+    "FLOAT",
+    "TEXT",
+    "DESCRIPTION",
+    "BOOLEAN",
+    "DATE",
+    "DATETIME",
+    "SELECT",
+    "MULTISELECT",
+]
+
+def execute(
+    self,
+    type: PropertyTypeValue | None = None,
+    limit: Annotated[int, Field(ge=1, le=100)] = 20,
+    offset: Annotated[int, Field(ge=0)] = 0,
+) -> str:
+    ...
+```
+
+Why this matters:
+
+- clients can see allowed enum values directly
+- limits and validation become part of the schema
+- the LLM has a better chance of calling the tool correctly
+
+### 5. Use domain language, not only internal enum language
 
 Internal values like `BOOLEAN` are useful for the backend, but the tool UX should expose a friendly explanation as well.
 
@@ -124,7 +254,7 @@ For property types and similar enums, we should return both:
 
 This is especially useful for recommendation tools and client-side confirmations.
 
-### 5. Secure server defaults
+### 6. Secure server defaults
 
 We should strongly consider:
 
@@ -139,7 +269,7 @@ Then use controlled domain errors for messages that are safe to show to clients.
 
 This reduces the risk of leaking internals in MCP error responses.
 
-### 6. Methods should eventually use `add_tool`
+### 7. Methods should eventually use `add_tool`
 
 FastMCP documents a cleaner method-based pattern:
 

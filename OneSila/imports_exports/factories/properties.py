@@ -248,6 +248,7 @@ class ImportPropertyInstance(AbstractImportInstance):
         fac.run()
 
         # Save the created/updated instance.
+        self.created = fac.created
         self.instance = fac.instance
 
         # Only create a default translation if:
@@ -363,6 +364,7 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
         fac.run()
 
         # Save the created/updated instance.
+        self.created = fac.created
         self.instance = fac.instance
 
         if fac.created and not (hasattr(self, 'translations') and len(self.translations) > 0):

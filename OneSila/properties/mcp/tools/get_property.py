@@ -1,25 +1,43 @@
 from __future__ import annotations
 
-from django.db.models import Prefetch
+from typing import Annotated
 
+from channels.db import database_sync_to_async
+from fastmcp import Context
+from fastmcp.dependencies import CurrentContext
+from fastmcp.tools.tool import ToolResult
+from pydantic import Field
+
+from core.models.multi_tenant import MultiTenantCompany
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
-from llm.mcp.serializers import json_response
-from properties.models import Property, PropertySelectValue
+from properties.mcp.helpers import get_property_detail_queryset, serialize_property_detail
+from properties.mcp.output_types import GET_PROPERTY_OUTPUT_SCHEMA
+from properties.mcp.types import PropertyDetailPayload
+from properties.models import Property
 
 
 class GetPropertyMcpTool(BaseMcpTool):
     name = "get_property"
+    title = "Get Property"
     read_only = True
+    output_schema = GET_PROPERTY_OUTPUT_SCHEMA
+    annotations = {
+        "idempotentHint": True,
+        "destructiveHint": False,
+        "openWorldHint": False,
+    }
 
-    def execute(
+    async def execute(
         self,
-        property_id: int | None = None,
-        internal_name: str | None = None,
-        name: str | None = None,
-    ) -> str:
+        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID.")] = None,
+        internal_name: Annotated[str | None, Field(description="Exact property internal name.")] = None,
+        name: Annotated[str | None, Field(description="Exact translated property name within the authenticated company.")] = None,
+        ctx: Context = CurrentContext(),
+    ) -> ToolResult:
         """
-        Get one property by id, exact internal name, or exact translated name.
-        Returns full property details including translations and select values.
+        Get a single company-scoped property by exact identifier.
+        Use this when you already know the property ID, exact internal name, or exact translated name
+        and you need the full property details, translations, and select values.
 
         Args:
             property_id: The database id of the property.
@@ -27,22 +45,56 @@ class GetPropertyMcpTool(BaseMcpTool):
             name: Exact translated property name.
         """
         try:
-            multi_tenant_company = self.get_multi_tenant_company(required=True)
-            property_instance = self._get_property_match(
+            multi_tenant_company = await self.get_multi_tenant_company(required=True)
+            await ctx.info(
+                f"Getting property for company_id={multi_tenant_company.id} "
+                f"with property_id={property_id!r}, internal_name={internal_name!r}, name={name!r}."
+            )
+            response_data = await self._get_property_detail(
                 multi_tenant_company=multi_tenant_company,
                 property_id=property_id,
                 internal_name=internal_name,
                 name=name,
             )
-            property_instance = self._property_queryset(multi_tenant_company=multi_tenant_company).get(id=property_instance.id)
-            return json_response(data=self._serialize_property_detail(property_instance=property_instance))
+            await ctx.info(
+                f"Loaded property_id={response_data['id']} internal_name={response_data['internal_name']!r}."
+            )
+            return self.build_result(
+                summary=f"Loaded property '{response_data['name']}' ({response_data['type_label']}).",
+                structured_content=response_data,
+            )
+        except McpToolError as error:
+            await ctx.warning(str(error))
+            raise
         except Exception as error:
-            return self.handle_error(error=error, action=self.name)
+            await ctx.error(f"Get property failed: {error}")
+            self.handle_error(error=error, action=self.name)
+            raise
+
+    @database_sync_to_async
+    def _get_property_detail(
+        self,
+        *,
+        multi_tenant_company: MultiTenantCompany,
+        property_id: int | None,
+        internal_name: str | None,
+        name: str | None,
+    ) -> PropertyDetailPayload:
+        property_instance = self._get_property_match(
+            multi_tenant_company=multi_tenant_company,
+            property_id=property_id,
+            internal_name=internal_name,
+            name=name,
+        )
+        property_instance = get_property_detail_queryset(
+            multi_tenant_company=multi_tenant_company,
+        ).get(id=property_instance.id)
+        return serialize_property_detail(property_instance=property_instance)
 
     def _get_property_match(
         self,
         *,
-        multi_tenant_company,
+        multi_tenant_company: MultiTenantCompany,
         property_id: int | None,
         internal_name: str | None,
         name: str | None,
@@ -72,46 +124,3 @@ class GetPropertyMcpTool(BaseMcpTool):
             raise McpToolError("Multiple properties matched the provided identifiers.")
 
         return queryset.get(id=property_ids[0])
-
-    def _property_queryset(self, *, multi_tenant_company):
-        property_value_queryset = PropertySelectValue.objects.filter(
-            multi_tenant_company=multi_tenant_company,
-        ).prefetch_related("propertyselectvaluetranslation_set")
-
-        return Property.objects.filter(multi_tenant_company=multi_tenant_company).prefetch_related(
-            "propertytranslation_set",
-            Prefetch("propertyselectvalue_set", queryset=property_value_queryset.order_by("id")),
-        )
-
-    def _serialize_property_detail(self, *, property_instance: Property) -> dict:
-        return {
-            "id": property_instance.id,
-            "name": property_instance.name,
-            "internal_name": property_instance.internal_name,
-            "type": property_instance.type,
-            "is_public_information": property_instance.is_public_information,
-            "add_to_filters": property_instance.add_to_filters,
-            "has_image": property_instance.has_image,
-            "is_product_type": property_instance.is_product_type,
-            "translations": [
-                {
-                    "language": translation.language,
-                    "name": translation.name,
-                }
-                for translation in property_instance.propertytranslation_set.all()
-            ],
-            "values": [
-                {
-                    "id": property_value.id,
-                    "value": property_value.value,
-                    "translations": [
-                        {
-                            "language": translation.language,
-                            "value": translation.value,
-                        }
-                        for translation in property_value.propertyselectvaluetranslation_set.all()
-                    ],
-                }
-                for property_value in property_instance.propertyselectvalue_set.all()
-            ],
-        }
