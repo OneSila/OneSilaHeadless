@@ -6,6 +6,7 @@ from .helpers import (
     filter_queryset_by_ids,
     serialize_property_data,
     serialize_property_select_value_data,
+    get_select_value_label,
     to_bool,
 )
 from .mixins import AbstractExportFactory
@@ -215,7 +216,10 @@ class RulesExportFactory(AbstractExportFactory):
         payload = []
         for index, rule in enumerate(self.iterate_queryset(queryset=queryset), start=1):
             row = {
-                "value": rule.product_type.value_by_language_code(language=self.language),
+                "value": get_select_value_label(
+                    select_value=rule.product_type,
+                    language=self.language,
+                ),
             }
             if self.include_column(key="require_ean_code"):
                 row["require_ean_code"] = rule.require_ean_code
