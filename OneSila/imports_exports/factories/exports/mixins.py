@@ -105,6 +105,21 @@ class AbstractExportFactory(abc.ABC):
         )
         return total_records
 
+    def get_queryset_total_records(self):
+        queryset = self.get_queryset()
+        return queryset.count()
+
+    def validate_periodic_record_limit(self):
+        if not self.export_process.is_periodic:
+            return
+
+        total_records = self.get_queryset_total_records()
+        if total_records > self.export_process.PERIODIC_MAX_TOTAL_RECORDS:
+            raise ValueError(
+                f"Periodic exports are limited to {self.export_process.PERIODIC_MAX_TOTAL_RECORDS} records. "
+                f"This export would process {total_records} records."
+            )
+
     def iterate_queryset(self, *, queryset):
         return queryset.iterator(chunk_size=self.iterator_chunk_size)
 
@@ -193,22 +208,21 @@ class ExportRunner:
         export_process.status = export_process.STATUS_PROCESSING
         export_process.percentage = 0
         export_process.error_traceback = ""
-        export_process.save(update_fields=["status", "percentage", "error_traceback"])
+        export_process.raw_data = []
+        export_process.save(update_fields=["status", "percentage", "error_traceback", "raw_data"])
 
         try:
             factory_class = get_export_factory(kind=export_process.kind)
             factory = factory_class(export_process=export_process)
+            factory.validate_periodic_record_limit()
             raw_data = factory.build_payload()
 
-            export_process.raw_data = raw_data
             export_process.total_records = factory.get_total_records(payload=raw_data)
             export_process.percentage = max(export_process.percentage, 90)
-            if export_process.type == export_process.TYPE_JSON_FEED and export_process.file:
-                export_process.file.delete(save=False)
-                export_process.file = None
-            export_process.save(update_fields=["raw_data", "total_records", "percentage", "file"])
+            export_process.raw_data = []
+            export_process.save(update_fields=["raw_data", "total_records", "percentage"])
 
-            export_process.generate_file()
+            export_process.generate_file(raw_data=raw_data)
 
             update_fields = ["status", "percentage", "raw_data", "total_records", "error_traceback"]
             if export_process.file:
@@ -229,6 +243,7 @@ class ExportRunner:
             export_process.status = export_process.STATUS_FAILED
             export_process.percentage = 100
             export_process.error_traceback = format_exc()
+            export_process.raw_data = []
 
             update_fields = ["status", "percentage", "error_traceback", "raw_data", "total_records"]
             if export_process.file:

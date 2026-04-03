@@ -89,10 +89,11 @@ def _serialize_cell_value(*, value):
 
 
 class TabularExportBuilder:
-    def __init__(self, *, export_process):
+    def __init__(self, *, export_process, raw_data=None):
         self.export_process = export_process
         self.kind = export_process.kind
-        self.raw_data = ensure_serializable(export_process.raw_data)
+        source_data = export_process.raw_data if raw_data is None else raw_data
+        self.raw_data = ensure_serializable(source_data)
 
     def build(self):
         headers = []
@@ -345,13 +346,13 @@ class TabularExportBuilder:
             row[item_prefix] = item
 
 
-def build_tabular_export(*, export_process):
-    return TabularExportBuilder(export_process=export_process).build()
+def build_tabular_export(*, export_process, raw_data=None):
+    return TabularExportBuilder(export_process=export_process, raw_data=raw_data).build()
 
 
-def build_csv_export_content(*, export_process):
-    return TabularExportBuilder(export_process=export_process).to_csv_bytes()
+def build_csv_export_content(*, export_process, raw_data=None):
+    return TabularExportBuilder(export_process=export_process, raw_data=raw_data).to_csv_bytes()
 
 
-def build_excel_export_content(*, export_process):
-    return TabularExportBuilder(export_process=export_process).to_excel_bytes()
+def build_excel_export_content(*, export_process, raw_data=None):
+    return TabularExportBuilder(export_process=export_process, raw_data=raw_data).to_excel_bytes()

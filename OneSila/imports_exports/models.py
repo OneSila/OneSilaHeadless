@@ -410,6 +410,7 @@ class Export(models.Model):
         (TYPE_CSV, "CSV"),
         (TYPE_EXCEL, "Excel"),
     ]
+    PERIODIC_MAX_TOTAL_RECORDS = 50000
 
     KIND_PRODUCTS = "products"
     KIND_PROPERTIES = "properties"
@@ -577,20 +578,20 @@ class Export(models.Model):
         self.last_run_at = timezone.now()
         self.save(update_fields=["last_run_at"])
 
-    def generate_file(self):
+    def generate_file(self, *, raw_data):
         if self.type == self.TYPE_JSON_FEED:
-            return None
+            return self.generate_json(raw_data=raw_data)
         if self.type == self.TYPE_JSON:
-            return self.generate_json()
+            return self.generate_json(raw_data=raw_data)
         if self.type == self.TYPE_CSV:
-            return self.generate_csv()
+            return self.generate_csv(raw_data=raw_data)
         if self.type == self.TYPE_EXCEL:
-            return self.generate_excel()
+            return self.generate_excel(raw_data=raw_data)
         raise ValidationError(f"Unsupported export type: {self.type}")
 
-    def generate_json(self):
+    def generate_json(self, *, raw_data):
         payload = json.dumps(
-            ensure_serializable(self.raw_data),
+            ensure_serializable(raw_data),
             ensure_ascii=False,
             indent=2,
             sort_keys=True,
@@ -599,18 +600,18 @@ class Export(models.Model):
         self.file.save(filename, ContentFile(payload), save=False)
         return self.file
 
-    def generate_csv(self):
+    def generate_csv(self, *, raw_data):
         from imports_exports.factories.exports.tabular import build_csv_export_content
 
-        payload = build_csv_export_content(export_process=self)
+        payload = build_csv_export_content(export_process=self, raw_data=raw_data)
         filename = f"{self.kind}-{self.id or 'export'}.csv"
         self.file.save(filename, ContentFile(payload), save=False)
         return self.file
 
-    def generate_excel(self):
+    def generate_excel(self, *, raw_data):
         from imports_exports.factories.exports.tabular import build_excel_export_content
 
-        payload = build_excel_export_content(export_process=self)
+        payload = build_excel_export_content(export_process=self, raw_data=raw_data)
         filename = f"{self.kind}-{self.id or 'export'}.xlsx"
         self.file.save(filename, ContentFile(payload), save=False)
         return self.file

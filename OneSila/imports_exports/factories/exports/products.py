@@ -60,6 +60,53 @@ class ProductsExportFactory(AbstractExportFactory):
         super().validate()
         self.assert_language_supported()
 
+    def _needs_translations_prefetch(self):
+        return self.include_column(key="name") or self.include_column(key="translations")
+
+    def _needs_product_properties_prefetch(self):
+        return (
+            self.include_column(key="product_type")
+            or self.include_column(key="properties")
+            or self.include_column(key="configurator_select_values")
+        )
+
+    def _needs_sales_channel_assignments_prefetch(self):
+        return self.include_column(key="sales_channels")
+
+    def _needs_parent_sales_channel_assignments_prefetch(self):
+        return self.include_column(key="sales_channels")
+
+    def _needs_media_prefetch(self):
+        return self.include_column(key="images") or self.include_column(key="documents")
+
+    def _needs_sales_prices_prefetch(self):
+        return self.include_column(key="prices")
+
+    def _needs_sales_pricelist_items_prefetch(self):
+        return self.include_column(key="sales_pricelist_items")
+
+    def _needs_configurable_variations_prefetch(self):
+        return (
+            self.include_column(key="configurable_products_skus")
+            or self.include_column(key="variations")
+            or self.include_column(key="configurator_select_values")
+        )
+
+    def _needs_bundle_variations_prefetch(self):
+        return (
+            self.include_column(key="bundle_products_skus")
+            or self.include_column(key="bundle_variations")
+        )
+
+    def _needs_alias_products_prefetch(self):
+        return (
+            self.include_column(key="alias_products_skus")
+            or self.include_column(key="alias_variations")
+        )
+
+    def _needs_ean_codes_prefetch(self):
+        return self.include_column(key="ean_code")
+
     def get_queryset(self):
         ids = self.normalize_ids(
             value=(
@@ -76,88 +123,139 @@ class ProductsExportFactory(AbstractExportFactory):
 
         queryset = Product.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-        ).select_related(
-            "vat_rate",
-            "alias_parent_product",
-        ).prefetch_related(
-            Prefetch(
-                "translations",
-                queryset=ProductTranslation.objects.select_related("sales_channel").prefetch_related("bullet_points"),
-            ),
-            Prefetch(
-                "saleschannelviewassign_set",
-                queryset=SalesChannelViewAssign.objects.select_related(
-                    "sales_channel",
-                    "sales_channel_view",
-                ),
-            ),
-            Prefetch(
-                "productproperty_set",
-                queryset=ProductProperty.objects.select_related(
-                    "property",
-                    "value_select",
-                ).prefetch_related(
-                    "value_multi_select",
-                    "value_select__propertyselectvaluetranslation_set",
-                    "property__propertytranslation_set",
-                    "productpropertytexttranslation_set",
-                ),
-            ),
-            Prefetch(
-                "configurablevariation_through_variations",
-                queryset=ConfigurableVariation.objects.select_related("parent").prefetch_related(
-                    Prefetch(
-                        "parent__saleschannelviewassign_set",
-                        queryset=SalesChannelViewAssign.objects.select_related(
-                            "sales_channel",
-                            "sales_channel_view",
-                        ),
-                    ),
-                ),
-            ),
-            Prefetch(
-                "bundlevariation_through_variations",
-                queryset=BundleVariation.objects.select_related("parent").prefetch_related(
-                    Prefetch(
-                        "parent__saleschannelviewassign_set",
-                        queryset=SalesChannelViewAssign.objects.select_related(
-                            "sales_channel",
-                            "sales_channel_view",
-                        ),
-                    ),
-                ),
-            ),
-            Prefetch(
-                "alias_parent_product__saleschannelviewassign_set",
-                queryset=SalesChannelViewAssign.objects.select_related(
-                    "sales_channel",
-                    "sales_channel_view",
-                ),
-            ),
-            Prefetch(
-                "mediaproductthrough_set",
-                queryset=MediaProductThrough.objects.select_related(
-                    "media",
-                    "media__document_type",
-                    "sales_channel",
-                ),
-            ),
-            Prefetch(
-                "salesprice_set",
-                queryset=SalesPrice.objects.select_related("currency"),
-            ),
-            Prefetch(
-                "salespricelistitem_set",
-                queryset=SalesPriceListItem.objects.select_related(
-                    "salespricelist",
-                    "salespricelist__currency",
-                ),
-            ),
-            "configurable_variations",
-            "bundle_variations",
-            "alias_products",
-            "eancode_set",
         )
+
+        select_related_fields = []
+        prefetches = []
+
+        if self.include_column(key="vat_rate"):
+            select_related_fields.append("vat_rate")
+
+        if self._needs_parent_sales_channel_assignments_prefetch():
+            select_related_fields.append("alias_parent_product")
+
+        if select_related_fields:
+            queryset = queryset.select_related(*select_related_fields)
+
+        if self._needs_translations_prefetch():
+            prefetches.append(
+                Prefetch(
+                    "translations",
+                    queryset=ProductTranslation.objects.select_related("sales_channel").prefetch_related("bullet_points"),
+                )
+            )
+
+        if self._needs_sales_channel_assignments_prefetch():
+            prefetches.append(
+                Prefetch(
+                    "saleschannelviewassign_set",
+                    queryset=SalesChannelViewAssign.objects.select_related(
+                        "sales_channel",
+                        "sales_channel_view",
+                    ),
+                )
+            )
+
+        if self._needs_product_properties_prefetch():
+            prefetches.append(
+                Prefetch(
+                    "productproperty_set",
+                    queryset=ProductProperty.objects.select_related(
+                        "property",
+                        "value_select",
+                    ).prefetch_related(
+                        "value_multi_select",
+                        "value_select__propertyselectvaluetranslation_set",
+                        "property__propertytranslation_set",
+                        "productpropertytexttranslation_set",
+                    ),
+                )
+            )
+
+        if self._needs_parent_sales_channel_assignments_prefetch():
+            prefetches.append(
+                Prefetch(
+                    "configurablevariation_through_variations",
+                    queryset=ConfigurableVariation.objects.select_related("parent").prefetch_related(
+                        Prefetch(
+                            "parent__saleschannelviewassign_set",
+                            queryset=SalesChannelViewAssign.objects.select_related(
+                                "sales_channel",
+                                "sales_channel_view",
+                            ),
+                        ),
+                    ),
+                )
+            )
+            prefetches.append(
+                Prefetch(
+                    "bundlevariation_through_variations",
+                    queryset=BundleVariation.objects.select_related("parent").prefetch_related(
+                        Prefetch(
+                            "parent__saleschannelviewassign_set",
+                            queryset=SalesChannelViewAssign.objects.select_related(
+                                "sales_channel",
+                                "sales_channel_view",
+                            ),
+                        ),
+                    ),
+                )
+            )
+            prefetches.append(
+                Prefetch(
+                    "alias_parent_product__saleschannelviewassign_set",
+                    queryset=SalesChannelViewAssign.objects.select_related(
+                        "sales_channel",
+                        "sales_channel_view",
+                    ),
+                )
+            )
+
+        if self._needs_media_prefetch():
+            prefetches.append(
+                Prefetch(
+                    "mediaproductthrough_set",
+                    queryset=MediaProductThrough.objects.select_related(
+                        "media",
+                        "media__document_type",
+                        "sales_channel",
+                    ),
+                )
+            )
+
+        if self._needs_sales_prices_prefetch():
+            prefetches.append(
+                Prefetch(
+                    "salesprice_set",
+                    queryset=SalesPrice.objects.select_related("currency"),
+                )
+            )
+
+        if self._needs_sales_pricelist_items_prefetch():
+            prefetches.append(
+                Prefetch(
+                    "salespricelistitem_set",
+                    queryset=SalesPriceListItem.objects.select_related(
+                        "salespricelist",
+                        "salespricelist__currency",
+                    ),
+                )
+            )
+
+        if self._needs_configurable_variations_prefetch():
+            prefetches.append("configurable_variations")
+
+        if self._needs_bundle_variations_prefetch():
+            prefetches.append("bundle_variations")
+
+        if self._needs_alias_products_prefetch():
+            prefetches.append("alias_products")
+
+        if self._needs_ean_codes_prefetch():
+            prefetches.append("eancode_set")
+
+        if prefetches:
+            queryset = queryset.prefetch_related(*prefetches)
 
         if ids:
             queryset = queryset.filter(id__in=ids)

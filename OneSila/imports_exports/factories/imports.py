@@ -64,9 +64,13 @@ class ImportMixin:
                 self.import_process.save()
 
     def strat_process(self):
+        self._broken_records = []
+        self.import_process.broken_record_entries.all().delete()
         self.import_process.status = Import.STATUS_PROCESSING
         self.import_process.percentage = 0
-        self.import_process.save()
+        self.import_process.broken_records = []
+        self.import_process.error_traceback = ""
+        self.import_process.save(update_fields=["status", "percentage", "broken_records", "error_traceback"])
 
     def mark_success(self):
         self.import_process.status = Import.STATUS_SUCCESS
