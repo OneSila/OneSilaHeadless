@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.conf import settings
+from django.http import HttpResponse
 from django.urls import include, path
 from strawberry.django.views import AsyncGraphQLView
 from .schema import schema
@@ -25,7 +26,15 @@ from sales_channels.views import sales_channel_content_template_preview
 from integrations.views import PublicIntegrationTypeDirectListView
 
 
+def _mcp_reserved(request):
+    return HttpResponse(
+        "This path is handled by the MCP server in asgi.py, not Django.",
+        status=503,
+    )
+
 urlpatterns = [
+    path('mcp/', _mcp_reserved, name='mcp-reserved'),
+    path('mcp', _mcp_reserved),
     path('', include('core.urls')),
     path(f'admin{settings.ADMIN_ROUTE_SUFFIX}/', admin.site.urls),
     path('contacts/', include('contacts.urls')),
