@@ -2,16 +2,17 @@ from django.http import FileResponse, Http404, HttpResponseForbidden
 from django.views import View
 
 from imports_exports.models import Export
+from llm.models import McpApiKey
 
 class DirectExportFeedView(View):
     def get(self, request, feed_key):
-        # authorization = str(request.headers.get("Authorization", "") or "").strip()
-        # if not authorization.startswith("Bearer "):
-        #     return HttpResponseForbidden("Missing bearer token.")
-        #
-        # token = authorization.split(" ", 1)[1].strip()
-        # if not token:
-        #     return HttpResponseForbidden("Missing bearer token.")
+        authorization = str(request.headers.get("Authorization", "") or "").strip()
+        if not authorization.startswith("Bearer "):
+            return HttpResponseForbidden("Missing bearer token.")
+
+        token = authorization.split(" ", 1)[1].strip()
+        if not token:
+            return HttpResponseForbidden("Missing bearer token.")
 
         export = Export.objects.filter(
             feed_key=feed_key,
@@ -20,6 +21,14 @@ class DirectExportFeedView(View):
         ).first()
         if export is None or not export.file:
             raise Http404("Export feed not found.")
+
+        api_key = McpApiKey.objects.filter(
+            key=token,
+            is_active=True,
+            multi_tenant_company=export.multi_tenant_company,
+        ).first()
+        if api_key is None:
+            return HttpResponseForbidden("Invalid bearer token.")
 
         return FileResponse(
             export.file.open("rb"),

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from core.tests import TestCase
 from django.core.files.base import ContentFile
+from llm.models import McpApiKey
 from imports_exports.factories.exports.products import ProductsExportFactory
 from eancodes.models import EanCode
 from imports_exports.models import Export
@@ -364,19 +365,20 @@ class ExportRunnerTest(TestCase):
 
 
 class DirectExportFeedViewTest(TestCase):
-    # @patch("imports_exports.models.safe_run_task")
-    # def test_direct_feed_requires_bearer_token(self, mocked_safe_run_task):
-    #     export_process = Export.objects.create(
-    #         multi_tenant_company=self.multi_tenant_company,
-    #         kind=Export.KIND_PROPERTIES,
-    #         type=Export.TYPE_JSON_FEED,
-    #         status=Export.STATUS_SUCCESS,
-    #     )
-    #     export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
-    #
-    #     response = self.client.get(f"/direct/export/{export_process.feed_key}/")
-    #     self.assertEqual(response.status_code, 403)
-    #     mocked_safe_run_task.assert_not_called()
+    @patch("imports_exports.models.safe_run_task")
+    def test_direct_feed_requires_bearer_token(self, mocked_safe_run_task):
+        export_process = Export.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            kind=Export.KIND_PROPERTIES,
+            type=Export.TYPE_JSON_FEED,
+            status=Export.STATUS_SUCCESS,
+        )
+        export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
+
+        response = self.client.get(f"/direct/export/{export_process.feed_key}/")
+
+        self.assertEqual(response.status_code, 403)
+        mocked_safe_run_task.assert_not_called()
 
     @patch("imports_exports.models.safe_run_task")
     def test_direct_feed_returns_json(self, mocked_safe_run_task):
@@ -387,14 +389,39 @@ class DirectExportFeedViewTest(TestCase):
             status=Export.STATUS_SUCCESS,
         )
         export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
+        api_key = McpApiKey.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
 
         response = self.client.get(
             f"/direct/export/{export_process.feed_key}/",
-            HTTP_AUTHORIZATION="Bearer anything",
+            HTTP_AUTHORIZATION=f"Bearer {api_key.key}",
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(b"".join(response.streaming_content), b'{"hello": "world"}')
+        mocked_safe_run_task.assert_not_called()
+
+    @patch("imports_exports.models.safe_run_task")
+    def test_direct_feed_rejects_token_for_other_company(self, mocked_safe_run_task):
+        export_process = Export.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            kind=Export.KIND_PROPERTIES,
+            type=Export.TYPE_JSON_FEED,
+            status=Export.STATUS_SUCCESS,
+        )
+        export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
+        other_company = baker.make("core.MultiTenantCompany")
+        api_key = McpApiKey.objects.create(
+            multi_tenant_company=other_company,
+        )
+
+        response = self.client.get(
+            f"/direct/export/{export_process.feed_key}/",
+            HTTP_AUTHORIZATION=f"Bearer {api_key.key}",
+        )
+
+        self.assertEqual(response.status_code, 403)
         mocked_safe_run_task.assert_not_called()
 
 
