@@ -22,7 +22,15 @@ from products.mcp.tools.upsert_product_property_values import UpsertProductPrope
 from products.models import Product, ProductTranslation, ProductTranslationBulletPoint
 from products_inspector.constants import HAS_IMAGES_ERROR
 from products_inspector.models import Inspector, InspectorBlock
-from properties.models import Property, ProductProperty, PropertySelectValue, PropertySelectValueTranslation, PropertyTranslation
+from properties.models import (
+    Property,
+    ProductPropertiesRule,
+    ProductPropertiesRuleItem,
+    ProductProperty,
+    PropertySelectValue,
+    PropertySelectValueTranslation,
+    PropertyTranslation,
+)
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 
@@ -161,6 +169,39 @@ class ProductMcpToolAsyncTestCase(TestCase):
             value="Book",
             multi_tenant_company=self.multi_tenant_company,
         )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.product_type_property,
+            value_select=self.product_type_select_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.product_rule = ProductPropertiesRule.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_type=self.product_type_select_value,
+        )
+        ProductPropertiesRuleItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.product_rule,
+            property=self.property,
+            type=ProductPropertiesRuleItem.REQUIRED,
+        )
+        self.optional_property = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+            internal_name="subtitle_hint",
+        )
+        PropertyTranslation.objects.create(
+            property=self.optional_property,
+            language="en",
+            name="Subtitle Hint",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductPropertiesRuleItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.product_rule,
+            property=self.optional_property,
+            type=ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+        )
 
         self.image = Media.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -250,8 +291,45 @@ class ProductMcpToolAsyncTestCase(TestCase):
             if item["language"] == "fr"
         )
         self.assertEqual(french_translation["bullet_points"], ["Point de vente"])
-        self.assertEqual(result.structured_content["properties"][0]["property"]["internal_name"], "book_format")
-        self.assertEqual(result.structured_content["properties"][0]["values"][0]["id"], self.select_value.id)
+        properties_by_internal_name = {
+            item["property"]["internal_name"]: item
+            for item in result.structured_content["properties"]
+        }
+        self.assertEqual(
+            properties_by_internal_name["book_format"]["values"][0]["id"],
+            self.select_value.id,
+        )
+        self.assertEqual(
+            result.structured_content["property_requirements"]["product_type"],
+            {
+                "id": self.product_type_select_value.id,
+                "select_value": "Book",
+            },
+        )
+        self.assertEqual(
+            result.structured_content["property_requirements"]["requirements"]["book_format"]["requirement_type"],
+            ProductPropertiesRuleItem.REQUIRED,
+        )
+        self.assertTrue(
+            result.structured_content["property_requirements"]["requirements"]["book_format"]["effectively_required"]
+        )
+        self.assertTrue(
+            result.structured_content["property_requirements"]["requirements"]["book_format"]["has_value"]
+        )
+        self.assertEqual(
+            result.structured_content["property_requirements"]["requirements"]["book_format"]["current_value_summary"],
+            "Hardcover",
+        )
+        self.assertEqual(
+            result.structured_content["property_requirements"]["requirements"]["subtitle_hint"]["requirement_type"],
+            ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+        )
+        self.assertTrue(
+            result.structured_content["property_requirements"]["requirements"]["subtitle_hint"]["effectively_required"]
+        )
+        self.assertFalse(
+            result.structured_content["property_requirements"]["requirements"]["subtitle_hint"]["has_value"]
+        )
         self.assertEqual(result.structured_content["prices"][0]["currency"], self.currency.iso_code)
         self.assertEqual(len(result.structured_content["images"]), 1)
         ctx.error.assert_not_awaited()

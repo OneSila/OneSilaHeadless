@@ -37,7 +37,13 @@ class GetProductMcpTool(BaseMcpTool):
         """
         Get a single company-scoped product by exact SKU.
         Use this when you already know the SKU and need the product detail, pricing,
-        assigned property values, images, VAT data, and inspector status.
+        assigned property values, images, VAT data, inspector status, and
+        property_requirements guidance for the current product type.
+
+        `property_requirements` explains which properties the product is expected
+        to have for its current product type. Only `OPTIONAL` is truly optional.
+        Any other `requirement_type` should be treated as effectively required,
+        especially when `has_value` is `false`.
 
         Args:
             sku: Exact product SKU.

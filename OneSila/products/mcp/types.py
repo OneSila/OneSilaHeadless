@@ -8,6 +8,12 @@ from properties.mcp.types import PropertyReferencePayload, PropertySelectValueSu
 
 
 ProductTypeValue = Literal["SIMPLE", "BUNDLE", "CONFIGURABLE", "ALIAS"]
+ProductRequirementTypeValue = Literal[
+    "REQUIRED_IN_CONFIGURATOR",
+    "OPTIONAL_IN_CONFIGURATOR",
+    "REQUIRED",
+    "OPTIONAL",
+]
 ProductValueScalar = str | int | float | bool | None
 ProductValuePayload = ProductValueScalar | list[ProductValueScalar]
 
@@ -103,6 +109,25 @@ class ProductAssignedPropertyPayload(TypedDict):
     values: list[ProductAssignedPropertyValuePayload]
 
 
+class ProductRequirementProductTypePayload(TypedDict):
+    id: int
+    select_value: str
+
+
+class ProductPropertyRequirementPayload(TypedDict):
+    property_id: int
+    property_name: str
+    requirement_type: ProductRequirementTypeValue
+    effectively_required: bool
+    has_value: bool
+    current_value_summary: str | None
+
+
+class ProductPropertyRequirementsPayload(TypedDict):
+    product_type: ProductRequirementProductTypePayload | None
+    requirements: dict[str, ProductPropertyRequirementPayload]
+
+
 class ProductSummaryPayload(TypedDict):
     id: int
     sku: str | None
@@ -122,6 +147,7 @@ class ProductDetailPayload(ProductSummaryPayload):
     allow_backorder: bool
     vat_rate_data: ProductVatRatePayload | None
     inspector: ProductInspectorPayload
+    property_requirements: ProductPropertyRequirementsPayload
     translations: list[ProductTranslationPayload]
     images: list[ProductImagePayload]
     properties: list[ProductAssignedPropertyPayload]

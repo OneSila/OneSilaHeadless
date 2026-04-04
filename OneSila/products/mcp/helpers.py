@@ -22,6 +22,9 @@ from products.mcp.types import (
     ProductImagePayload,
     ProductInspectorPayload,
     ProductPricePayload,
+    ProductPropertyRequirementPayload,
+    ProductPropertyRequirementsPayload,
+    ProductRequirementProductTypePayload,
     ProductSummaryPayload,
     ProductVatRatePayload,
     ProductFrontendUrlPayload,
@@ -30,7 +33,7 @@ from products.models import Product, ProductTranslation
 from products_inspector.models import InspectorBlock
 from products_inspector.constants import GREEN, ORANGE, RED
 from properties.mcp.helpers import serialize_property_reference
-from properties.models import ProductProperty
+from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem, ProductProperty
 from sales_prices.models import SalesPrice
 
 
@@ -416,6 +419,143 @@ def serialize_product_assigned_properties(*, product: Product) -> list[ProductAs
     return payloads
 
 
+def _serialize_current_value_summary(*, value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        non_empty_values = [str(item) for item in value if item not in (None, "")]
+        return ", ".join(non_empty_values) or None
+    if isinstance(value, str):
+        stripped_value = value.strip()
+        return stripped_value or None
+    return str(value)
+
+
+def _value_has_data(*, value) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, list):
+        return any(_value_has_data(value=item) for item in value)
+    return True
+
+
+def _get_requirement_key(*, property_internal_name: str | None, property_id: int) -> str:
+    return property_internal_name or f"property_{property_id}"
+
+
+def _serialize_requirement_product_type(
+    *,
+    property_payloads: list[ProductAssignedPropertyPayload],
+) -> ProductRequirementProductTypePayload | None:
+    for property_payload in property_payloads:
+        property_reference = property_payload["property"]
+        if not property_reference["is_product_type"]:
+            continue
+
+        select_value_id = next(
+            (
+                value_payload["id"]
+                for value_payload in property_payload["values"]
+                if value_payload["id"] is not None
+            ),
+            None,
+        )
+        if select_value_id is None:
+            return None
+
+        return {
+            "id": select_value_id,
+            "select_value": _serialize_current_value_summary(
+                value=property_payload["value"],
+            ) or "",
+        }
+
+    return None
+
+
+def _get_product_properties_rule(
+    *,
+    product_type_id: int | None,
+    product: Product,
+) -> ProductPropertiesRule | None:
+    if product_type_id is None:
+        return None
+
+    return (
+        ProductPropertiesRule.objects.filter(
+            multi_tenant_company=product.multi_tenant_company,
+            product_type_id=product_type_id,
+            sales_channel__isnull=True,
+        )
+        .prefetch_related("items__property__propertytranslation_set")
+        .first()
+    )
+
+
+def _serialize_property_requirement(
+    *,
+    rule_item: ProductPropertiesRuleItem,
+    property_payload_map: dict[int, ProductAssignedPropertyPayload],
+) -> ProductPropertyRequirementPayload:
+    assigned_property = property_payload_map.get(rule_item.property_id)
+    current_value = assigned_property["value"] if assigned_property else None
+
+    return {
+        "property_id": rule_item.property_id,
+        "property_name": rule_item.property.name,
+        "requirement_type": rule_item.type,
+        "effectively_required": rule_item.type != ProductPropertiesRuleItem.OPTIONAL,
+        "has_value": _value_has_data(value=current_value),
+        "current_value_summary": _serialize_current_value_summary(value=current_value),
+    }
+
+
+def serialize_product_property_requirements(
+    *,
+    product: Product,
+    property_payloads: list[ProductAssignedPropertyPayload],
+) -> ProductPropertyRequirementsPayload:
+    product_type = _serialize_requirement_product_type(
+        property_payloads=property_payloads,
+    )
+    if product_type is None:
+        return {
+            "product_type": None,
+            "requirements": {},
+        }
+
+    property_payload_map = {
+        property_payload["property"]["id"]: property_payload
+        for property_payload in property_payloads
+    }
+    product_rule = _get_product_properties_rule(
+        product_type_id=product_type["id"],
+        product=product,
+    )
+    if product_rule is None:
+        return {
+            "product_type": product_type,
+            "requirements": {},
+        }
+
+    requirements = {
+        _get_requirement_key(
+            property_internal_name=rule_item.property.internal_name,
+            property_id=rule_item.property_id,
+        ): _serialize_property_requirement(
+            rule_item=rule_item,
+            property_payload_map=property_payload_map,
+        )
+        for rule_item in product_rule.items.all()
+    }
+    return {
+        "product_type": product_type,
+        "requirements": requirements,
+    }
+
+
 def serialize_product_summary(*, product: Product) -> ProductSummaryPayload:
     inspector_data = serialize_product_inspector(product=product)
     return {
@@ -435,14 +575,19 @@ def serialize_product_summary(*, product: Product) -> ProductSummaryPayload:
 
 
 def serialize_product_detail(*, product: Product) -> ProductDetailPayload:
+    serialized_properties = serialize_product_assigned_properties(product=product)
     return {
         **serialize_product_summary(product=product),
         "allow_backorder": product.allow_backorder,
         "vat_rate_data": serialize_vat_rate(product=product),
         "inspector": serialize_product_inspector(product=product),
+        "property_requirements": serialize_product_property_requirements(
+            product=product,
+            property_payloads=serialized_properties,
+        ),
         "translations": serialize_product_translations(product=product),
         "images": serialize_product_images(product=product),
-        "properties": serialize_product_assigned_properties(product=product),
+        "properties": serialized_properties,
         "prices": serialize_product_prices(product=product),
     }
 

@@ -176,6 +176,66 @@ PRODUCT_ASSIGNED_PROPERTY_OUTPUT_SCHEMA = {
 }
 
 
+PRODUCT_REQUIREMENT_TYPE_ENUM = [
+    "REQUIRED_IN_CONFIGURATOR",
+    "OPTIONAL_IN_CONFIGURATOR",
+    "REQUIRED",
+    "OPTIONAL",
+]
+
+
+PRODUCT_REQUIREMENT_PRODUCT_TYPE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "select_value": {"type": "string"},
+    },
+    "required": ["id", "select_value"],
+}
+
+
+PRODUCT_PROPERTY_REQUIREMENT_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "property_id": {"type": "integer"},
+        "property_name": {"type": "string"},
+        "requirement_type": {
+            "type": "string",
+            "enum": PRODUCT_REQUIREMENT_TYPE_ENUM,
+        },
+        "effectively_required": {"type": "boolean"},
+        "has_value": {"type": "boolean"},
+        "current_value_summary": {"type": ["string", "null"]},
+    },
+    "required": [
+        "property_id",
+        "property_name",
+        "requirement_type",
+        "effectively_required",
+        "has_value",
+        "current_value_summary",
+    ],
+}
+
+
+PRODUCT_PROPERTY_REQUIREMENTS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "product_type": {
+            "oneOf": [
+                PRODUCT_REQUIREMENT_PRODUCT_TYPE_OUTPUT_SCHEMA,
+                {"type": "null"},
+            ],
+        },
+        "requirements": {
+            "type": "object",
+            "additionalProperties": PRODUCT_PROPERTY_REQUIREMENT_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["product_type", "requirements"],
+}
+
+
 PRODUCT_SUMMARY_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -221,6 +281,7 @@ GET_PRODUCT_OUTPUT_SCHEMA = {
             ],
         },
         "inspector": PRODUCT_INSPECTOR_OUTPUT_SCHEMA,
+        "property_requirements": PRODUCT_PROPERTY_REQUIREMENTS_OUTPUT_SCHEMA,
         "translations": {
             "type": "array",
             "items": PRODUCT_TRANSLATION_OUTPUT_SCHEMA,
@@ -243,6 +304,7 @@ GET_PRODUCT_OUTPUT_SCHEMA = {
         "allow_backorder",
         "vat_rate_data",
         "inspector",
+        "property_requirements",
         "translations",
         "images",
         "properties",
