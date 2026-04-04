@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from core.models.multi_tenant import MultiTenantCompany
+from currencies.models import Currency
 from imports_exports.factories.products import ImportProductInstance
 from products.mcp.helpers import get_product_detail_queryset, serialize_product_detail
 from products.mcp.types import (
@@ -91,6 +92,35 @@ def validate_company_language(
         )
 
     return normalized_language
+
+
+def get_company_currency_match(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    iso_code: str,
+) -> Currency:
+    normalized_iso_code = str(iso_code or "").strip().upper()
+    if not normalized_iso_code:
+        raise ValueError("currency is required.")
+
+    try:
+        currency = Currency.objects.select_related("inherits_from").get(
+            multi_tenant_company=multi_tenant_company,
+            iso_code=normalized_iso_code,
+        )
+    except Currency.DoesNotExist as error:
+        raise ValueError(
+            f"Currency {normalized_iso_code!r} is not configured for this account. "
+            "Use get_vat_rates or account currency settings to confirm available configuration before editing prices."
+        ) from error
+
+    if currency.inherits_from_id is not None:
+        raise ValueError(
+            f"Currency {normalized_iso_code!r} inherits its price from {currency.inherits_from.iso_code!r} "
+            "and cannot be edited directly. Update the base currency price instead."
+        )
+
+    return currency
 
 
 def sanitize_bullet_points_input(

@@ -33,6 +33,7 @@ from properties.models import (
 )
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
+from currencies.models import Currency
 
 
 class DummyMcp:
@@ -455,6 +456,51 @@ class ProductMcpToolAsyncTestCase(TestCase):
         self.assertEqual(result.structured_content["product"]["prices"][0]["price"], "13.50")
         self.assertEqual(result.structured_content["product"]["prices"][0]["rrp"], "16.00")
         ctx.error.assert_not_awaited()
+
+    @patch("llm.mcp.auth.get_access_token")
+    def test_upsert_product_price_rejects_inherited_currency(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        inherited_currency = Currency.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            iso_code="GBP",
+            name="Pound Sterling",
+            symbol="£",
+            inherits_from=self.currency,
+        )
+        ctx = DummyContext()
+        tool = UpsertProductPriceMcpTool(mcp=DummyMcp())
+
+        with self.assertRaisesMessage(
+            Exception,
+            "Currency 'GBP' inherits its price from 'EUR' and cannot be edited directly. Update the base currency price instead.",
+        ):
+            async_to_sync(tool.execute)(
+                sku="BOOK-001",
+                currency=inherited_currency.iso_code,
+                price="10.00",
+                ctx=ctx,
+            )
+
+    @patch("llm.mcp.auth.get_access_token")
+    def test_upsert_product_price_rejects_unconfigured_currency(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        ctx = DummyContext()
+        tool = UpsertProductPriceMcpTool(mcp=DummyMcp())
+
+        with self.assertRaisesMessage(
+            Exception,
+            "Currency 'GBP' is not configured for this account.",
+        ):
+            async_to_sync(tool.execute)(
+                sku="BOOK-001",
+                currency="GBP",
+                price="10.00",
+                ctx=ctx,
+            )
 
     @patch("llm.mcp.auth.get_access_token")
     def test_update_product_content_executes_from_async_context(self, mock_get_access_token):
