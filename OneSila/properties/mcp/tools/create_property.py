@@ -10,6 +10,7 @@ from pydantic import Field
 
 from imports_exports.factories.properties import ImportPropertyInstance
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_CREATE, TAG_PROPERTIES, tool_tags
 from properties.mcp.helpers import (
     build_import_process,
     get_property_detail_queryset,
@@ -25,6 +26,7 @@ from properties.models import Property
 class CreatePropertyMcpTool(BaseMcpTool):
     name = "create_property"
     title = "Create Property"
+    tags = tool_tags(TAG_CREATE, TAG_PROPERTIES)
     output_schema = CREATE_PROPERTY_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": False,

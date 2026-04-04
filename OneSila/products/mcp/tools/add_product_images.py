@@ -9,6 +9,7 @@ from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_EDIT, TAG_IMAGES, TAG_PRODUCTS, tool_tags
 from products.mcp.output_types import PRODUCT_BATCH_MUTATION_OUTPUT_SCHEMA
 from products.mcp.types import ProductBatchMutationPayload, ProductImageInputPayload
 from products.mcp.update_helpers import (
@@ -24,6 +25,7 @@ from products.mcp.update_helpers import (
 class AddProductImagesMcpTool(BaseMcpTool):
     name = "add_product_images"
     title = "Add Product Images"
+    tags = tool_tags(TAG_EDIT, TAG_PRODUCTS, TAG_IMAGES)
     output_schema = PRODUCT_BATCH_MUTATION_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": False,

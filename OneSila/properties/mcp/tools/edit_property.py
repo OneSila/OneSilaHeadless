@@ -11,6 +11,7 @@ from pydantic import Field
 from core.models.multi_tenant import MultiTenantCompany
 from imports_exports.factories.properties import ImportPropertyInstance
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_EDIT, TAG_PROPERTIES, tool_tags
 from properties.mcp.helpers import (
     build_import_process,
     get_property_detail_queryset,
@@ -26,6 +27,7 @@ from properties.models import Property
 class EditPropertyMcpTool(BaseMcpTool):
     name = "edit_property"
     title = "Edit Property"
+    tags = tool_tags(TAG_EDIT, TAG_PROPERTIES)
     output_schema = EDIT_PROPERTY_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": False,

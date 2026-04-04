@@ -10,6 +10,7 @@ from pydantic import Field
 
 from core.models.multi_tenant import MultiTenantCompany
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_FRONTEND, TAG_GET, TAG_PRODUCTS, tool_tags
 from products.mcp.helpers import serialize_product_frontend_url
 from products.mcp.output_types import GET_PRODUCT_FRONTEND_URL_OUTPUT_SCHEMA
 from products.mcp.types import ProductFrontendUrlPayload
@@ -20,6 +21,7 @@ class GetProductFrontendUrlMcpTool(BaseMcpTool):
     name = "get_product_frontend_url"
     title = "Get Product Frontend URL"
     read_only = True
+    tags = tool_tags(TAG_GET, TAG_PRODUCTS, TAG_FRONTEND)
     output_schema = GET_PRODUCT_FRONTEND_URL_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

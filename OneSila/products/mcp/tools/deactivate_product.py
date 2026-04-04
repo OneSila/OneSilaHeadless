@@ -9,6 +9,7 @@ from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_EDIT, TAG_PRODUCTS, tool_tags
 from products.mcp.output_types import PRODUCT_MUTATION_OUTPUT_SCHEMA
 from products.mcp.types import ProductMutationPayload
 from products.mcp.update_helpers import (
@@ -21,6 +22,7 @@ from products.mcp.update_helpers import (
 class DeactivateProductMcpTool(BaseMcpTool):
     name = "deactivate_product"
     title = "Deactivate Product"
+    tags = tool_tags(TAG_EDIT, TAG_PRODUCTS)
     output_schema = PRODUCT_MUTATION_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

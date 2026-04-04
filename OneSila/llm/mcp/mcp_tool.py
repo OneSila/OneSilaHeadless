@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 from typing import Any
 
@@ -23,6 +24,8 @@ class BaseMcpTool:
     title: str | None = None
     description: str | None = None
     read_only: bool = False
+    tags: set[str] | None = None
+    meta: dict[str, Any] | None = None
     annotations: dict[str, Any] | None = None
     output_schema: dict[str, Any] | None = None
     timeout: float | None = None
@@ -37,6 +40,8 @@ class BaseMcpTool:
             name=self.name or self.execute.__name__,
             title=self.title,
             description=description,
+            tags=self.tags,
+            meta=self.meta,
             annotations=self._build_annotations(),
             output_schema=self.output_schema,
             timeout=self.timeout,
@@ -69,6 +74,38 @@ class BaseMcpTool:
             raise McpToolError(f"{field_name} is required.")
         return value
 
+    def sanitize_limit(self, *, limit: int, maximum: int = 100) -> int:
+        if not isinstance(limit, int) or limit < 1:
+            raise McpToolError(f"limit must be a positive integer, got: {limit!r}")
+        return min(limit, maximum)
+
+    def sanitize_offset(self, *, offset: int) -> int:
+        if not isinstance(offset, int) or offset < 0:
+            raise McpToolError(f"offset must be a non-negative integer, got: {offset!r}")
+        return offset
+
+    def sanitize_optional_bool(self, *, value: bool | None, field_name: str) -> bool | None:
+        if value is None:
+            return None
+        if not isinstance(value, bool):
+            raise McpToolError(f"{field_name} must be a boolean, got: {value!r}")
+        return value
+
+    def sanitize_optional_int(
+        self,
+        *,
+        value: int | None,
+        field_name: str,
+        minimum: int | None = None,
+    ) -> int | None:
+        if value is None:
+            return None
+        if not isinstance(value, int):
+            raise McpToolError(f"{field_name} must be an integer, got: {value!r}")
+        if minimum is not None and value < minimum:
+            raise McpToolError(f"{field_name} must be >= {minimum}, got: {value!r}")
+        return value
+
     def handle_error(self, *, error: Exception, action: str) -> None:
         logger.exception("%s error: %s", action, error)
         if isinstance(error, McpToolError):
@@ -82,8 +119,18 @@ class BaseMcpTool:
         structured_content: dict[str, Any],
         meta: dict[str, Any] | None = None,
     ) -> ToolResult:
+        structured_content_text = json.dumps(
+            structured_content,
+            ensure_ascii=True,
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
         return ToolResult(
-            content=[TextContent(type="text", text=summary)],
+            content=[
+                TextContent(type="text", text=summary),
+                TextContent(type="text", text=structured_content_text),
+            ],
             structured_content=structured_content,
             meta=meta,
         )

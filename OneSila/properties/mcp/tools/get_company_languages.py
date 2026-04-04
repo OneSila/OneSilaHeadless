@@ -5,6 +5,7 @@ from fastmcp.dependencies import CurrentContext
 from fastmcp.tools.tool import ToolResult
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_COMPANY, TAG_GET, TAG_LANGUAGES, tool_tags
 from properties.mcp.helpers import serialize_company_languages
 from properties.mcp.output_types import GET_COMPANY_LANGUAGES_OUTPUT_SCHEMA
 from properties.mcp.types import CompanyLanguagesPayload
@@ -14,6 +15,7 @@ class GetCompanyLanguagesMcpTool(BaseMcpTool):
     name = "get_company_languages"
     title = "Get Company Languages"
     read_only = True
+    tags = tool_tags(TAG_GET, TAG_COMPANY, TAG_LANGUAGES)
     output_schema = GET_COMPANY_LANGUAGES_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

@@ -76,6 +76,7 @@ class PropertyDetailPayload(PropertySummaryPayload):
 
 
 class SearchPropertiesPayload(TypedDict):
+    total_count: int
     has_more: bool
     offset: int
     limit: int
@@ -106,6 +107,7 @@ class PropertySelectValueDetailPayload(PropertySelectValueSummaryPayload):
 
 
 class SearchPropertySelectValuesPayload(TypedDict):
+    total_count: int
     has_more: bool
     offset: int
     limit: int

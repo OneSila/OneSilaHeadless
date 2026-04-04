@@ -10,6 +10,12 @@ from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import (
+    TAG_GET,
+    TAG_PROPERTIES,
+    TAG_PROPERTY_SELECT_VALUES,
+    tool_tags,
+)
 from properties.mcp.helpers import (
     get_property_select_value_detail_queryset,
     serialize_property_select_value_detail,
@@ -23,6 +29,7 @@ class GetPropertySelectValueMcpTool(BaseMcpTool):
     name = "get_property_select_value"
     title = "Get Property Select Value"
     read_only = True
+    tags = tool_tags(TAG_GET, TAG_PROPERTIES, TAG_PROPERTY_SELECT_VALUES)
     output_schema = GET_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

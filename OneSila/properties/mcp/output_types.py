@@ -110,6 +110,7 @@ PROPERTY_REFERENCE_OUTPUT_SCHEMA = {
 SEARCH_PROPERTIES_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
+        "total_count": {"type": "integer"},
         "has_more": {"type": "boolean"},
         "offset": {"type": "integer"},
         "limit": {"type": "integer"},
@@ -118,7 +119,7 @@ SEARCH_PROPERTIES_OUTPUT_SCHEMA = {
             "items": PROPERTY_SUMMARY_OUTPUT_SCHEMA,
         },
     },
-    "required": ["has_more", "offset", "limit", "results"],
+    "required": ["total_count", "has_more", "offset", "limit", "results"],
 }
 
 PROPERTY_SELECT_VALUE_SUMMARY_OUTPUT_SCHEMA = {
@@ -149,6 +150,7 @@ PROPERTY_SELECT_VALUE_SUMMARY_OUTPUT_SCHEMA = {
 SEARCH_PROPERTY_SELECT_VALUES_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
+        "total_count": {"type": "integer"},
         "has_more": {"type": "boolean"},
         "offset": {"type": "integer"},
         "limit": {"type": "integer"},
@@ -157,7 +159,7 @@ SEARCH_PROPERTY_SELECT_VALUES_OUTPUT_SCHEMA = {
             "items": PROPERTY_SELECT_VALUE_SUMMARY_OUTPUT_SCHEMA,
         },
     },
-    "required": ["has_more", "offset", "limit", "results"],
+    "required": ["total_count", "has_more", "offset", "limit", "results"],
 }
 
 GET_PROPERTY_OUTPUT_SCHEMA = {

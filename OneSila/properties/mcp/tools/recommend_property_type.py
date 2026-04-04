@@ -10,6 +10,7 @@ from pydantic import Field
 
 from llm.factories.property_type_detector import DetectPropertyTypeLLM
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_PROPERTIES, TAG_RECOMMEND, TAG_TYPES, tool_tags
 from properties.mcp.helpers import get_property_type_label
 from properties.mcp.output_types import RECOMMEND_PROPERTY_TYPE_OUTPUT_SCHEMA
 from properties.mcp.types import PropertyTypeValue, RecommendPropertyTypePayload
@@ -19,6 +20,7 @@ class RecommendPropertyTypeMcpTool(BaseMcpTool):
     name = "recommend_property_type"
     title = "Recommend Property Type"
     read_only = True
+    tags = tool_tags(TAG_RECOMMEND, TAG_PROPERTIES, TAG_TYPES)
     output_schema = RECOMMEND_PROPERTY_TYPE_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from core.models.multi_tenant import MultiTenantCompany
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_PRODUCTS, TAG_SEARCH, tool_tags
 from media.models import Media, MediaProductThrough
 from products.mcp.helpers import get_product_summary_queryset, serialize_product_summary
 from products.mcp.output_types import SEARCH_PRODUCTS_OUTPUT_SCHEMA
@@ -22,6 +23,7 @@ class SearchProductsMcpTool(BaseMcpTool):
     name = "search_products"
     title = "Search Products"
     read_only = True
+    tags = tool_tags(TAG_SEARCH, TAG_PRODUCTS)
     output_schema = SEARCH_PRODUCTS_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,
@@ -75,25 +77,25 @@ class SearchProductsMcpTool(BaseMcpTool):
                 search=search,
                 sku=sku,
                 product_type=self._sanitize_type(type=type),
-                active=self._sanitize_optional_bool(value=active, field_name="active"),
-                vat_rate=self._sanitize_optional_int(value=vat_rate, field_name="vat_rate", minimum=0),
-                has_missing_information=self._sanitize_optional_bool(
+                active=self.sanitize_optional_bool(value=active, field_name="active"),
+                vat_rate=self.sanitize_optional_int(value=vat_rate, field_name="vat_rate", minimum=0),
+                has_missing_information=self.sanitize_optional_bool(
                     value=has_missing_information,
                     field_name="has_missing_information",
                 ),
-                has_missing_required_information=self._sanitize_optional_bool(
+                has_missing_required_information=self.sanitize_optional_bool(
                     value=has_missing_required_information,
                     field_name="has_missing_required_information",
                 ),
-                property_id=self._sanitize_optional_int(value=property_id, field_name="property_id", minimum=1),
-                select_value_id=self._sanitize_optional_int(
+                property_id=self.sanitize_optional_int(value=property_id, field_name="property_id", minimum=1),
+                select_value_id=self.sanitize_optional_int(
                     value=select_value_id,
                     field_name="select_value_id",
                     minimum=1,
                 ),
-                has_images=self._sanitize_optional_bool(value=has_images, field_name="has_images"),
-                limit=self._sanitize_limit(limit=limit),
-                offset=self._sanitize_offset(offset=offset),
+                has_images=self.sanitize_optional_bool(value=has_images, field_name="has_images"),
+                limit=self.sanitize_limit(limit=limit),
+                offset=self.sanitize_offset(offset=offset),
             )
             await ctx.info(
                 f"Product search returned {len(response_data['results'])} results; has_more={response_data['has_more']}."
@@ -110,16 +112,6 @@ class SearchProductsMcpTool(BaseMcpTool):
             self.handle_error(error=error, action=self.name)
             raise
 
-    def _sanitize_limit(self, *, limit: int) -> int:
-        if not isinstance(limit, int) or limit < 1:
-            raise McpToolError(f"limit must be a positive integer, got: {limit!r}")
-        return min(limit, 100)
-
-    def _sanitize_offset(self, *, offset: int) -> int:
-        if not isinstance(offset, int) or offset < 0:
-            raise McpToolError(f"offset must be a non-negative integer, got: {offset!r}")
-        return offset
-
     def _sanitize_type(self, *, type: ProductTypeValue | None) -> ProductTypeValue | None:
         if type is None:
             return None
@@ -127,20 +119,6 @@ class SearchProductsMcpTool(BaseMcpTool):
         if type not in allowed_types:
             raise McpToolError(f"Invalid type: {type!r}. Allowed types are: {sorted(allowed_types)}")
         return type
-
-    def _sanitize_optional_bool(self, *, value: bool | None, field_name: str) -> bool | None:
-        if value is None:
-            return None
-        if not isinstance(value, bool):
-            raise McpToolError(f"{field_name} must be a boolean value, got: {value!r}")
-        return value
-
-    def _sanitize_optional_int(self, *, value: int | None, field_name: str, minimum: int) -> int | None:
-        if value is None:
-            return None
-        if not isinstance(value, int) or value < minimum:
-            raise McpToolError(f"{field_name} must be an integer >= {minimum}, got: {value!r}")
-        return value
 
     @database_sync_to_async
     def _search_products(
@@ -221,6 +199,7 @@ class SearchProductsMcpTool(BaseMcpTool):
                 filter_has_images=Exists(image_assignments),
             ).filter(filter_has_images=has_images)
 
+        total_count = queryset.values("id").distinct().count()
         product_ids = list(
             queryset.order_by("id").values_list("id", flat=True).distinct()[offset:offset + limit + 1]
         )
@@ -232,6 +211,7 @@ class SearchProductsMcpTool(BaseMcpTool):
         )
 
         return {
+            "total_count": total_count,
             "has_more": has_more,
             "offset": offset,
             "limit": limit,

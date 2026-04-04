@@ -9,6 +9,7 @@ from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_CREATE, TAG_PRODUCTS, tool_tags
 from products.mcp.create_helpers import (
     build_create_product_data,
     build_create_product_payload,
@@ -21,6 +22,7 @@ from products.mcp.types import CreateProductPayload, ProductTypeValue
 class CreateProductMcpTool(BaseMcpTool):
     name = "create_product"
     title = "Create Product"
+    tags = tool_tags(TAG_CREATE, TAG_PRODUCTS)
     output_schema = CREATE_PRODUCT_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": False,

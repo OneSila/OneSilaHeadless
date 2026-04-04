@@ -6,6 +6,7 @@ from fastmcp.dependencies import CurrentContext
 from fastmcp.tools.tool import ToolResult
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_GET, TAG_PRODUCTS, TAG_TAXES, tool_tags
 from products.mcp.catalog_helpers import get_vat_rates_payload
 from products.mcp.output_types import GET_VAT_RATES_OUTPUT_SCHEMA
 from products.mcp.types import GetVatRatesPayload
@@ -15,6 +16,7 @@ class GetVatRatesMcpTool(BaseMcpTool):
     name = "get_vat_rates"
     title = "Get VAT Rates"
     read_only = True
+    tags = tool_tags(TAG_GET, TAG_PRODUCTS, TAG_TAXES)
     output_schema = GET_VAT_RATES_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

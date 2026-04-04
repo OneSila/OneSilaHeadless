@@ -254,6 +254,7 @@ GET_PRODUCT_OUTPUT_SCHEMA = {
 SEARCH_PRODUCTS_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
+        "total_count": {"type": "integer"},
         "has_more": {"type": "boolean"},
         "offset": {"type": "integer"},
         "limit": {"type": "integer"},
@@ -262,7 +263,7 @@ SEARCH_PRODUCTS_OUTPUT_SCHEMA = {
             "items": PRODUCT_SUMMARY_OUTPUT_SCHEMA,
         },
     },
-    "required": ["has_more", "offset", "limit", "results"],
+    "required": ["total_count", "has_more", "offset", "limit", "results"],
 }
 
 

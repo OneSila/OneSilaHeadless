@@ -11,6 +11,12 @@ from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import (
+    TAG_PROPERTIES,
+    TAG_PROPERTY_SELECT_VALUES,
+    TAG_SEARCH,
+    tool_tags,
+)
 from properties.mcp.helpers import (
     get_property_select_value_detail_queryset,
     serialize_property_select_value_detail,
@@ -27,6 +33,7 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
     name = "search_property_select_values"
     title = "Search Property Select Values"
     read_only = True
+    tags = tool_tags(TAG_SEARCH, TAG_PROPERTIES, TAG_PROPERTY_SELECT_VALUES)
     output_schema = SEARCH_PROPERTY_SELECT_VALUES_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,
@@ -65,21 +72,21 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
                 f"property_internal_name={property_internal_name!r}, property_name={property_name!r}."
             )
 
-            limit = self._sanitize_limit(limit=limit)
-            offset = self._sanitize_offset(offset=offset)
-            missing_main_translation = self._sanitize_optional_bool(
+            limit = self.sanitize_limit(limit=limit)
+            offset = self.sanitize_offset(offset=offset)
+            missing_main_translation = self.sanitize_optional_bool(
                 value=missing_main_translation,
                 field_name="missing_main_translation",
             )
-            missing_translations = self._sanitize_optional_bool(
+            missing_translations = self.sanitize_optional_bool(
                 value=missing_translations,
                 field_name="missing_translations",
             )
-            used_in_products = self._sanitize_optional_bool(
+            used_in_products = self.sanitize_optional_bool(
                 value=used_in_products,
                 field_name="used_in_products",
             )
-            is_product_type = self._sanitize_optional_bool(
+            is_product_type = self.sanitize_optional_bool(
                 value=is_product_type,
                 field_name="is_product_type",
             )
@@ -112,23 +119,6 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
             await ctx.error(f"Property select value search failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_limit(self, *, limit: int) -> int:
-        if not isinstance(limit, int) or limit < 1:
-            raise McpToolError(f"limit must be a positive integer, got: {limit!r}")
-        return min(limit, 100)
-
-    def _sanitize_offset(self, *, offset: int) -> int:
-        if not isinstance(offset, int) or offset < 0:
-            raise McpToolError(f"offset must be a non-negative integer, got: {offset!r}")
-        return offset
-
-    def _sanitize_optional_bool(self, *, value: bool | None, field_name: str) -> bool | None:
-        if value is None:
-            return None
-        if not isinstance(value, bool):
-            raise McpToolError(f"{field_name} must be a boolean value, got: {value!r}")
-        return value
 
     def _apply_property_scope(
         self,
@@ -257,6 +247,7 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
             else:
                 queryset = queryset.filter(translations_count=required_count)
 
+        total_count = queryset.values("id").distinct().count()
         select_value_ids = list(
             queryset.order_by("id").values_list("id", flat=True).distinct()[offset:offset + limit + 1]
         )
@@ -269,6 +260,7 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
         )
 
         return {
+            "total_count": total_count,
             "has_more": has_more,
             "offset": offset,
             "limit": limit,

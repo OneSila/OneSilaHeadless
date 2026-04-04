@@ -129,6 +129,7 @@ class ProductDetailPayload(ProductSummaryPayload):
 
 
 class SearchProductsPayload(TypedDict):
+    total_count: int
     has_more: bool
     offset: int
     limit: int

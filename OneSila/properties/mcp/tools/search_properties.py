@@ -10,6 +10,7 @@ from django.db.models import Count, F, Q
 from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_PROPERTIES, TAG_SEARCH, tool_tags
 from properties.mcp.output_types import SEARCH_PROPERTIES_OUTPUT_SCHEMA
 from properties.mcp.types import PropertySummaryPayload, PropertyTypeValue, SearchPropertiesPayload
 from properties.models import Property
@@ -19,6 +20,7 @@ class SearchPropertiesMcpTool(BaseMcpTool):
     name = "search_properties"
     title = "Search Properties"
     read_only = True
+    tags = tool_tags(TAG_SEARCH, TAG_PROPERTIES)
     output_schema = SEARCH_PROPERTIES_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,
@@ -62,19 +64,19 @@ class SearchPropertiesMcpTool(BaseMcpTool):
                 f"Searching properties for company_id={multi_tenant_company.id} "
                 f"with search={search!r}, internal_name={internal_name!r}, type={type!r}."
             )
-            limit = self._sanitize_limit(limit=limit)
-            offset = self._sanitize_offset(offset=offset)
+            limit = self.sanitize_limit(limit=limit)
+            offset = self.sanitize_offset(offset=offset)
             property_type = self._sanitize_type(type=type)
-            is_public = self._sanitize_optional_bool(value=is_public, field_name="is_public")
-            missing_main_translation = self._sanitize_optional_bool(
+            is_public = self.sanitize_optional_bool(value=is_public, field_name="is_public")
+            missing_main_translation = self.sanitize_optional_bool(
                 value=missing_main_translation,
                 field_name="missing_main_translation",
             )
-            missing_translations = self._sanitize_optional_bool(
+            missing_translations = self.sanitize_optional_bool(
                 value=missing_translations,
                 field_name="missing_translations",
             )
-            used_in_products = self._sanitize_optional_bool(
+            used_in_products = self.sanitize_optional_bool(
                 value=used_in_products,
                 field_name="used_in_products",
             )
@@ -106,16 +108,6 @@ class SearchPropertiesMcpTool(BaseMcpTool):
             self.handle_error(error=error, action=self.name)
             raise
 
-    def _sanitize_limit(self, *, limit: int) -> int:
-        if not isinstance(limit, int) or limit < 1:
-            raise McpToolError(f"limit must be a positive integer, got: {limit!r}")
-        return min(limit, 100)
-
-    def _sanitize_offset(self, *, offset: int) -> int:
-        if not isinstance(offset, int) or offset < 0:
-            raise McpToolError(f"offset must be a non-negative integer, got: {offset!r}")
-        return offset
-
     def _sanitize_type(self, *, type: PropertyTypeValue | None) -> PropertyTypeValue | None:
         if type is None:
             return None
@@ -123,13 +115,6 @@ class SearchPropertiesMcpTool(BaseMcpTool):
         if type not in allowed_types:
             raise McpToolError(f"Invalid type: {type!r}. Allowed types are: {sorted(allowed_types)}")
         return type
-
-    def _sanitize_optional_bool(self, *, value: bool | None, field_name: str) -> bool | None:
-        if value is None:
-            return None
-        if not isinstance(value, bool):
-            raise McpToolError(f"{field_name} must be a boolean value, got: {value!r}")
-        return value
 
     @database_sync_to_async
     def _search_properties(
@@ -188,6 +173,7 @@ class SearchPropertiesMcpTool(BaseMcpTool):
             else:
                 queryset = queryset.filter(translations_count=required_count)
 
+        total_count = queryset.values("id").distinct().count()
         property_ids = list(
             queryset.order_by("id").values_list("id", flat=True).distinct()[offset:offset + limit + 1]
         )
@@ -197,6 +183,7 @@ class SearchPropertiesMcpTool(BaseMcpTool):
         )
 
         return {
+            "total_count": total_count,
             "has_more": has_more,
             "offset": offset,
             "limit": limit,

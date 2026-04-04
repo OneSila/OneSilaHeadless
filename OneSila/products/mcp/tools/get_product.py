@@ -10,6 +10,7 @@ from pydantic import Field
 
 from core.models.multi_tenant import MultiTenantCompany
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_GET, TAG_PRODUCTS, tool_tags
 from products.mcp.helpers import get_product_detail_queryset, serialize_product_detail
 from products.mcp.output_types import GET_PRODUCT_OUTPUT_SCHEMA
 from products.mcp.types import ProductDetailPayload
@@ -20,6 +21,7 @@ class GetProductMcpTool(BaseMcpTool):
     name = "get_product"
     title = "Get Product"
     read_only = True
+    tags = tool_tags(TAG_GET, TAG_PRODUCTS)
     output_schema = GET_PRODUCT_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

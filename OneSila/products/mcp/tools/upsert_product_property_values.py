@@ -9,6 +9,7 @@ from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_EDIT, TAG_PRODUCTS, TAG_PROPERTIES, tool_tags
 from products.mcp.output_types import PRODUCT_BATCH_MUTATION_OUTPUT_SCHEMA
 from products.mcp.types import ProductBatchMutationPayload, ProductPropertyValueUpdateInputPayload
 from products.mcp.update_helpers import (
@@ -23,6 +24,7 @@ from products.mcp.update_helpers import (
 class UpsertProductPropertyValuesMcpTool(BaseMcpTool):
     name = "upsert_product_property_values"
     title = "Upsert Product Property Values"
+    tags = tool_tags(TAG_EDIT, TAG_PRODUCTS, TAG_PROPERTIES)
     output_schema = PRODUCT_BATCH_MUTATION_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": False,

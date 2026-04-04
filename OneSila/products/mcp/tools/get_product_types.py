@@ -6,6 +6,7 @@ from fastmcp.dependencies import CurrentContext
 from fastmcp.tools.tool import ToolResult
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_GET, TAG_PRODUCTS, TAG_TYPES, tool_tags
 from products.mcp.catalog_helpers import get_product_types_payload
 from products.mcp.output_types import GET_PRODUCT_TYPES_OUTPUT_SCHEMA
 from products.mcp.types import GetProductTypesPayload
@@ -15,6 +16,7 @@ class GetProductTypesMcpTool(BaseMcpTool):
     name = "get_product_types"
     title = "Get Product Types"
     read_only = True
+    tags = tool_tags(TAG_GET, TAG_PRODUCTS, TAG_TYPES)
     output_schema = GET_PRODUCT_TYPES_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

@@ -10,6 +10,7 @@ from pydantic import Field
 
 from core.models.multi_tenant import MultiTenantCompany
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import TAG_GET, TAG_PROPERTIES, tool_tags
 from properties.mcp.helpers import get_property_detail_queryset, serialize_property_detail
 from properties.mcp.output_types import GET_PROPERTY_OUTPUT_SCHEMA
 from properties.mcp.types import PropertyDetailPayload
@@ -20,6 +21,7 @@ class GetPropertyMcpTool(BaseMcpTool):
     name = "get_property"
     title = "Get Property"
     read_only = True
+    tags = tool_tags(TAG_GET, TAG_PROPERTIES)
     output_schema = GET_PROPERTY_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": True,

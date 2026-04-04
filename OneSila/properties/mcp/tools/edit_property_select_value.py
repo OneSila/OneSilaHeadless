@@ -11,6 +11,12 @@ from pydantic import Field
 from core.models.multi_tenant import MultiTenantCompany
 from imports_exports.factories.properties import ImportPropertySelectValueInstance
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
+from llm.mcp.tags import (
+    TAG_EDIT,
+    TAG_PROPERTIES,
+    TAG_PROPERTY_SELECT_VALUES,
+    tool_tags,
+)
 from properties.mcp.helpers import (
     build_import_process,
     get_property_select_value_detail_queryset,
@@ -29,6 +35,7 @@ from properties.models import PropertySelectValue
 class EditPropertySelectValueMcpTool(BaseMcpTool):
     name = "edit_property_select_value"
     title = "Edit Property Select Value"
+    tags = tool_tags(TAG_EDIT, TAG_PROPERTIES, TAG_PROPERTY_SELECT_VALUES)
     output_schema = EDIT_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": False,
