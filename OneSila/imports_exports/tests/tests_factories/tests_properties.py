@@ -980,6 +980,29 @@ class ImportProductPropertyInstanceProcessTest(TestCase):
         instance = self._process_instance(prop, "true")
         self.assertEqual(instance.instance.value_boolean, True)
 
+    def test_boolean_property_false_string(self):
+        prop = self._create_property("Available", Property.TYPES.BOOLEAN)
+        instance = self._process_instance(prop, "false")
+        self.assertEqual(instance.instance.value_boolean, False)
+
+    def test_multiselect_property_ids_as_comma_separated_string(self):
+        prop = self._create_property("Size", Property.TYPES.MULTISELECT)
+
+        select_s = PropertySelectValue.objects.create(property=prop, multi_tenant_company=prop.multi_tenant_company)
+        select_m = PropertySelectValue.objects.create(property=prop, multi_tenant_company=prop.multi_tenant_company)
+
+        data = {
+            "value": f"{select_s.id}, {select_m.id}",
+            "value_is_id": True,
+            "property_data": {"name": prop.name},
+        }
+        instance = ImportProductPropertyInstance(data, self.import_process, property=prop, product=self.product)
+        instance.multi_tenant_company = self.import_process.multi_tenant_company
+        instance.process()
+
+        values = list(instance.instance.value_multi_select.order_by("id").values_list("id", flat=True))
+        self.assertEqual(values, [select_s.id, select_m.id])
+
     def test_date_property(self):
         prop = self._create_property("Launch Date", Property.TYPES.DATE)
         instance = self._process_instance(prop, "2024-12-01 00:00:00")

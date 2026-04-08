@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from core.models.multi_tenant import MultiTenantCompany
+from imports_exports.factories.exports.helpers import serialize_sales_channel_payload
 
-from products.mcp.types import GetProductTypesPayload, GetVatRatesPayload, VatRateOptionPayload
+from products.mcp.types import (
+    GetProductTypesPayload,
+    SearchSalesChannelsPayload,
+    GetVatRatesPayload,
+    SalesChannelReferencePayload,
+    VatRateOptionPayload,
+)
 from properties.mcp.helpers import (
     get_property_select_value_detail_queryset,
     serialize_property_reference,
     serialize_property_select_value_detail,
 )
 from properties.models import Property, PropertySelectValue
+from sales_channels.models import SalesChannel
 from taxes.models import VatRate
 
 
@@ -48,6 +56,55 @@ def serialize_vat_rate_option(*, vat_rate: VatRate) -> VatRateOptionPayload:
         "id": vat_rate.id,
         "name": vat_rate.name,
         "rate": vat_rate.rate,
+    }
+
+
+def serialize_sales_channel_option(*, sales_channel: SalesChannel) -> SalesChannelReferencePayload:
+    payload = serialize_sales_channel_payload(sales_channel=sales_channel)
+    payload["active"] = bool(sales_channel.active)
+    return payload
+
+
+def search_sales_channels_payload(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    search: str | None,
+    active: bool | None,
+    type_value: str | None,
+    limit: int,
+    offset: int,
+) -> SearchSalesChannelsPayload:
+    queryset = SalesChannel.objects.filter(
+        multi_tenant_company=multi_tenant_company,
+    )
+    if search:
+        queryset = queryset.filter(hostname__icontains=search)
+    if active is not None:
+        queryset = queryset.filter(active=active)
+
+    sales_channels = list(queryset.order_by("hostname", "id"))
+    serialized_channels = [
+        serialize_sales_channel_option(sales_channel=sales_channel)
+        for sales_channel in sales_channels
+    ]
+    if type_value:
+        normalized_type = type_value.strip().lower()
+        serialized_channels = [
+            payload
+            for payload in serialized_channels
+            if payload["type"].lower() == normalized_type
+        ]
+
+    total_count = len(serialized_channels)
+    paginated_channels = serialized_channels[offset: offset + limit + 1]
+    has_more = len(paginated_channels) > limit
+
+    return {
+        "total_count": total_count,
+        "has_more": has_more,
+        "offset": offset,
+        "limit": limit,
+        "results": paginated_channels[:limit],
     }
 
 

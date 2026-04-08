@@ -10,7 +10,6 @@ PRODUCT_TYPE_ENUM = ["SIMPLE", "BUNDLE", "CONFIGURABLE", "ALIAS"]
 PRODUCT_IMAGE_TYPE_ENUM = ["MOOD", "PACK", "COLOR"]
 SCALAR_VALUE_VARIANTS = [
     {"type": "string"},
-    {"type": "integer"},
     {"type": "number"},
     {"type": "boolean"},
     {"type": "null"},
@@ -80,6 +79,19 @@ PRODUCT_INSPECTOR_OUTPUT_SCHEMA = {
 }
 
 
+SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "hostname": {"type": "string"},
+        "active": {"type": "boolean"},
+        "type": {"type": "string"},
+        "subtype": {"type": ["string", "null"]},
+    },
+    "required": ["id", "hostname", "active", "type", "subtype"],
+}
+
+
 PRODUCT_IMAGE_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -93,7 +105,12 @@ PRODUCT_IMAGE_OUTPUT_SCHEMA = {
         "description": {"type": ["string", "null"]},
         "is_main_image": {"type": "boolean"},
         "sort_order": {"type": "integer"},
-        "sales_channel_id": {"type": ["integer", "null"]},
+        "sales_channel": {
+            "oneOf": [
+                SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA,
+                {"type": "null"},
+            ],
+        },
     },
     "required": [
         "image_url",
@@ -103,7 +120,7 @@ PRODUCT_IMAGE_OUTPUT_SCHEMA = {
         "description",
         "is_main_image",
         "sort_order",
-        "sales_channel_id",
+        "sales_channel",
     ],
 }
 
@@ -124,7 +141,12 @@ PRODUCT_TRANSLATION_OUTPUT_SCHEMA = {
     "properties": {
         "language": {"type": "string"},
         "name": {"type": "string"},
-        "sales_channel": {"type": ["integer", "null"]},
+        "sales_channel": {
+            "oneOf": [
+                SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA,
+                {"type": "null"},
+            ],
+        },
         "subtitle": {"type": "string"},
         "short_description": {"type": "string"},
         "description": {"type": "string"},
@@ -376,6 +398,22 @@ GET_VAT_RATES_OUTPUT_SCHEMA = {
         },
     },
     "required": ["count", "results"],
+}
+
+
+SEARCH_SALES_CHANNELS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "total_count": {"type": "integer"},
+        "has_more": {"type": "boolean"},
+        "offset": {"type": "integer"},
+        "limit": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["total_count", "has_more", "offset", "limit", "results"],
 }
 
 

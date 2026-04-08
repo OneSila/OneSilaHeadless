@@ -15,6 +15,7 @@ TAG_CONTENT = "content"
 TAG_PRICES = "prices"
 TAG_IMAGES = "images"
 TAG_TAXES = "taxes"
+TAG_SALES_CHANNELS = "sales_channels"
 
 
 def tool_tags(*values: str) -> set[str]:

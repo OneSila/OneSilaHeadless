@@ -8,7 +8,8 @@ from django.db.models import Exists, OuterRef, Prefetch, QuerySet
 from get_absolute_url.helpers import generate_absolute_url
 
 from imports_exports.factories.exports.helpers import (
-    get_product_translation_payloads,
+    serialize_product_translation_payload,
+    serialize_sales_channel_payload,
     serialize_product_property_value,
 )
 from media.models import Media, MediaProductThrough
@@ -25,6 +26,7 @@ from products.mcp.types import (
     ProductPropertyRequirementPayload,
     ProductPropertyRequirementsPayload,
     ProductRequirementProductTypePayload,
+    SalesChannelReferencePayload,
     ProductSummaryPayload,
     ProductVatRatePayload,
     ProductFrontendUrlPayload,
@@ -303,7 +305,9 @@ def _serialize_product_image(*, assignment: MediaProductThrough) -> ProductImage
         "description": assignment.media.description,
         "is_main_image": assignment.is_main_image,
         "sort_order": assignment.sort_order,
-        "sales_channel_id": assignment.sales_channel_id,
+        "sales_channel": serialize_sales_channel_reference(
+            sales_channel=assignment.sales_channel,
+        ),
     }
 
 
@@ -350,13 +354,38 @@ def serialize_product_prices(*, product: Product) -> list[ProductPricePayload]:
     ]
 
 
+def serialize_sales_channel_reference(*, sales_channel) -> SalesChannelReferencePayload | None:
+    if sales_channel is None:
+        return None
+
+    payload = serialize_sales_channel_payload(sales_channel=sales_channel)
+    payload["active"] = bool(sales_channel.active)
+    return payload
+
+
 def serialize_product_translations(*, product: Product) -> list[ProductTranslationPayload]:
     return [
         {
-            key: value
-            for key, value in payload.items()
+            **{
+                key: value
+                for key, value in serialize_product_translation_payload(
+                    translation=translation,
+                ).items()
+                if key != "sales_channel"
+            },
+            "sales_channel": serialize_sales_channel_reference(
+                sales_channel=translation.sales_channel,
+            ),
         }
-        for payload in get_product_translation_payloads(product=product)
+        for translation in sorted(
+            product.translations.all(),
+            key=lambda item: (
+                item.language,
+                item.sales_channel_id is not None,
+                item.sales_channel.hostname if item.sales_channel_id else "",
+                item.id,
+            ),
+        )
     ]
 
 

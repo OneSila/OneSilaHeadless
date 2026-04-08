@@ -39,7 +39,7 @@ class UpdateProductContentMcpTool(BaseMcpTool):
         language: Annotated[str, Field(description="Target company language code for the translation update.")] = ...,
         product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID.")] = None,
         sku: Annotated[str | None, Field(description="Exact product SKU.")] = None,
-        sales_channel_id: Annotated[int | None, Field(ge=1, description="Optional exact sales channel database ID for a channel-specific translation override.")] = None,
+        sales_channel_id: Annotated[int | None, Field(ge=1, description="Optional exact sales channel database ID for a channel-specific translation override. Use search_sales_channels first to map hostnames or marketplace names to ids.")] = None,
         name: Annotated[str | None, Field(description="Updated product name for the target translation.")] = None,
         subtitle: Annotated[str | None, Field(description="Updated subtitle for the target translation.")] = None,
         short_description: Annotated[str | None, Field(description="Updated short description for the target translation.")] = None,

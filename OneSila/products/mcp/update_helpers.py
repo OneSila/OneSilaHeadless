@@ -23,6 +23,61 @@ from properties.models import Property
 from sales_channels.models import SalesChannel
 
 
+def parse_boolean_input(*, value, field_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        normalized_value = value.strip().lower()
+        if normalized_value in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized_value in {"0", "false", "no", "n", "off"}:
+            return False
+
+    raise ValueError(
+        f"{field_name} must be a boolean or a boolean-like string such as true/false, got: {value!r}"
+    )
+
+
+def split_comma_separated_values(*, value: str) -> list[str]:
+    return [chunk.strip() for chunk in value.split(",") if chunk.strip()]
+
+
+def normalize_property_update_value(
+    *,
+    property_instance: Property,
+    value,
+    value_is_id: bool,
+):
+    if property_instance.type == Property.TYPES.BOOLEAN:
+        return parse_boolean_input(
+            value=value,
+            field_name=f"value for property {property_instance.internal_name or property_instance.id}",
+        )
+
+    if property_instance.type == Property.TYPES.SELECT and value_is_id:
+        return int(value)
+
+    if property_instance.type == Property.TYPES.MULTISELECT and value_is_id:
+        raw_values = value
+        if isinstance(raw_values, str):
+            raw_values = split_comma_separated_values(value=raw_values)
+        elif isinstance(raw_values, (list, tuple, set)):
+            raw_values = list(raw_values)
+        else:
+            raw_values = [raw_values]
+
+        try:
+            return [int(item) for item in raw_values]
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "MULTISELECT values with value_is_id=true must be a list of ids or a comma-separated string of ids."
+            ) from error
+
+    return value
+
+
 def build_product_import_process(*, multi_tenant_company: MultiTenantCompany):
     return SimpleNamespace(
         multi_tenant_company=multi_tenant_company,
@@ -219,12 +274,17 @@ def sanitize_product_property_updates_input(
         property_id = update.get("property_id")
         property_internal_name = str(update.get("property_internal_name", "")).strip() or None
         value = update.get("value")
-        value_is_id = bool(update.get("value_is_id", False))
+        raw_value_is_id = update.get("value_is_id", False)
 
         if property_id is None and not property_internal_name:
             raise ValueError("Each property update must include property_id or property_internal_name.")
         if value is None:
             raise ValueError("Each property update must include value.")
+
+        value_is_id = parse_boolean_input(
+            value=raw_value_is_id,
+            field_name="value_is_id",
+        ) if raw_value_is_id is not None else False
 
         translations = sanitize_product_property_translations_input(
             translations=update.get("translations"),
@@ -419,7 +479,11 @@ def resolve_properties_for_updates(
         property_instance = queryset.get(id=property_ids[0])
         resolved_update = {
             "property": property_instance,
-            "value": update["value"],
+            "value": normalize_property_update_value(
+                property_instance=property_instance,
+                value=update["value"],
+                value_is_id=update.get("value_is_id", False),
+            ),
             "value_is_id": update.get("value_is_id", False),
         }
         if update.get("translations") is not None:

@@ -41,6 +41,14 @@ class ProductInspectorPayload(TypedDict):
     issues: list[ProductInspectorIssuePayload]
 
 
+class SalesChannelReferencePayload(TypedDict, total=False):
+    id: int
+    hostname: str
+    active: bool
+    type: str
+    subtype: str | None
+
+
 class ProductImagePayload(TypedDict):
     image_url: str | None
     thumbnail_url: str | None
@@ -49,7 +57,7 @@ class ProductImagePayload(TypedDict):
     description: str | None
     is_main_image: bool
     sort_order: int
-    sales_channel_id: int | None
+    sales_channel: SalesChannelReferencePayload | None
 
 
 class ProductPricePayload(TypedDict):
@@ -84,7 +92,7 @@ class ProductImageInputPayload(TypedDict, total=False):
 class ProductTranslationPayload(TypedDict, total=False):
     language: str
     name: str
-    sales_channel: int | None
+    sales_channel: SalesChannelReferencePayload | None
     subtitle: str
     short_description: str
     description: str
@@ -185,6 +193,14 @@ class GetProductTypesPayload(TypedDict):
 class GetVatRatesPayload(TypedDict):
     count: int
     results: list[VatRateOptionPayload]
+
+
+class SearchSalesChannelsPayload(TypedDict):
+    total_count: int
+    has_more: bool
+    offset: int
+    limit: int
+    results: list[SalesChannelReferencePayload]
 
 
 class ProductMutationPayload(TypedDict):

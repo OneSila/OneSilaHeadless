@@ -7,6 +7,7 @@ from products.mcp.tools import (
     GetProductMcpTool,
     GetProductTypesMcpTool,
     GetVatRatesMcpTool,
+    SearchSalesChannelsMcpTool,
     SearchProductsMcpTool,
     UpdateProductContentMcpTool,
     UpsertProductPriceMcpTool,
@@ -18,6 +19,7 @@ def register_product_mcp_tools(*, mcp):
     SearchProductsMcpTool(mcp=mcp)
     GetProductMcpTool(mcp=mcp)
     GetProductFrontendUrlMcpTool(mcp=mcp)
+    SearchSalesChannelsMcpTool(mcp=mcp)
     GetProductTypesMcpTool(mcp=mcp)
     GetVatRatesMcpTool(mcp=mcp)
     CreateProductMcpTool(mcp=mcp)
@@ -38,6 +40,7 @@ __all__ = [
     "GetProductMcpTool",
     "GetProductTypesMcpTool",
     "GetVatRatesMcpTool",
+    "SearchSalesChannelsMcpTool",
     "SearchProductsMcpTool",
     "UpdateProductContentMcpTool",
     "UpsertProductPriceMcpTool",

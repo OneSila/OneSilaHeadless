@@ -41,6 +41,7 @@ class AddProductImagesMcpTool(BaseMcpTool):
                 description=(
                     "Non-empty list of image inputs. Each image must include image_url and may include title, "
                     "description, type, is_main_image, sort_order, and sales_channel_id. "
+                    "Use search_sales_channels first to map hostnames or marketplace names to sales_channel_id. "
                     "A JSON-stringified list is also accepted."
                 )
             )

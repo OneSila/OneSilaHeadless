@@ -40,8 +40,10 @@ class UpsertProductPropertyValuesMcpTool(BaseMcpTool):
                 description=(
                     "Non-empty list of property value updates. Each update must include property_id or "
                     "property_internal_name, plus value. For SELECT and MULTISELECT, prefer select-value IDs "
-                    "with value_is_id=true. For TEXT and DESCRIPTION, translations may also be provided. "
-                    "A JSON-stringified list is also accepted."
+                    "with value_is_id=true. For MULTISELECT ids, value may be a list of ids or a comma-separated "
+                    "string of ids. BOOLEAN values may be passed as booleans or as true/false-style strings. "
+                    "For TEXT and DESCRIPTION, translations may also be provided. A JSON-stringified list is "
+                    "also accepted."
                 )
             )
         ] = ...,
