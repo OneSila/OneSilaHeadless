@@ -62,7 +62,7 @@ class ManagedFastMCPApp:
         await self.app(scope, receive, send)
 
 
-raw_mcp_app = mcp.http_app(path="/")
+raw_mcp_app = mcp.http_app(path="/", stateless_http=True)
 managed_mcp_app = ManagedFastMCPApp(app=raw_mcp_app)
 
 

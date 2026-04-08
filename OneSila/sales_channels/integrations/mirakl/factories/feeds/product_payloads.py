@@ -180,6 +180,7 @@ class MiraklProductPayloadBuilder:
         "leadtime-to-ship",
         "update-delete",
     ]
+    _QUANTITY_CACHE_MISSING = object()
 
     def __init__(
         self,
@@ -200,6 +201,7 @@ class MiraklProductPayloadBuilder:
         self._local_language_by_remote_code_cache: dict[str, str | None] = {}
         self._offer_property_cache: dict[str, MiraklProperty | None] = {}
         self._document_type_by_code_cache: dict[str, MiraklDocumentType | None] = {}
+        self._offer_quantity_by_remote_sku_cache: dict[str, int | object] = {}
 
     def build(self) -> tuple[MiraklProductType, list[dict[str, str]]]:
         self.validate_feed_prerequisites()
@@ -517,7 +519,7 @@ class MiraklProductPayloadBuilder:
         description = product_context["description"]
         short_description = product_context["short_description"]
         price = self._stringify(price_data.get("full_price"))
-        quantity = self._resolve_create_quantity(product_context=product_context)
+        quantity = self._resolve_quantity(product_context=product_context)
         if self.action == SalesChannelFeedItem.ACTION_DELETE:
             if not description:
                 description = self._default_delete_text()
@@ -553,16 +555,62 @@ class MiraklProductPayloadBuilder:
             return "DELETE"
         return "UPDATE"
 
-    def _resolve_create_quantity(self, *, product_context: dict[str, Any]) -> str:
+    def _resolve_quantity(self, *, product_context: dict[str, Any]) -> str:
         row_remote_product = product_context.get("remote_product") or self.remote_product
+        if self.action == SalesChannelFeedItem.ACTION_DELETE:
+            return ""
+
         remote_sku = str(getattr(row_remote_product, "remote_sku", "") or "").strip()
         if remote_sku:
-            return ""
+            return self._stringify(self._get_existing_offer_quantity(product_context=product_context, remote_sku=remote_sku))
 
         starting_stock = getattr(self.sales_channel, "starting_stock", None)
         if starting_stock in (None, ""):
             return ""
         return self._stringify(max(int(starting_stock), 0))
+
+    def _get_existing_offer_quantity(self, *, product_context: dict[str, Any], remote_sku: str) -> int:
+        cached_quantity = self._offer_quantity_by_remote_sku_cache.get(remote_sku, self._UNSET)
+        if cached_quantity is not self._UNSET:
+            if cached_quantity is self._QUANTITY_CACHE_MISSING:
+                self._raise_offer_quantity_not_found(product_context=product_context, remote_sku=remote_sku)
+            return int(cached_quantity)
+
+        offers_payload = self._mirakl_get(path="/api/offers", params={"product_id": remote_sku, "shop_id": self.sales_channel.shop_id})
+        offers = offers_payload.get("offers") or []
+        selected_offer = self._select_existing_offer_for_quantity(offers=offers)
+        if selected_offer is None:
+            self._offer_quantity_by_remote_sku_cache[remote_sku] = self._QUANTITY_CACHE_MISSING
+            self._raise_offer_quantity_not_found(product_context=product_context, remote_sku=remote_sku)
+
+        quantity = selected_offer.get("quantity")
+        try:
+            parsed_quantity = int(quantity)
+        except (TypeError, ValueError) as exc:
+            self._raise_offer_quantity_not_found(product_context=product_context, remote_sku=remote_sku)
+
+        self._offer_quantity_by_remote_sku_cache[remote_sku] = parsed_quantity
+        return parsed_quantity
+
+    def _select_existing_offer_for_quantity(self, *, offers: list[Any]) -> dict[str, Any] | None:
+        normalized_offers = [offer for offer in offers if isinstance(offer, dict)]
+        active_offers = [offer for offer in normalized_offers if offer.get("active") is True]
+        if active_offers:
+            return active_offers[0]
+        if len(normalized_offers) == 1:
+            return normalized_offers[0]
+        return None
+
+    def _raise_offer_quantity_not_found(self, *, product_context: dict[str, Any], remote_sku: str) -> None:
+        local_product = product_context.get("product") or getattr(self.remote_product, "local_instance", None) or self.local_product
+        product_sku = product_context.get("sku") or getattr(local_product, "sku", None) or remote_sku
+        raise PreFlightCheckError(
+            f"Could not set quantity for product {product_sku}: OF21 returned no usable offer for remote_sku '{remote_sku}'."
+        )
+
+    def _mirakl_get(self, *, path: str, params: dict[str, Any]) -> dict[str, Any]:
+        helper = _MiraklPayloadBuilderMiraklAPI(sales_channel=self.sales_channel)
+        return helper.mirakl_get(path=path, params=params)
 
     def _resolve_offer_state(self, *, product_context: dict[str, Any]) -> str:
         remote_property = self._get_condition_property()
@@ -1141,7 +1189,7 @@ class MiraklProductPayloadBuilder:
         return self._stringify(product_context["price_data"].get("discounted_price"))
 
     def _resolve_stock(self, *, remote_property: MiraklProperty, product_context: dict[str, Any], bullet_index: int | None = None, image_index: int | None = None) -> str:
-        return self._resolve_create_quantity()
+        return self._resolve_quantity(product_context=product_context)
 
     def _get_document_type_for_property(self, *, remote_property: MiraklProperty) -> MiraklDocumentType | None:
         property_code = str(getattr(remote_property, "code", "") or "").strip()
@@ -2115,6 +2163,11 @@ class MiraklProductDeleteFactory(GetMiraklAPIMixin, _MiraklFeedPersistenceMixin,
 
     def serialize_response(self, response):
         return response
+
+
+class _MiraklPayloadBuilderMiraklAPI(GetMiraklAPIMixin):
+    def __init__(self, *, sales_channel):
+        self.sales_channel = sales_channel
 
 
 class _BaseMiraklProductPayloadFactory:
