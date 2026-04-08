@@ -32,6 +32,7 @@ class SheinSignatureMixin:
     store_info_path = "/open-api/openapi-business-backend/query-store-info"
     certificate_rule_path = "/open-api/goods/get-certificate-rule"
     upload_certificate_file_path = "/open-api/goods/upload-certificate-file"
+    certificate_type_list_v2_path = "/open-api/goods/certificate/get-all-certificate-type-list-v2"
     save_or_update_certificate_pool_path = "/open-api/goods/save-or-update-certificate-pool"
     save_certificate_pool_skc_bind_path = "/open-api/goods/save-certificate-pool-skc-bind"
     certificate_rule_default_system_id = "spmp"
@@ -464,6 +465,44 @@ class SheinSignatureMixin:
 
         response = self.shein_post(path=self.certificate_rule_path, payload=payload)
         return self._extract_certificate_rule_records_from_response(response=response)
+
+    def get_all_certificate_type_list_v2(self) -> list[dict[str, Any]]:
+        response = self.shein_post(
+            path=self.certificate_type_list_v2_path,
+            payload={},
+            add_language=True,
+        )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            logger.exception("Unable to decode Shein certificate type V2 response")
+            raise ValueError(_("Shein certificate type V2 returned invalid JSON.")) from exc
+
+        if not isinstance(payload, dict):
+            return []
+
+        code = payload.get("code")
+        if code is not None and str(code) != "0":
+            message = payload.get("msg") or "Unknown error"
+            raise SheinResponseException(
+                _("Failed to fetch Shein certificate types V2: %(message)s (code %(code)s)")
+                % {"message": message, "code": code}
+            )
+
+        info = payload.get("info")
+        if not isinstance(info, dict):
+            return []
+
+        data = info.get("data")
+        if isinstance(data, list):
+            return [record for record in data if isinstance(record, dict)]
+
+        certificate_type_info_list = info.get("certificateTypeInfoList")
+        if isinstance(certificate_type_info_list, list):
+            return [record for record in certificate_type_info_list if isinstance(record, dict)]
+
+        return []
 
     def _extract_certificate_rule_records_from_response(
         self,

@@ -1,9 +1,14 @@
+from unittest.mock import patch
+
 from core.tests import TestCase
 from model_bakery import baker
 
 from products.models import Product
 from sales_channels.integrations.shein.factories.products.shelf import (
     SheinProductShelfUpdateFactory,
+)
+from sales_channels.integrations.shein.factories.products.assigns import (
+    SheinSalesChannelViewAssignUpdateFactory,
 )
 from sales_channels.integrations.shein.models import SheinProduct, SheinSalesChannel, SheinSalesChannelView
 from sales_channels.models import SalesChannelViewAssign
@@ -108,3 +113,110 @@ class SheinProductShelfUpdateFactoryTests(TestCase):
 
         names = {entry["skc_name"] for entry in payload["skc_site_info_list"]}
         self.assertEqual(names, {"SKC-ONE", "SKC-TWO"})
+
+    def test_assign_update_binds_assigns_without_remote_update_when_not_completed(self) -> None:
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku="SKU-PENDING",
+            skc_name="SKC-PENDING",
+            status=RemoteProduct.STATUS_PENDING_APPROVAL,
+        )
+        assign = SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=product,
+            sales_channel_view=self.view,
+            status=SalesChannelViewAssign.STATUS_PENDING_CREATION,
+        )
+
+        factory = SheinSalesChannelViewAssignUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            view=self.view,
+        )
+
+        response = factory.run()
+
+        assign.refresh_from_db()
+        self.assertIsNone(response)
+        self.assertEqual(assign.remote_product_id, remote_product.id)
+        self.assertEqual(assign.status, SalesChannelViewAssign.STATUS_CREATED)
+
+    @patch.object(SheinProductShelfUpdateFactory, "run", return_value={"code": "0"})
+    def test_assign_update_publishes_current_site_list_for_completed_product(self, mock_run) -> None:
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku="SKU-COMPLETE",
+            skc_name="SKC-COMPLETE",
+            status=RemoteProduct.STATUS_COMPLETED,
+        )
+        self._assign(product=product, remote_product=remote_product)
+        second_view = SheinSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="shein-fr",
+        )
+        SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=product,
+            sales_channel_view=second_view,
+        )
+
+        factory = SheinSalesChannelViewAssignUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            view=second_view,
+        )
+
+        payload = factory.run()
+
+        self.assertEqual(payload, {"code": "0"})
+        mock_run.assert_called_once()
+        second_assign = SalesChannelViewAssign.objects.get(
+            sales_channel=self.sales_channel,
+            product=product,
+            sales_channel_view=second_view,
+        )
+        self.assertEqual(second_assign.remote_product_id, remote_product.id)
+
+    def test_build_payload_supports_explicit_unpublish_site_list(self) -> None:
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku="SKU-DELETE",
+            skc_name="SKC-DELETE",
+            status=RemoteProduct.STATUS_COMPLETED,
+        )
+
+        shelf_factory = SheinProductShelfUpdateFactory(
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+            shelf_state=2,
+            site_list=["shein-fr"],
+        )
+
+        payload = shelf_factory.build_payload()
+
+        self.assertEqual(payload["skc_site_info_list"][0]["shelf_state"], 2)
+        self.assertEqual(payload["skc_site_info_list"][0]["site_list"], ["shein-fr"])

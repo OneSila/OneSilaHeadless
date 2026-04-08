@@ -141,6 +141,48 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
             product.inspector.blocks.filter(error_code=OPTIONAL_DOCUMENT_TYPES_ERROR).exists()
         )
 
+    def test_shein_non_uploadable_document_types_are_ignored_by_required_block(self):
+        sales_channel = SheinSalesChannel.objects.create(
+            hostname="https://shein.example.com",
+            open_key_id="open-key",
+            secret_key="secret-key",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        document_type = DocumentType.objects.create(
+            name="External SHEIN Cert",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        SheinCategory.objects.create(
+            sales_channel=sales_channel,
+            remote_id="cat-shein",
+            name="Shein Category",
+            is_leaf=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        SheinDocumentType.objects.create(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=document_type,
+            remote_id="340",
+            uploadable=False,
+            required_categories=["cat-shein"],
+            optional_categories=[],
+        )
+        SheinProductCategory.objects.create(
+            product=product,
+            sales_channel=sales_channel,
+            remote_id="cat-shein",
+            require_view=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        required_block = product.inspector.blocks.get(error_code=REQUIRED_DOCUMENT_TYPES_ERROR)
+        required_block.refresh_from_db()
+        self.assertTrue(required_block.successfully_checked)
+
     def test_remote_product_category_create_live_refreshes_document_blocks(self):
         product = SimpleProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,

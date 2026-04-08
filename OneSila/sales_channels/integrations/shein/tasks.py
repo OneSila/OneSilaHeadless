@@ -196,6 +196,48 @@ def update_shein_product_db_task(
     task.execute(actual_task)
 
 
+@remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
+@db_task(priority=HIGH_PRIORITY)
+def update_shein_sales_view_assign_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    product_id: int,
+    view_id: int | None = None,
+    is_delete: bool = False,
+):
+    """Update Shein site availability after a view assignment changes."""
+    from products.models import Product
+    from sales_channels.integrations.shein.factories.products import (
+        SheinSalesChannelViewAssignUpdateFactory,
+    )
+    from sales_channels.integrations.shein.models import (
+        SheinSalesChannel,
+        SheinSalesChannelView,
+    )
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        sales_channel = SheinSalesChannel.objects.get(id=sales_channel_id)
+        view = None
+        if view_id is not None:
+            view = SheinSalesChannelView.objects.filter(
+                id=view_id,
+                sales_channel=sales_channel,
+            ).first()
+
+        factory = SheinSalesChannelViewAssignUpdateFactory(
+            sales_channel=sales_channel,
+            local_instance=Product.objects.get(id=product_id),
+            view=view,
+            is_delete=is_delete,
+        )
+        factory.run()
+
+    task.execute(actual_task)
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task(priority=HIGH_PRIORITY)
 def resync_shein_product_db_task(
@@ -271,3 +313,22 @@ def shein__tasks__refresh_product_issues__cronjob() -> None:
             remote_product=product,
             sales_channel=product.sales_channel,
         ).run()
+
+
+@db_periodic_task(crontab(minute="0"))
+def shein__tasks__refresh_pending_external_documents__cronjob() -> None:
+    """Resume SHEIN products waiting on manual compliance documents once they are complete."""
+    from sales_channels.integrations.shein.factories.products.external_documents import (
+        SheinProductExternalDocumentsFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinProduct
+
+    products = SheinProduct.objects.select_related("sales_channel").filter(
+        pending_external_documents=True,
+        is_variation=False,
+    )
+    for product in products.iterator():
+        SheinProductExternalDocumentsFactory(
+            remote_product=product,
+            sales_channel=product.sales_channel,
+        ).apply(log_missing=False)

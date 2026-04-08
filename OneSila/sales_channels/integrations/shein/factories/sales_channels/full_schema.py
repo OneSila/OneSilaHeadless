@@ -71,6 +71,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self.synced_document_rules = 0
         self.synced_document_types_created = 0
         self.synced_document_types_updated = 0
+        self.uploadable_certificate_type_ids: set[str] | None = None
         self._remote_language_cache: set[tuple[Optional[int], str]] = set()
         self._attribute_template_cache: dict[str, list[dict[str, Any]]] = {}
         self._custom_value_permission_cache: dict[str, dict[str, bool]] = {}
@@ -103,6 +104,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self.synced_document_rules = 0
         self.synced_document_types_created = 0
         self.synced_document_types_updated = 0
+        self.uploadable_certificate_type_ids = None
 
         if not normalized_nodes:
             logger.info(
@@ -111,6 +113,9 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             )
             self._print_debug("No nodes returned from remote tree; aborting run.")
             return []
+
+        if self.sync_document_types:
+            self._refresh_uploadable_certificate_type_snapshot()
 
         logger.info(
             "Shein schema sync will process %s nodes for channel=%s",
@@ -290,6 +295,24 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         return category
 
+    def _refresh_uploadable_certificate_type_snapshot(self) -> None:
+        try:
+            certificate_type_records = self.get_all_certificate_type_list_v2()
+        except Exception:
+            logger.exception(
+                "Failed to refresh Shein certificate type V2 snapshot for channel=%s",
+                self.sales_channel_id,
+            )
+            self.uploadable_certificate_type_ids = None
+            return
+
+        uploadable_certificate_type_ids = {
+            str(record.get("certificateTypeId") or "").strip()
+            for record in certificate_type_records
+            if isinstance(record, dict) and str(record.get("certificateTypeId") or "").strip()
+        }
+        self.uploadable_certificate_type_ids = uploadable_certificate_type_ids
+
     def _sync_category_document_types(self, *, category: SheinCategory) -> None:
         category_remote_id = self._normalize_identifier(category.remote_id)
         if not category_remote_id:
@@ -298,6 +321,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         factory = SheinCertificateRuleSyncFactory(
             sales_channel=self.sales_channel,
             category_remote_id=category_remote_id,
+            uploadable_certificate_type_ids=self.uploadable_certificate_type_ids,
         )
         # Reuse this instance's request hook, so tests patching this class keep working.
         factory.shein_post = self.shein_post  # type: ignore[method-assign]

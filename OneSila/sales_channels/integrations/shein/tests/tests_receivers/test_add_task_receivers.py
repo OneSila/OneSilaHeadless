@@ -1,4 +1,7 @@
+from unittest.mock import patch
+
 from currencies.models import Currency
+from django.db import transaction
 from eancodes.models import EanCode
 from integrations.helpers import get_import_path
 from integrations.models import IntegrationTaskQueue
@@ -15,6 +18,7 @@ from sales_channels.integrations.shein.models import (
     SheinProductTypeItem,
     SheinProperty,
     SheinSalesChannel,
+    SheinSalesChannelView,
 )
 from sales_channels.integrations.shein.tasks_receiver_audit import (
     shein__content__update_db_task,
@@ -31,16 +35,18 @@ from sales_channels.integrations.shein.tasks_receiver_audit import (
     shein__variation__add_db_task,
     shein__variation__remove_db_task,
 )
-from sales_channels.models import SyncRequest
+from sales_channels.models import SalesChannelViewAssign, SyncRequest
 from sales_channels.tests.tests_receivers.mixins import AddTaskSyncRequestTestMixin
 from sales_channels.signals import (
     add_remote_product_variation,
+    create_remote_product,
     create_remote_image_association,
     create_remote_product_property,
     delete_remote_image,
     delete_remote_image_association,
     delete_remote_product_property,
     remove_remote_product_variation,
+    sales_view_assign_updated,
     update_remote_image_association,
     update_remote_price,
     update_remote_product,
@@ -48,6 +54,98 @@ from sales_channels.signals import (
     update_remote_product_eancode,
     update_remote_product_property,
 )
+from sales_channels.integrations.shein.tasks import (
+    create_shein_product_db_task,
+    update_shein_sales_view_assign_db_task,
+)
+
+
+class SheinAssignReceiverTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = SheinSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+        )
+        self.view = SheinSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="shein-uk",
+            is_default=True,
+        )
+        self.product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            sku="SHEIN-ASSIGN-1",
+        )
+        self.assign = SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
+            product=self.product,
+        )
+
+    def test_create_from_assign_queues_task(self):
+        self.assertEqual(self.assign.status, SalesChannelViewAssign.STATUS_CREATED)
+
+        initial_count = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).count()
+
+        with patch.object(
+            transaction,
+            "on_commit",
+            side_effect=lambda func, using=None: func(),
+        ):
+            create_remote_product.send(
+                sender=SalesChannelViewAssign,
+                instance=self.assign,
+                view=self.view,
+            )
+
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+            ).count(),
+            initial_count + 1,
+        )
+        task = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).latest("id")
+        self.assertEqual(task.task_name, get_import_path(create_shein_product_db_task))
+        self.assertEqual(task.task_kwargs.get("product_id"), self.product.id)
+
+    def test_assign_update_queues_task(self):
+        initial_count = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).count()
+
+        with patch.object(
+            transaction,
+            "on_commit",
+            side_effect=lambda func, using=None: func(),
+        ):
+            sales_view_assign_updated.send(
+                sender=Product,
+                instance=self.product,
+                sales_channel=self.sales_channel,
+                view=self.view,
+                is_delete=True,
+            )
+
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+            ).count(),
+            initial_count + 1,
+        )
+        task = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).latest("id")
+        self.assertEqual(task.task_name, get_import_path(update_shein_sales_view_assign_db_task))
+        self.assertEqual(task.task_kwargs.get("product_id"), self.product.id)
+        self.assertEqual(task.task_kwargs.get("view_id"), self.view.id)
+        self.assertTrue(task.task_kwargs.get("is_delete"))
 
 
 class SheinMarketplaceSyncRequestTests(AddTaskSyncRequestTestMixin, TestCase):

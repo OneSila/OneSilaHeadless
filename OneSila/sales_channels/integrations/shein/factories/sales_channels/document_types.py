@@ -21,9 +21,19 @@ class SheinCertificateRuleSyncFactory(SheinSignatureMixin):
         *,
         sales_channel: SheinSalesChannel,
         category_remote_id: Optional[str] = None,
+        uploadable_certificate_type_ids: Optional[set[str]] = None,
     ) -> None:
         self.sales_channel = sales_channel
         self.category_remote_id = str(category_remote_id or "").strip()
+        self.uploadable_certificate_type_ids = (
+            {
+                str(certificate_type_id).strip()
+                for certificate_type_id in (uploadable_certificate_type_ids or set())
+                if str(certificate_type_id).strip()
+            }
+            if uploadable_certificate_type_ids is not None
+            else None
+        )
         self.created_count = 0
         self.updated_count = 0
         self.rules_processed = 0
@@ -95,6 +105,12 @@ class SheinCertificateRuleSyncFactory(SheinSignatureMixin):
         if not created and name and document_type.name != name:
             document_type.name = name
             changed = True
+
+        if self.uploadable_certificate_type_ids is not None:
+            uploadable = remote_id in self.uploadable_certificate_type_ids
+            if document_type.uploadable != uploadable:
+                document_type.uploadable = uploadable
+                changed = True
 
         if is_required:
             changed = document_type.add_required_category(

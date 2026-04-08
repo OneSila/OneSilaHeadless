@@ -592,11 +592,15 @@ class DocumentTypesInspectorBlockFactory(InspectorBlockFactory):
             "local_instance_id",
             "name",
             "translated_name",
+            "uploadable",
             self.category_field_name,
         )
 
         for row in queryset.iterator():
             sales_channel_id = row.get("sales_channel_id")
+            if row.get("uploadable") is False:
+                continue
+
             category_values = row.get(self.category_field_name) or []
             if not isinstance(category_values, list):
                 continue

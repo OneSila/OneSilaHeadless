@@ -19,6 +19,7 @@ from sales_channels.signals import (
     create_remote_image_association,
     remove_remote_product_variation,
     refresh_website_pull_models,
+    sales_view_assign_updated,
     sales_channel_created,
     update_remote_image_association,
     update_remote_price,
@@ -42,7 +43,7 @@ def sales_channels__shein__handle_pull(sender, instance, **kwargs):
     if not isinstance(real_instance, SheinSalesChannel):
         return
 
-    from sales_channels.integrations.shein.factories.sales_channels import  SheinSalesChannelViewPullFactory
+    from sales_channels.integrations.shein.factories.sales_channels import SheinSalesChannelViewPullFactory
 
     SheinSalesChannelViewPullFactory(sales_channel=instance).run()
     ensure_internal_properties_flow(real_instance)
@@ -128,6 +129,57 @@ def shein__shein_product__manual_sync(
         view=view,
         **kwargs,
     )
+
+
+@receiver(create_remote_product, sender="sales_channels.SalesChannelViewAssign")
+def shein__product__create_from_assign(*, sender, instance, **kwargs):
+    from sales_channels.integrations.shein.factories.task_queue import SheinSingleChannelAddTask
+    from sales_channels.integrations.shein.tasks import create_shein_product_db_task
+
+    product = getattr(instance, "product", None)
+    sales_channel = getattr(instance, "sales_channel", None)
+    if sales_channel is not None and hasattr(sales_channel, "get_real_instance"):
+        sales_channel = sales_channel.get_real_instance()
+
+    if product is None or not isinstance(sales_channel, SheinSalesChannel) or not sales_channel.active:
+        return
+
+    count = 1 + getattr(product, "get_configurable_variations", lambda: [])().count()
+
+    task_runner = SheinSingleChannelAddTask(
+        task_func=create_shein_product_db_task,
+        sales_channel=sales_channel,
+        number_of_remote_requests=count,
+    )
+    task_runner.set_extra_task_kwargs(
+        product_id=product.id,
+    )
+    task_runner.run()
+
+
+@receiver(sales_view_assign_updated, sender="products.Product")
+def shein__assign__update(*, sender, instance, **kwargs):
+    from sales_channels.integrations.shein.factories.task_queue import SheinSingleChannelAddTask
+    from sales_channels.integrations.shein.tasks import update_shein_sales_view_assign_db_task
+
+    sales_channel = kwargs.get("sales_channel")
+    if sales_channel is not None and hasattr(sales_channel, "get_real_instance"):
+        sales_channel = sales_channel.get_real_instance()
+    if not isinstance(sales_channel, SheinSalesChannel) or not sales_channel.active:
+        return
+
+    view = kwargs.get("view")
+    task_runner = SheinSingleChannelAddTask(
+        task_func=update_shein_sales_view_assign_db_task,
+        sales_channel=sales_channel,
+        number_of_remote_requests=1,
+    )
+    task_runner.set_extra_task_kwargs(
+        product_id=instance.id,
+        view_id=getattr(view, "id", None),
+        is_delete=bool(kwargs.get("is_delete", False)),
+    )
+    task_runner.run()
 
 
 @receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
