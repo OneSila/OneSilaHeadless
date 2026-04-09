@@ -120,6 +120,7 @@ class SheinImportTasksTest(TestCase):
             ),
             status=SheinProduct.STATUS_PENDING_EXTERNAL_DOCUMENTS,
             is_variation=False,
+            pending_external_documents=True,
         )
 
         shein__tasks__refresh_pending_external_documents__cronjob()
