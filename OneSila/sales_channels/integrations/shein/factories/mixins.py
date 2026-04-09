@@ -498,7 +498,7 @@ class SheinSignatureMixin:
         if isinstance(data, list):
             return [record for record in data if isinstance(record, dict)]
 
-        certificate_type_info_list = info.get("certificateTypeInfoList")
+        certificate_type_info_list = data.get("certificateTypeInfoList")
         if isinstance(certificate_type_info_list, list):
             return [record for record in certificate_type_info_list if isinstance(record, dict)]
 

@@ -18,18 +18,18 @@ from products.mcp.types import (
     ProductAssignedPropertyValuePayload,
     ProductAssignedPropertyValueTranslationPayload,
     ProductDetailPayload,
-    ProductInspectorIssuePayload,
-    ProductTranslationPayload,
     ProductImagePayload,
+    ProductInspectorIssuePayload,
     ProductInspectorPayload,
     ProductPricePayload,
     ProductPropertyRequirementPayload,
     ProductPropertyRequirementsPayload,
     ProductRequirementProductTypePayload,
-    SalesChannelReferencePayload,
+    ProductTranslationPayload,
+    ProductOnesilaUrlPayload,
     ProductSummaryPayload,
     ProductVatRatePayload,
-    ProductFrontendUrlPayload,
+    SalesChannelReferencePayload,
 )
 from products.models import Product, ProductTranslation
 from products_inspector.models import InspectorBlock
@@ -621,13 +621,13 @@ def serialize_product_detail(*, product: Product) -> ProductDetailPayload:
     }
 
 
-def serialize_product_frontend_url(*, product: Product) -> ProductFrontendUrlPayload:
-    frontend_path = f"/products/product/{product.global_id}"
-    frontend_url = f"{generate_absolute_url(trailing_slash=False).rstrip('/')}{frontend_path}"
+def serialize_product_onesila_url(*, product: Product) -> ProductOnesilaUrlPayload:
+    onesila_path = f"/products/product/{product.global_id}"
+    onesila_url = f"{generate_absolute_url(trailing_slash=False).rstrip('/')}{onesila_path}"
     return {
         "id": product.id,
         "sku": product.sku,
         "global_id": product.global_id,
-        "frontend_path": frontend_path,
-        "frontend_url": frontend_url,
+        "onesila_path": onesila_path,
+        "onesila_url": onesila_url,
     }

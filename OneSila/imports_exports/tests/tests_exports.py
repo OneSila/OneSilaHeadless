@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from core.tests import TestCase
 from django.core.files.base import ContentFile
+from model_bakery import baker
 from llm.models import McpApiKey
 from imports_exports.factories.exports.products import ProductsExportFactory
 from eancodes.models import EanCode

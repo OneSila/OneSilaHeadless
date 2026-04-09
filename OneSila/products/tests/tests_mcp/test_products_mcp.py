@@ -13,7 +13,7 @@ from products.mcp.tools.activate_product import ActivateProductMcpTool
 from products.mcp.tools.add_product_images import AddProductImagesMcpTool
 from products.mcp.tools.create_product import CreateProductMcpTool
 from products.mcp.tools.deactivate_product import DeactivateProductMcpTool
-from products.mcp.tools.get_product_frontend_url import GetProductFrontendUrlMcpTool
+from products.mcp.tools.get_product_onesila_url import GetProductOnesilaUrlMcpTool
 from products.mcp.tools.get_product import GetProductMcpTool
 from products.mcp.tools.get_product_types import GetProductTypesMcpTool
 from products.mcp.tools.get_vat_rates import GetVatRatesMcpTool
@@ -422,12 +422,12 @@ class ProductMcpToolAsyncTestCase(TestCase):
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
-    def test_get_product_frontend_url_executes_from_async_context(self, mock_get_access_token):
+    def test_get_product_onesila_url_executes_from_async_context(self, mock_get_access_token):
         mock_get_access_token.return_value = self._build_access_token(
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = GetProductFrontendUrlMcpTool(mcp=DummyMcp())
+        tool = GetProductOnesilaUrlMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
             sku="BOOK-001",
@@ -438,10 +438,10 @@ class ProductMcpToolAsyncTestCase(TestCase):
         self.assertEqual(result.structured_content["sku"], "BOOK-001")
         self.assertEqual(result.structured_content["global_id"], self.product.global_id)
         self.assertEqual(
-            result.structured_content["frontend_path"],
+            result.structured_content["onesila_path"],
             f"/products/product/{self.product.global_id}",
         )
-        self.assertIn(result.structured_content["frontend_path"], result.structured_content["frontend_url"])
+        self.assertIn(result.structured_content["onesila_path"], result.structured_content["onesila_url"])
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")

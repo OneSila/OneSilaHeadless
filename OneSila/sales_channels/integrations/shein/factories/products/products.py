@@ -122,7 +122,7 @@ class SheinProductBaseFactory(
         get_value_only: bool = False,
         skip_checks: bool = False,
         skip_price_update: bool = False,
-        skip_property_values_category_validation: bool = True, # shein is weird, sometimes it let you even if the value is not in the approved list
+        skip_property_values_category_validation: bool = False, # shein is weird, sometimes it let you even if the value is not in the approved list
     ) -> None:
         self.get_value_only = get_value_only
         self.skip_checks = skip_checks
@@ -207,6 +207,7 @@ class SheinProductBaseFactory(
 
     def sync_documents_after_publish(self):
         target_remote_products = self._get_document_target_remote_products()
+
         if not target_remote_products:
             self._sync_pending_external_documents(log_missing=True)
             return
@@ -821,10 +822,16 @@ class SheinProductBaseFactory(
             .order_by("id")
         )
         allowed_languages: list[str] = []
+        mapped_languages: dict[str, list[str]] = {}
         for entry in remote_language_qs:
             language = entry.local_instance
             if language and language not in allowed_languages:
                 allowed_languages.append(language)
+            remote_code = str(getattr(entry, "remote_code", "") or "").strip()
+            if language and remote_code:
+                mapped_languages.setdefault(language, [])
+                if remote_code not in mapped_languages[language]:
+                    mapped_languages[language].append(remote_code)
         if not allowed_languages:
             allowed_languages = [default_language]
 
@@ -870,16 +877,29 @@ class SheinProductBaseFactory(
                 if existing is None or (self._is_blank_html(existing) and not self._is_blank_html(description)):
                     desc_by_language[language] = description
 
+        def build_remote_language_entries(*, values_by_language: dict[str, str]) -> list[dict[str, str]]:
+            entries: list[dict[str, str]] = []
+            seen_remote_codes: set[str] = set()
+
+            for language, value in values_by_language.items():
+                remote_codes = mapped_languages.get(language) or [language]
+                for remote_code in remote_codes:
+                    normalized_remote_code = str(remote_code or "").strip()
+                    if not normalized_remote_code or normalized_remote_code in seen_remote_codes:
+                        continue
+                    seen_remote_codes.add(normalized_remote_code)
+                    entries.append({"language": normalized_remote_code, "name": value})
+
+            return entries
+
         if name_by_language:
-            self.multi_language_name_list = [
-                {"language": language, "name": value}
-                for language, value in name_by_language.items()
-            ]
+            self.multi_language_name_list = build_remote_language_entries(
+                values_by_language=name_by_language,
+            )
         if desc_by_language:
-            self.multi_language_desc_list = [
-                {"language": language, "name": value}
-                for language, value in desc_by_language.items()
-            ]
+            self.multi_language_desc_list = build_remote_language_entries(
+                values_by_language=desc_by_language,
+            )
 
     def _use_create_payload(self) -> bool:
         if getattr(self, "is_create", False):

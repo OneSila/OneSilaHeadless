@@ -341,6 +341,11 @@ def sales_channels__woocommerce__handle_pull_woocommerce_sales_channel_views(sen
         WoocommerceRemoteCurrencyPullFactory,
         WoocommerceLanguagePullFactory
     )
+    from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+
+    real_instance = instance.get_real_instance()
+    if not isinstance(real_instance, WoocommerceSalesChannel):
+        return
 
     views_factory = WoocommerceSalesChannelViewPullFactory(sales_channel=instance)
     views_factory.run()

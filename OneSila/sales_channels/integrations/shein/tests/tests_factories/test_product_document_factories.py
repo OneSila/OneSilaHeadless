@@ -604,6 +604,7 @@ class SheinProductFinalDocumentSyncTests(TestCase):
             spu_name="SPU-SIMPLE-EXTERNAL-RESOLVED-1",
             syncing_current_percentage=100,
             status=RemoteProduct.STATUS_PENDING_EXTERNAL_DOCUMENTS,
+            pending_external_documents=True,
         )
         self.remote_document_type_a.uploadable = False
         self.remote_document_type_a.save(update_fields=["uploadable"])

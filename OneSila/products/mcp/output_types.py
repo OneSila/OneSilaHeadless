@@ -351,16 +351,16 @@ SEARCH_PRODUCTS_OUTPUT_SCHEMA = {
 }
 
 
-GET_PRODUCT_FRONTEND_URL_OUTPUT_SCHEMA = {
+GET_PRODUCT_ONESILA_URL_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
         "id": {"type": "integer"},
         "sku": {"type": ["string", "null"]},
         "global_id": {"type": "string"},
-        "frontend_path": {"type": "string"},
-        "frontend_url": {"type": "string"},
+        "onesila_path": {"type": "string"},
+        "onesila_url": {"type": "string"},
     },
-    "required": ["id", "sku", "global_id", "frontend_path", "frontend_url"],
+    "required": ["id", "sku", "global_id", "onesila_path", "onesila_url"],
 }
 
 VAT_RATE_OPTION_OUTPUT_SCHEMA = {

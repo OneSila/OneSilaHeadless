@@ -162,6 +162,7 @@ class SheinProductShelfUpdateFactoryTests(TestCase):
             local_instance=product,
             remote_sku="SKU-COMPLETE",
             skc_name="SKC-COMPLETE",
+            syncing_current_percentage=100,
             status=RemoteProduct.STATUS_COMPLETED,
         )
         self._assign(product=product, remote_product=remote_product)

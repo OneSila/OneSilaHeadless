@@ -170,12 +170,12 @@ class SearchProductsPayload(TypedDict):
     results: list[ProductSummaryPayload]
 
 
-class ProductFrontendUrlPayload(TypedDict):
+class ProductOnesilaUrlPayload(TypedDict):
     id: int
     sku: str | None
     global_id: str
-    frontend_path: str
-    frontend_url: str
+    onesila_path: str
+    onesila_url: str
 
 
 class VatRateOptionPayload(TypedDict):
