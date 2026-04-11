@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 from asgiref.sync import async_to_sync
 from jsonschema import validate as jsonschema_validate
 
-from core.tests import TestCase
+from core.tests import TransactionTestCase
 from llm.mcp.runtime import AccessToken
 from products.mcp.output_types import PRODUCT_BATCH_MUTATION_OUTPUT_SCHEMA
 from media.models import Media, MediaProductThrough
@@ -37,7 +37,7 @@ from properties.models import (
 from sales_channels.models import SalesChannel
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
-from currencies.models import Currency
+from currencies.models import Currency, PublicCurrency
 
 
 class DummyMcp:
@@ -55,7 +55,7 @@ class DummyContext:
         self.error = AsyncMock()
 
 
-class ProductMcpToolAsyncTestCase(TestCase):
+class ProductMcpToolAsyncTestCase(TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel_connect_patcher = patch.object(SalesChannel, "connect", return_value=None)
@@ -69,6 +69,10 @@ class ProductMcpToolAsyncTestCase(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             name="Standard",
             rate=21,
+        )
+        PublicCurrency.objects.get_or_create(
+            iso_code="GBP",
+            defaults={"name": "Pound Sterling", "symbol": "£"},
         )
         self.product = Product.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -111,19 +115,26 @@ class ProductMcpToolAsyncTestCase(TestCase):
             sort_order=1,
             multi_tenant_company=self.multi_tenant_company,
         )
-        Inspector.objects.create(
+        inspector, _ = Inspector.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
-            has_missing_information=True,
-            has_missing_optional_information=False,
         )
-        InspectorBlock.objects.create(
+        inspector.has_missing_information = True
+        inspector.has_missing_optional_information = False
+        inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
+
+        image_block, _ = InspectorBlock.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            inspector=self.product.inspector,
+            inspector=inspector,
             error_code=HAS_IMAGES_ERROR,
-            successfully_checked=False,
-            fixing_message="Upload a main product image.",
+            defaults={
+                "successfully_checked": False,
+                "fixing_message": "Upload a main product image.",
+            },
         )
+        image_block.successfully_checked = False
+        image_block.fixing_message = "Upload a main product image."
+        image_block.save(update_fields=["successfully_checked", "fixing_message"])
 
         self.property = Property.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -173,6 +184,7 @@ class ProductMcpToolAsyncTestCase(TestCase):
         )
         PropertyTranslation.objects.get_or_create(
             property=self.product_type_property,
+            multi_tenant_company=self.multi_tenant_company,
             language="en",
             defaults={
                 "name": "Product Type",
@@ -195,9 +207,10 @@ class ProductMcpToolAsyncTestCase(TestCase):
             value_select=self.product_type_select_value,
             multi_tenant_company=self.multi_tenant_company,
         )
-        self.product_rule = ProductPropertiesRule.objects.create(
+        self.product_rule, _ = ProductPropertiesRule.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             product_type=self.product_type_select_value,
+            sales_channel=None,
         )
         ProductPropertiesRuleItem.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -207,7 +220,7 @@ class ProductMcpToolAsyncTestCase(TestCase):
         )
         self.optional_property = Property.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            type=Property.TYPES.TEXT,
+            type=Property.TYPES.SELECT,
             internal_name="subtitle_hint",
         )
         PropertyTranslation.objects.create(
@@ -244,6 +257,18 @@ class ProductMcpToolAsyncTestCase(TestCase):
             price=Decimal("12.50"),
             multi_tenant_company=self.multi_tenant_company,
         )
+
+        # Keep the async MCP fixtures deterministic. Several setup actions above
+        # trigger inspector refresh signals that would otherwise clear the
+        # "missing images" state these tests expect to serialize and filter by.
+        inspector = self.product.inspector
+        inspector.has_missing_information = True
+        inspector.has_missing_optional_information = False
+        inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
+        image_block = inspector.blocks.get(error_code=HAS_IMAGES_ERROR)
+        image_block.successfully_checked = False
+        image_block.fixing_message = "Upload a main product image."
+        image_block.save(update_fields=["successfully_checked", "fixing_message"])
 
     def _build_access_token(self, *, company_id: int) -> AccessToken:
         return AccessToken(
@@ -340,29 +365,33 @@ class ProductMcpToolAsyncTestCase(TestCase):
                 "select_value": "Book",
             },
         )
+        requirements_by_property_id = {
+            item["property_id"]: item
+            for item in result.structured_content["property_requirements"]["requirements"].values()
+        }
         self.assertEqual(
-            result.structured_content["property_requirements"]["requirements"]["book_format"]["requirement_type"],
+            requirements_by_property_id[self.property.id]["requirement_type"],
             ProductPropertiesRuleItem.REQUIRED,
         )
         self.assertTrue(
-            result.structured_content["property_requirements"]["requirements"]["book_format"]["effectively_required"]
+            requirements_by_property_id[self.property.id]["effectively_required"]
         )
         self.assertTrue(
-            result.structured_content["property_requirements"]["requirements"]["book_format"]["has_value"]
+            requirements_by_property_id[self.property.id]["has_value"]
         )
         self.assertEqual(
-            result.structured_content["property_requirements"]["requirements"]["book_format"]["current_value_summary"],
+            requirements_by_property_id[self.property.id]["current_value_summary"],
             "Hardcover",
         )
         self.assertEqual(
-            result.structured_content["property_requirements"]["requirements"]["subtitle_hint"]["requirement_type"],
+            requirements_by_property_id[self.optional_property.id]["requirement_type"],
             ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
         )
         self.assertTrue(
-            result.structured_content["property_requirements"]["requirements"]["subtitle_hint"]["effectively_required"]
+            requirements_by_property_id[self.optional_property.id]["effectively_required"]
         )
         self.assertFalse(
-            result.structured_content["property_requirements"]["requirements"]["subtitle_hint"]["has_value"]
+            requirements_by_property_id[self.optional_property.id]["has_value"]
         )
         self.assertEqual(result.structured_content["prices"][0]["currency"], self.currency.iso_code)
         self.assertEqual(len(result.structured_content["images"]), 1)
@@ -550,9 +579,9 @@ class ProductMcpToolAsyncTestCase(TestCase):
         )
         inherited_currency = Currency.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            iso_code="GBP",
-            name="Pound Sterling",
-            symbol="£",
+            iso_code="EUR",
+            name="Euro",
+            symbol="€",
             inherits_from=self.currency,
         )
         ctx = DummyContext()
@@ -560,7 +589,7 @@ class ProductMcpToolAsyncTestCase(TestCase):
 
         with self.assertRaisesMessage(
             Exception,
-            "Currency 'GBP' inherits its price from 'EUR' and cannot be edited directly. Update the base currency price instead.",
+            "Currency 'EUR' inherits its price from 'GBP' and cannot be edited directly. Update the base currency price instead.",
         ):
             async_to_sync(tool.execute)(
                 sku="BOOK-001",
@@ -579,11 +608,11 @@ class ProductMcpToolAsyncTestCase(TestCase):
 
         with self.assertRaisesMessage(
             Exception,
-            "Currency 'GBP' is not configured for this account.",
+            "Currency 'ZZZ' is not configured for this account.",
         ):
             async_to_sync(tool.execute)(
                 sku="BOOK-001",
-                currency="GBP",
+                currency="ZZZ",
                 price="10.00",
                 ctx=ctx,
             )
@@ -637,7 +666,7 @@ class ProductMcpToolAsyncTestCase(TestCase):
             sku="BOOK-001",
             updates=(
                 f'[{{"property_id": {self.property.id}, "value": {self.other_select_value.id}, '
-                '"value_is_id": true}}]'
+                f'"value_is_id": true}}]'
             ),
             ctx=ctx,
         )
@@ -737,7 +766,7 @@ class ProductMcpToolAsyncTestCase(TestCase):
             sku="BOOK-001",
             updates=(
                 f'[{{"property_id": {multiselect_property.id}, "value": "{ebook_value.id}, {audio_value.id}", '
-                '"value_is_id": "true"}}]'
+                f'"value_is_id": "true"}}]'
             ),
             ctx=ctx,
         )

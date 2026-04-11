@@ -339,8 +339,10 @@ class SheinProductFinalDocumentSyncTests(TestCase):
     @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductExternalDocumentsFactory, "apply", return_value=False)
     def test_final_process_syncs_only_document_types_required_by_remote_rules(
         self,
+        _mock_external_documents_apply,
         mock_get_certificate_rules,
         mock_sync_document_assignment,
         _mock_delete_document_assignment,
@@ -518,8 +520,10 @@ class SheinProductFinalDocumentSyncTests(TestCase):
     @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductExternalDocumentsFactory, "get_certificate_rule_by_product_spu")
     def test_final_process_sets_pending_external_documents_for_non_uploadable_required_types(
         self,
+        mock_external_get_certificate_rules,
         mock_get_certificate_rules,
         mock_sync_document_assignment,
         _mock_delete_document_assignment,
@@ -558,6 +562,7 @@ class SheinProductFinalDocumentSyncTests(TestCase):
                 "certificateMissStatus": True,
             },
         ]
+        mock_external_get_certificate_rules.return_value = mock_get_certificate_rules.return_value
 
         factory = SheinProductCreateFactory(
             sales_channel=self.sales_channel,
@@ -645,8 +650,10 @@ class SheinProductFinalDocumentSyncTests(TestCase):
     @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductExternalDocumentsFactory, "apply", return_value=False)
     def test_final_process_configurable_targets_each_variation_remote_product(
         self,
+        _mock_external_documents_apply,
         mock_get_certificate_rules,
         mock_sync_document_assignment,
         _mock_delete_document_assignment,
@@ -747,8 +754,10 @@ class SheinProductFinalDocumentSyncTests(TestCase):
     @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductExternalDocumentsFactory, "apply", return_value=False)
     def test_final_process_configurable_deduplicates_by_skc(
         self,
+        _mock_external_documents_apply,
         mock_get_certificate_rules,
         mock_sync_document_assignment,
         _mock_delete_document_assignment,
