@@ -68,7 +68,8 @@ class ImportsExportsMutationTestCase(
         self.assertTrue(instance.skip_broken_records)
         self.assertEqual(instance.status, MappedImport.STATUS_PENDING)
 
-    def test_create_export_maps_ids_columns_and_nested_parameters(self):
+    @patch("imports_exports.models.safe_run_task")
+    def test_create_export_maps_ids_columns_and_nested_parameters(self, mocked_safe_run_task):
         mutation = """
         mutation($data: ExportCreateInput!) {
           createExport(data: $data) {
@@ -107,6 +108,7 @@ class ImportsExportsMutationTestCase(
         )
         self.assertEqual(export_process.columns, ["sku", "translations"])
         self.assertEqual(export_process.status, Export.STATUS_PENDING)
+        mocked_safe_run_task.assert_called_once()
 
     def test_update_export_rejects_invalid_parameter_for_kind(self):
         export_process = Export.objects.create(
