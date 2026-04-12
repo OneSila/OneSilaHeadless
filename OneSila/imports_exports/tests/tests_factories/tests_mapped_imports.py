@@ -67,7 +67,6 @@ class MappedImportSkipBrokenRecordsTest(TestCase):
         self.assertIn('error', mapped_import.broken_records[0])
         self.assertIn('traceback', mapped_import.broken_records[0])
 
-    @unittest.skip("TODO 04.04.2026: Count is 1 not 0.")
     def test_rerun_clears_previous_broken_records(self):
         invalid_product_data = [
             {"sku": "P001", "name": "Duplicate Product", "type": "SIMPLE"},

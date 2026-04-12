@@ -327,9 +327,7 @@ class ExportRunnerTest(TestCase):
             ],
         )
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: CSV generation is implemented now, so this failure expectation is stale.")
-    def test_csv_export_preserves_raw_data_before_failure(self):
+    def test_csv_export_generates_file_successfully(self):
         export_process = Export.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             kind=Export.KIND_PROPERTIES,
@@ -340,9 +338,12 @@ class ExportRunnerTest(TestCase):
         export_process.run()
         export_process.refresh_from_db()
 
-        self.assertEqual(export_process.status, Export.STATUS_FAILED)
-        self.assertTrue(export_process.raw_data)
-        self.assertIn("CSV file generation is not implemented yet", export_process.error_traceback)
+        self.assertEqual(export_process.status, Export.STATUS_SUCCESS)
+        self.assertEqual(export_process.error_traceback, "")
+        self.assertEqual(export_process.raw_data, [])
+        self.assertTrue(export_process.file)
+        self.assertTrue(export_process.file.name.endswith(".csv"))
+        self.assertGreater(export_process.file.size, 0)
 
     def test_no_columns_defaults_to_all_supported_columns(self):
         export_process = Export.objects.create(

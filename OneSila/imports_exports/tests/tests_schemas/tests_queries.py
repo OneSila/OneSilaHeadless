@@ -1,5 +1,3 @@
-import unittest
-
 from django.core.files.base import ContentFile
 from django.test import TransactionTestCase
 from model_bakery import baker
@@ -40,6 +38,7 @@ class ImportsExportsQueryTestCase(TransactionTestCaseMixin, TransactionTestCase)
             save=True,
         )
         self.broken_record = ImportBrokenRecord.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             import_process=self.mapped_import,
             record={"sku": "SKU-QUERY-1", "error": "Broken"},
         )
@@ -67,8 +66,6 @@ class ImportsExportsQueryTestCase(TransactionTestCaseMixin, TransactionTestCase)
             percentage=100,
         )
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: ImportBrokenRecord create path in this test is missing multi_tenant_company.")
     def test_queries_expose_custom_urls_and_percentage_colors(self):
         query = """
         query {
@@ -160,11 +157,9 @@ class ImportsExportsQueryTestCase(TransactionTestCaseMixin, TransactionTestCase)
         self.assertEqual(broken_record_node["id"], self.to_global_id(self.broken_record))
         self.assertEqual(
             broken_record_node["importProcess"]["id"],
-            self.to_global_id(self.mapped_import),
+            to_base64(ImportType, self.mapped_import.pk),
         )
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: ImportBrokenRecord create path in this test is missing multi_tenant_company.")
     def test_import_broken_records_accepts_mapped_import_filter_alias(self):
         query = """
         query($filter: ImportBrokenRecordFilter) {
