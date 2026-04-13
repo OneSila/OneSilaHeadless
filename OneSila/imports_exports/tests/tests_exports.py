@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 from core.tests import TestCase
 from django.core.files.base import ContentFile
+from model_bakery import baker
+from llm.models import McpApiKey
 from imports_exports.factories.exports.products import ProductsExportFactory
 from eancodes.models import EanCode
 from imports_exports.models import Export
@@ -325,9 +327,7 @@ class ExportRunnerTest(TestCase):
             ],
         )
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: CSV generation is implemented now, so this failure expectation is stale.")
-    def test_csv_export_preserves_raw_data_before_failure(self):
+    def test_csv_export_generates_file_successfully(self):
         export_process = Export.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             kind=Export.KIND_PROPERTIES,
@@ -338,9 +338,12 @@ class ExportRunnerTest(TestCase):
         export_process.run()
         export_process.refresh_from_db()
 
-        self.assertEqual(export_process.status, Export.STATUS_FAILED)
-        self.assertTrue(export_process.raw_data)
-        self.assertIn("CSV file generation is not implemented yet", export_process.error_traceback)
+        self.assertEqual(export_process.status, Export.STATUS_SUCCESS)
+        self.assertEqual(export_process.error_traceback, "")
+        self.assertEqual(export_process.raw_data, [])
+        self.assertTrue(export_process.file)
+        self.assertTrue(export_process.file.name.endswith(".csv"))
+        self.assertGreater(export_process.file.size, 0)
 
     def test_no_columns_defaults_to_all_supported_columns(self):
         export_process = Export.objects.create(
@@ -364,19 +367,20 @@ class ExportRunnerTest(TestCase):
 
 
 class DirectExportFeedViewTest(TestCase):
-    # @patch("imports_exports.models.safe_run_task")
-    # def test_direct_feed_requires_bearer_token(self, mocked_safe_run_task):
-    #     export_process = Export.objects.create(
-    #         multi_tenant_company=self.multi_tenant_company,
-    #         kind=Export.KIND_PROPERTIES,
-    #         type=Export.TYPE_JSON_FEED,
-    #         status=Export.STATUS_SUCCESS,
-    #     )
-    #     export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
-    #
-    #     response = self.client.get(f"/direct/export/{export_process.feed_key}/")
-    #     self.assertEqual(response.status_code, 403)
-    #     mocked_safe_run_task.assert_not_called()
+    @patch("imports_exports.models.safe_run_task")
+    def test_direct_feed_requires_bearer_token(self, mocked_safe_run_task):
+        export_process = Export.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            kind=Export.KIND_PROPERTIES,
+            type=Export.TYPE_JSON_FEED,
+            status=Export.STATUS_SUCCESS,
+        )
+        export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
+
+        response = self.client.get(f"/direct/export/{export_process.feed_key}/")
+
+        self.assertEqual(response.status_code, 403)
+        mocked_safe_run_task.assert_not_called()
 
     @patch("imports_exports.models.safe_run_task")
     def test_direct_feed_returns_json(self, mocked_safe_run_task):
@@ -387,14 +391,39 @@ class DirectExportFeedViewTest(TestCase):
             status=Export.STATUS_SUCCESS,
         )
         export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
+        api_key = McpApiKey.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
 
         response = self.client.get(
             f"/direct/export/{export_process.feed_key}/",
-            HTTP_AUTHORIZATION="Bearer anything",
+            HTTP_AUTHORIZATION=f"Bearer {api_key.key}",
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(b"".join(response.streaming_content), b'{"hello": "world"}')
+        mocked_safe_run_task.assert_not_called()
+
+    @patch("imports_exports.models.safe_run_task")
+    def test_direct_feed_rejects_token_for_other_company(self, mocked_safe_run_task):
+        export_process = Export.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            kind=Export.KIND_PROPERTIES,
+            type=Export.TYPE_JSON_FEED,
+            status=Export.STATUS_SUCCESS,
+        )
+        export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
+        other_company = baker.make("core.MultiTenantCompany")
+        api_key = McpApiKey.objects.create(
+            multi_tenant_company=other_company,
+        )
+
+        response = self.client.get(
+            f"/direct/export/{export_process.feed_key}/",
+            HTTP_AUTHORIZATION=f"Bearer {api_key.key}",
+        )
+
+        self.assertEqual(response.status_code, 403)
         mocked_safe_run_task.assert_not_called()
 
 

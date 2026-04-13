@@ -235,7 +235,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         ):
             builder.build()
 
-    def test_create_quantity_uses_starting_stock_when_remote_sku_missing(self):
+    def test_resolve_quantity_uses_starting_stock_when_remote_sku_missing(self):
         self.sales_channel.starting_stock = 7
         self.sales_channel.save(update_fields=["starting_stock"])
         local_property = baker.make(
@@ -252,13 +252,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         builder.remote_product.remote_sku = ""
 
         self.assertEqual(
-            builder._resolve_create_quantity(product_context={"remote_product": builder.remote_product}),
+            builder._resolve_quantity(product_context={"remote_product": builder.remote_product}),
             "7",
         )
 
-    def test_create_quantity_is_blank_once_remote_sku_exists(self):
-        self.sales_channel.starting_stock = 7
-        self.sales_channel.save(update_fields=["starting_stock"])
+    def test_resolve_quantity_uses_of21_when_remote_sku_exists(self):
         local_property = baker.make(
             Property,
             multi_tenant_company=self.multi_tenant_company,
@@ -272,10 +270,94 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         )
         builder.remote_product.remote_sku = "MKP-REMOTE-1"
 
-        self.assertEqual(
-            builder._resolve_create_quantity(product_context={"remote_product": builder.remote_product}),
-            "",
+        with patch.object(
+            builder,
+            "_mirakl_get",
+            return_value={"offers": [{"active": True, "quantity": 9}], "total_count": 1},
+        ) as mirakl_get_mock:
+            self.assertEqual(
+                builder._resolve_quantity(product_context={"remote_product": builder.remote_product}),
+                "9",
+            )
+
+        mirakl_get_mock.assert_called_once_with(
+            path="/api/offers",
+            params={"product_id": "MKP-REMOTE-1", "shop_id": self.sales_channel.shop_id},
         )
+
+    def test_resolve_quantity_skips_of21_for_delete_rows(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, _ = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+            action=SalesChannelFeedItem.ACTION_DELETE,
+        )
+        builder.remote_product.remote_sku = "MKP-REMOTE-1"
+
+        with patch.object(builder, "_mirakl_get") as mirakl_get_mock:
+            self.assertEqual(
+                builder._resolve_quantity(product_context={"remote_product": builder.remote_product}),
+                "",
+            )
+
+        mirakl_get_mock.assert_not_called()
+
+    def test_resolve_quantity_raises_when_of21_returns_no_offer_for_existing_remote_sku(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, _ = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+            action=SalesChannelFeedItem.ACTION_CREATE,
+        )
+        builder.remote_product.remote_sku = "MKP-REMOTE-1"
+
+        with patch.object(builder, "_mirakl_get", return_value={"offers": [], "total_count": 0}):
+            with self.assertRaisesMessage(
+                PreFlightCheckError,
+                "Could not set quantity for product SKU-1: OF21 returned no usable offer for remote_sku 'MKP-REMOTE-1'.",
+            ):
+                builder._resolve_quantity(product_context={"remote_product": builder.remote_product})
+
+    def test_resolve_quantity_prefers_first_active_offer_from_of21(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, _ = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+            action=SalesChannelFeedItem.ACTION_CREATE,
+        )
+        builder.remote_product.remote_sku = "MKP-REMOTE-1"
+
+        with patch.object(
+            builder,
+            "_mirakl_get",
+            return_value={
+                "offers": [
+                    {"active": False, "quantity": 3},
+                    {"active": True, "quantity": 12},
+                    {"active": True, "quantity": 18},
+                ],
+                "total_count": 3,
+            },
+        ):
+            self.assertEqual(
+                builder._resolve_quantity(product_context={"remote_product": builder.remote_product}),
+                "12",
+            )
 
     def test_create_factory_initialize_remote_product_does_not_seed_remote_sku(self):
         product = baker.make(
@@ -513,7 +595,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         builder.local_product = parent_product
 
         self.assertEqual(
-            builder._resolve_create_quantity(product_context={"remote_product": variation_remote}),
+            builder._resolve_quantity(product_context={"remote_product": variation_remote}),
             "7",
         )
 

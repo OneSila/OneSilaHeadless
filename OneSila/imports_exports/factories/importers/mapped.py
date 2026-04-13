@@ -76,7 +76,7 @@ class MappedImportRunner(ImportMixin):
     # PRODUCT
     # --------------
     def get_products_data(self):
-        return [self.data] if self.get_total_instances() == 1 else self.data
+        return [self.data] if isinstance(self.data, dict) else self.data
 
     def get_structured_product_data(self, product_data):
         return product_data
@@ -85,7 +85,7 @@ class MappedImportRunner(ImportMixin):
     # PROPERTY
     # --------------
     def get_properties_data(self):
-        return [self.data] if self.get_total_instances() == 1 else self.data
+        return [self.data] if isinstance(self.data, dict) else self.data
 
     def get_structured_property_data(self, property_data):
         return property_data
@@ -94,7 +94,7 @@ class MappedImportRunner(ImportMixin):
     # SELECT VALUES
     # --------------
     def get_select_values_data(self):
-        return [self.data] if self.get_total_instances() == 1 else self.data
+        return [self.data] if isinstance(self.data, dict) else self.data
 
     def get_structured_select_value_data(self, value_data):
         return value_data
@@ -103,7 +103,7 @@ class MappedImportRunner(ImportMixin):
     # RULES
     # --------------
     def get_rules_data(self):
-        return [self.data] if self.get_total_instances() == 1 else self.data
+        return [self.data] if isinstance(self.data, dict) else self.data
 
     def get_structured_rule_data(self, rule_data):
         return rule_data
@@ -112,7 +112,7 @@ class MappedImportRunner(ImportMixin):
     # EAN CODES
     # --------------
     def get_ean_codes_data(self):
-        return [self.data] if self.get_total_instances() == 1 else self.data
+        return [self.data] if isinstance(self.data, dict) else self.data
 
     def get_structured_ean_code_data(self, ean_code_data):
         return ean_code_data

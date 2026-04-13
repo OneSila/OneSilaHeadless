@@ -272,7 +272,17 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
 
         remote_id = feed.product_remote_id or feed.remote_id
         if feed.status in {SalesChannelFeed.STATUS_SUCCESS, SalesChannelFeed.STATUS_PARTIAL}:
-            self._mark_items_success(feed=feed, remote_id=remote_id, allow_completion=not feed.has_error_report)
+            results = self._mark_items_success(
+                feed=feed,
+                remote_id=remote_id,
+                allow_completion=not feed.has_error_report,
+            )
+            if results["total_items"] and results["failed_items"] == results["total_items"]:
+                feed.status = SalesChannelFeed.STATUS_FAILED
+                feed.error_message = results["first_failed_message"] or "Mirakl product import failed."
+                feed.save(update_fields=["status", "error_message"])
+                return
+
             feed.error_message = ""
             feed.save(update_fields=["error_message"])
             return
@@ -282,8 +292,12 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
         feed.save(update_fields=["error_message"])
         self._mark_items_failed(feed=feed, remote_id=remote_id, message=message)
 
-    def _mark_items_success(self, *, feed: MiraklSalesChannelFeed, remote_id: str, allow_completion: bool) -> None:
+    def _mark_items_success(self, *, feed: MiraklSalesChannelFeed, remote_id: str, allow_completion: bool) -> dict[str, str | int | None]:
+        total_items = 0
+        failed_items = 0
+        first_failed_message: str | None = None
         for item in MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related("remote_product"):
+            total_items += 1
             remote_product = self._resolve_mirakl_product(remote_product=item.remote_product)
             if remote_product is None:
                 continue
@@ -295,6 +309,9 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 item.status = SalesChannelFeedItem.STATUS_FAILED
                 item.error_message = message
                 item.save(update_fields=["status", "error_message"])
+                failed_items += 1
+                if first_failed_message is None:
+                    first_failed_message = message
                 remote_product.refresh_status(
                     override_status=remote_product.STATUS_APPROVAL_REJECTED,
                 )
@@ -323,6 +340,11 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
                 identifier=f"mirakl-product-feed-{remote_id}",
                 remote_product=remote_product,
             )
+        return {
+            "total_items": total_items,
+            "failed_items": failed_items,
+            "first_failed_message": first_failed_message,
+        }
 
     def _mark_items_failed(self, *, feed: MiraklSalesChannelFeed, remote_id: str, message: str) -> None:
         for item in MiraklSalesChannelFeedItem.objects.filter(feed=feed).select_related("remote_product"):

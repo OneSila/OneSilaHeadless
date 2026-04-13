@@ -1,9 +1,8 @@
-import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, TestCase
 from model_bakery import baker
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
@@ -14,10 +13,15 @@ from imports_exports.schema.mutation_helpers import (
     _validate_periodic_export_size,
 )
 from products.models import Product
-from sales_channels.models import SalesChannel
+from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+from sales_channels.tests.helpers import DisableMagentoAndWooConnectionsMixin
 
 
-class ImportsExportsMutationTestCase(TransactionTestCaseMixin, TransactionTestCase):
+class ImportsExportsMutationTestCase(
+    DisableMagentoAndWooConnectionsMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
     def setUp(self):
         super().setUp()
         self.product = baker.make(
@@ -26,13 +30,13 @@ class ImportsExportsMutationTestCase(TransactionTestCaseMixin, TransactionTestCa
             type=Product.SIMPLE,
             sku="SKU-MUT-1",
         )
-        self.sales_channel = baker.make(
-            SalesChannel,
+        self.sales_channel = WoocommerceSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
+            hostname="https://example-store.test",
+            api_key="ck_test",
+            api_secret="cs_test",
         )
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: test fixture creates abstract SalesChannel and triggers connect().")
     def test_create_mapped_import_from_json_url(self):
         mutation = """
         mutation($data: MappedImportCreateInput!) {
@@ -64,9 +68,8 @@ class ImportsExportsMutationTestCase(TransactionTestCaseMixin, TransactionTestCa
         self.assertTrue(instance.skip_broken_records)
         self.assertEqual(instance.status, MappedImport.STATUS_PENDING)
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: test fixture creates abstract SalesChannel and triggers connect().")
-    def test_create_export_maps_ids_columns_and_nested_parameters(self):
+    @patch("imports_exports.models.safe_run_task")
+    def test_create_export_maps_ids_columns_and_nested_parameters(self, mocked_safe_run_task):
         mutation = """
         mutation($data: ExportCreateInput!) {
           createExport(data: $data) {
@@ -105,9 +108,8 @@ class ImportsExportsMutationTestCase(TransactionTestCaseMixin, TransactionTestCa
         )
         self.assertEqual(export_process.columns, ["sku", "translations"])
         self.assertEqual(export_process.status, Export.STATUS_PENDING)
+        mocked_safe_run_task.assert_called_once()
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: test fixture creates abstract SalesChannel and triggers connect().")
     def test_update_export_rejects_invalid_parameter_for_kind(self):
         export_process = Export.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -134,8 +136,6 @@ class ImportsExportsMutationTestCase(TransactionTestCaseMixin, TransactionTestCa
 
         self.assertIsNotNone(resp.errors)
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: test fixture creates abstract SalesChannel and triggers connect().")
     @patch("imports_exports.models.safe_run_task")
     def test_resync_mapped_import_sends_instance_to_pending_and_dispatches_async(self, mocked_safe_run_task):
         mapped_import = MappedImport.objects.create(
@@ -163,8 +163,6 @@ class ImportsExportsMutationTestCase(TransactionTestCaseMixin, TransactionTestCa
         self.assertEqual(mapped_import.percentage, 0)
         mocked_safe_run_task.assert_called_once()
 
-    # @TODO TO fix 04.04.2026
-    @unittest.skip("TODO 04.04.2026: test fixture creates abstract SalesChannel and triggers connect().")
     def test_delete_export_uses_generic_delete_mutation(self):
         export_process = Export.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -187,7 +185,7 @@ class ImportsExportsMutationTestCase(TransactionTestCaseMixin, TransactionTestCa
         self.assertFalse(Export.objects.filter(id=export_process.id).exists())
 
 
-class ExportMutationHelpersUnitTest(unittest.TestCase):
+class ExportMutationHelpersUnitTest(TestCase):
     def test_build_export_parameters_ignores_none_values(self):
         data = SimpleNamespace(
             sales_channel=None,

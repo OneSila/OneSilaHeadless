@@ -54,6 +54,7 @@ class SheinCertificateRuleSyncFactoryTest(TestCase):
         factory = SheinCertificateRuleSyncFactory(
             sales_channel=self.sales_channel,
             category_remote_id="1001",
+            uploadable_certificate_type_ids={"2001"},
         )
         response = _JsonResponse(
             payload={
@@ -96,6 +97,7 @@ class SheinCertificateRuleSyncFactoryTest(TestCase):
             remote_id="2001",
         )
         self.assertEqual(document_type.name, "CPC")
+        self.assertTrue(document_type.uploadable)
         self.assertEqual(document_type.required_categories, ["1001"])
         self.assertEqual(document_type.optional_categories, [])
         self.assertFalse(
@@ -117,6 +119,7 @@ class SheinCertificateRuleSyncFactoryTest(TestCase):
         factory = SheinCertificateRuleSyncFactory(
             sales_channel=self.sales_channel,
             category_remote_id="1001",
+            uploadable_certificate_type_ids=set(),
         )
         response = _JsonResponse(
             payload={
@@ -144,5 +147,25 @@ class SheinCertificateRuleSyncFactoryTest(TestCase):
         self.assertEqual(stats["document_types_created"], 0)
         self.assertEqual(stats["document_types_updated"], 1)
         self.assertEqual(document_type.name, "After")
+        self.assertFalse(document_type.uploadable)
         self.assertEqual(document_type.required_categories, [])
         self.assertEqual(document_type.optional_categories, ["1001"])
+
+    def test_uploadable_field_is_persisted_on_document_type(self):
+        uploadable_document_type = SheinDocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="4001",
+            name="Uploadable",
+            uploadable=True,
+        )
+        external_document_type = SheinDocumentType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="4002",
+            name="External Only",
+            uploadable=False,
+        )
+
+        self.assertTrue(uploadable_document_type.uploadable)
+        self.assertFalse(external_document_type.uploadable)

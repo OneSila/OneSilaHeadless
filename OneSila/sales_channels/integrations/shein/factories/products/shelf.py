@@ -18,10 +18,12 @@ class SheinProductShelfUpdateFactory(SheinSignatureMixin, SheinSalesChannelAssig
         sales_channel,
         remote_product,
         shelf_state: int = 1,
+        site_list: list[str] | None = None,
     ) -> None:
         self.sales_channel = sales_channel
         self.remote_product = remote_product
         self.shelf_state = shelf_state
+        self.site_list = list(site_list or [])
         self.local_instance = getattr(remote_product, "local_instance", None)
 
     def validate(self) -> None:
@@ -72,7 +74,7 @@ class SheinProductShelfUpdateFactory(SheinSignatureMixin, SheinSalesChannelAssig
         return skc_names
 
     def build_payload(self) -> dict[str, Any]:
-        site_list = self._collect_site_list()
+        site_list = self.site_list or self._collect_site_list()
         if not site_list:
             raise PreFlightCheckError("Missing Shein site_list for shelf update.")
 

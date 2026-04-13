@@ -248,6 +248,7 @@ class ImportPropertyInstance(AbstractImportInstance):
         fac.run()
 
         # Save the created/updated instance.
+        self.created = fac.created
         self.instance = fac.instance
 
         # Only create a default translation if:
@@ -363,6 +364,7 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
         fac.run()
 
         # Save the created/updated instance.
+        self.created = fac.created
         self.instance = fac.instance
 
         if fac.created and not (hasattr(self, 'translations') and len(self.translations) > 0):
@@ -709,6 +711,37 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
         else:
             self.factory_class = ProductPropertyImport
 
+    @staticmethod
+    def _coerce_boolean_value(*, value) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int) and value in {0, 1}:
+            return bool(value)
+        if isinstance(value, str):
+            normalized_value = value.strip().lower()
+            if normalized_value in {"1", "true", "yes", "y", "on"}:
+                return True
+            if normalized_value in {"0", "false", "no", "n", "off"}:
+                return False
+
+        raise ValueError(f"Invalid boolean value: {value!r}")
+
+    @staticmethod
+    def _coerce_multiselect_ids(*, value) -> list[int]:
+        if isinstance(value, str):
+            raw_values = [chunk.strip() for chunk in value.split(',') if chunk.strip()]
+        elif isinstance(value, (list, tuple, set)):
+            raw_values = list(value)
+        else:
+            raw_values = [value]
+
+        try:
+            return [int(item) for item in raw_values]
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "MULTISELECT values with value_is_id=True must be a list of ids or a comma-separated string of ids."
+            ) from error
+
     def set_value(self):
 
         if self.property.type == Property.TYPES.INT:
@@ -716,7 +749,7 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
         elif self.property.type == Property.TYPES.FLOAT:
             self.value_float = float(self.value)
         elif self.property.type == Property.TYPES.BOOLEAN:
-            self.value_boolean = bool(self.value)
+            self.value_boolean = self._coerce_boolean_value(value=self.value)
         elif self.property.type in [Property.TYPES.DATE, Property.TYPES.DATETIME]:
 
             try:
@@ -745,7 +778,7 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
         elif self.property.type == Property.TYPES.MULTISELECT:
 
             if self.value_is_id:
-                ids = [int(x) for x in self.value]
+                ids = self._coerce_multiselect_ids(value=self.value)
                 self.value_multi_select = PropertySelectValue.objects.filter(id__in=ids)
             else:
 

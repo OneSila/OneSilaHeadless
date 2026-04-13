@@ -297,15 +297,16 @@ class MiraklTransformationErrorReportIssueSyncFactory:
     ) -> int:
         created_or_updated = 0
         line_number = row.get("line_number") or row.get("line_number_") or row.get("line")
-        for source, severity, column_name in (
-            (source_error, "ERROR", "errors"),
-            (source_warning, "WARNING", "warnings"),
+        for source, severity, column_name, is_rejected in (
+            (source_error, "ERROR", "errors", source_error == self.SOURCE_ERROR_REPORT_ERROR),
+            (source_warning, "WARNING", "warnings", False),
         ):
             for code, message in self._parse_issue_entries(value=row.get(column_name, "")):
                 self._upsert_issue(
                     remote_product=remote_product,
                     source=source,
                     severity=severity,
+                    is_rejected=is_rejected,
                     code=code,
                     message=message,
                     line_number=line_number,
@@ -320,6 +321,7 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         remote_product: MiraklProduct,
         source: str,
         severity: str,
+        is_rejected: bool,
         code: str,
         message: str | None,
         line_number: str | None,
@@ -351,7 +353,7 @@ class MiraklTransformationErrorReportIssueSyncFactory:
                 severity=severity,
                 reason_label=None,
                 attribute_code=None,
-                is_rejected=False,
+                is_rejected=is_rejected,
                 raw_data=raw_data,
             )
         else:
@@ -359,7 +361,7 @@ class MiraklTransformationErrorReportIssueSyncFactory:
             issue.message = message
             issue.reason_label = None
             issue.attribute_code = None
-            issue.is_rejected = False
+            issue.is_rejected = is_rejected
             issue.raw_data = raw_data
             issue.save(
                 update_fields=[
@@ -404,14 +406,44 @@ class MiraklTransformationErrorReportIssueSyncFactory:
     def _normalize_mapping_row(self, *, raw_row) -> dict[str, str]:
         if not isinstance(raw_row, dict):
             return {}
+        ordered_headers = [header for header in raw_row.keys() if header is not None]
         row = {
-            self._normalize_header(value=header): self._stringify(value=value)
-            for header, value in raw_row.items()
-            if header is not None
+            self._normalize_header(value=header): self._stringify(value=raw_row.get(header))
+            for header in ordered_headers
         }
+        self._recover_overflow_tail_values(
+            row=row,
+            ordered_headers=ordered_headers,
+            overflow_values=raw_row.get(None),
+        )
         if any(value for value in row.values()):
             return row
         return {}
+
+    def _recover_overflow_tail_values(
+        self,
+        *,
+        row: dict[str, str],
+        ordered_headers: list[str],
+        overflow_values,
+    ) -> None:
+        if not ordered_headers or not isinstance(overflow_values, list) or not overflow_values:
+            return
+
+        normalized_headers = [
+            self._normalize_header(value=header)
+            for header in ordered_headers
+        ]
+        tail_values = [self._stringify(value=row.get(normalized_headers[-1]))]
+        tail_values.extend(self._stringify(value=value) for value in overflow_values)
+        recover_count = min(len(normalized_headers), len(tail_values))
+        if recover_count <= 0:
+            return
+
+        for header, value in zip(normalized_headers[-recover_count:], tail_values[-recover_count:]):
+            if not header:
+                continue
+            row[header] = value
 
     def _normalize_lookup_value(self, *, value) -> str:
         return self._stringify(value=value).strip()

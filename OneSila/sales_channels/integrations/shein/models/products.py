@@ -32,6 +32,10 @@ class SheinProduct(RemoteProduct):
         blank=True,
         help_text="SKU identifier returned by publishOrEdit (sku_code).",
     )
+    pending_external_documents = models.BooleanField(
+        default=False,
+        help_text="True while this product waits for non-uploadable SHEIN compliance documents to be completed manually.",
+    )
 
     @property
     def url_skc_name(self) -> str | None:
@@ -64,6 +68,8 @@ class SheinProduct(RemoteProduct):
             return self.STATUS_FAILED
         if self.syncing_current_percentage != 100:
             return self.STATUS_PROCESSING
+        if self._has_pending_external_documents():
+            return self.STATUS_PENDING_EXTERNAL_DOCUMENTS
 
         from sales_channels.integrations.shein.helpers.document_state import (
             shein_aggregate_document_states_to_status,
@@ -101,6 +107,9 @@ class SheinProduct(RemoteProduct):
             return self.STATUS_PENDING_APPROVAL
 
         return self.STATUS_COMPLETED
+
+    def _has_pending_external_documents(self) -> bool:
+        return bool(getattr(self, "pending_external_documents", False))
 
     def _get_document_status_scope_remote_product_ids(self) -> list[int]:
         if not self.pk:

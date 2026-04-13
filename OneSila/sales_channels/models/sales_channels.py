@@ -287,34 +287,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         return f"{self.product} @ {self.sales_channel_view}"
 
     def save(self, *args, **kwargs):
-        update_fields = kwargs.get("update_fields")
-        previous_status = self.status
-        is_new = self.pk is None
-        self._set_pending_creation_status(is_new=is_new)
-
-        if update_fields is not None and previous_status != self.status:
-            update_fields = set(update_fields)
-            update_fields.add("status")
-            kwargs["update_fields"] = list(update_fields)
-
         return super().save(*args, **kwargs)
-
-    def _set_pending_creation_status(self, *, is_new: bool) -> None:
-        if not is_new or self.remote_product_id:
-            return
-
-        view = getattr(self, "sales_channel_view", None)
-        if view is None:
-            return
-
-        resolved_view = view.get_real_instance() if hasattr(view, "get_real_instance") else view
-        if resolved_view is None:
-            return
-
-        from sales_channels.integrations.shein.models import SheinSalesChannelView
-
-        if isinstance(resolved_view, SheinSalesChannelView):
-            self.status = self.STATUS_PENDING_CREATION
 
     @property
     def remote_url(self):

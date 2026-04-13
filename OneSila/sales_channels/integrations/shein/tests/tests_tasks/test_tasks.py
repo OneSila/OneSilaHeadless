@@ -11,6 +11,7 @@ from sales_channels.integrations.shein.models import (
     SheinSalesChannel,
 )
 from sales_channels.integrations.shein.tasks import (
+    shein__tasks__refresh_pending_external_documents__cronjob,
     delete_shein_product_db_task,
     shein__tasks__refresh_product_issues__cronjob,
     shein_import_db_task,
@@ -103,3 +104,25 @@ class SheinImportTasksTest(TestCase):
             remote_instance=remote_product.id,
         )
         mock_delete_factory.return_value.run.assert_called_once_with()
+
+    @patch(
+        "sales_channels.integrations.shein.factories.products.external_documents.SheinProductExternalDocumentsFactory.apply"
+    )
+    def test_refresh_pending_external_documents_cronjob_runs_factory(self, mock_apply):
+        remote_product = baker.make(
+            SheinProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=baker.make(
+                "products.Product",
+                multi_tenant_company=self.multi_tenant_company,
+                type="SIMPLE",
+            ),
+            status=SheinProduct.STATUS_PENDING_EXTERNAL_DOCUMENTS,
+            is_variation=False,
+            pending_external_documents=True,
+        )
+
+        shein__tasks__refresh_pending_external_documents__cronjob()
+
+        mock_apply.assert_called_once_with(log_missing=False)

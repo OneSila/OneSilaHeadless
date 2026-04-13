@@ -9,6 +9,84 @@ from properties.models import (
     PropertySelectValue,
 )
 
+def get_related_objects(*, instance, related_name):
+    prefetched = getattr(instance, "_prefetched_objects_cache", {})
+    if related_name in prefetched:
+        return list(prefetched[related_name])
+    return list(getattr(instance, related_name).all())
+
+
+def get_translation_value(
+    *,
+    instance,
+    related_name,
+    field_name,
+    language=None,
+    fallback=None,
+    sales_channel=None,
+):
+    translations = get_related_objects(instance=instance, related_name=related_name)
+    if not translations:
+        return fallback
+
+    target_language = language
+    if target_language is None:
+        multi_tenant_company = getattr(instance, "multi_tenant_company", None)
+        target_language = getattr(multi_tenant_company, "language", None)
+
+    if related_name == "translations" and sales_channel is not None:
+        for translation in translations:
+            if (
+                translation.language == target_language
+                and translation.sales_channel_id == sales_channel.id
+            ):
+                translated_value = getattr(translation, field_name, None)
+                if translated_value not in (None, ""):
+                    return translated_value
+                break
+
+        for translation in translations:
+            if translation.language == target_language and translation.sales_channel_id is None:
+                translated_value = getattr(translation, field_name, None)
+                if translated_value not in (None, ""):
+                    return translated_value
+
+    if target_language is not None:
+        for translation in translations:
+            if translation.language == target_language:
+                translated_value = getattr(translation, field_name, None)
+                if translated_value not in (None, ""):
+                    return translated_value
+
+    translated_value = getattr(translations[-1], field_name, None)
+    if translated_value in (None, ""):
+        return fallback
+    return translated_value
+
+
+def get_property_name(*, property_instance, language=None):
+    if language is None and hasattr(property_instance, "translated_name"):
+        return property_instance.translated_name
+    return get_translation_value(
+        instance=property_instance,
+        related_name="propertytranslation_set",
+        field_name="name",
+        language=language,
+        fallback="No Name Set",
+    )
+
+
+def get_select_value_label(*, select_value, language=None):
+    if language is None and hasattr(select_value, "translated_value"):
+        return select_value.translated_value
+    return get_translation_value(
+        instance=select_value,
+        related_name="propertyselectvaluetranslation_set",
+        field_name="value",
+        language=language,
+        fallback="No Value Set",
+    )
+
 def build_product_stub(*, product):
     return {
         "sku": product.sku,
@@ -22,7 +100,10 @@ def serialize_property_translations(*, property_instance, language=None):
             "language": translation.language,
             "name": translation.name,
         }
-        for translation in property_instance.propertytranslation_set.all().order_by("language")
+        for translation in sorted(
+            get_related_objects(instance=property_instance, related_name="propertytranslation_set"),
+            key=lambda item: item.language,
+        )
         if language in (None, translation.language)
     ]
 
@@ -34,7 +115,7 @@ def serialize_property_data(
     language=None,
 ):
     data = {
-        "name": property_instance.name,
+        "name": get_property_name(property_instance=property_instance, language=language),
         "internal_name": property_instance.internal_name,
         "type": property_instance.type,
         "is_public_information": property_instance.is_public_information,
@@ -56,7 +137,10 @@ def serialize_select_value_translations(*, select_value, language=None):
             "language": translation.language,
             "value": translation.value,
         }
-        for translation in select_value.propertyselectvaluetranslation_set.all().order_by("language")
+        for translation in sorted(
+            get_related_objects(instance=select_value, related_name="propertyselectvaluetranslation_set"),
+            key=lambda item: item.language,
+        )
         if language in (None, translation.language)
     ]
 
@@ -70,7 +154,10 @@ def serialize_property_select_value_data(
     include_property_data=False,
     include_id=False,
 ):
-    value = select_value.id if values_are_ids else select_value.value_by_language_code(language=language)
+    value = select_value.id if values_are_ids else get_select_value_label(
+        select_value=select_value,
+        language=language,
+    )
     data = {
         "value": value,
     }
@@ -112,9 +199,13 @@ def serialize_product_translation_payload(*, translation):
     if translation.url_key:
         payload["url_key"] = translation.url_key
 
-    bullet_points = list(
-        translation.bullet_points.all().order_by("sort_order").values_list("text", flat=True)
-    )
+    bullet_points = [
+        bullet_point.text
+        for bullet_point in sorted(
+            get_related_objects(instance=translation, related_name="bullet_points"),
+            key=lambda item: ((item.sort_order is None), item.sort_order, item.id),
+        )
+    ]
     if bullet_points:
         payload["bullet_points"] = bullet_points
 
@@ -182,7 +273,10 @@ def get_product_translation_payloads(
 def get_product_property_text_translation_map(*, product_property):
     return {
         translation.language: translation
-        for translation in product_property.productpropertytexttranslation_set.all()
+        for translation in get_related_objects(
+            instance=product_property,
+            related_name="productpropertytexttranslation_set",
+        )
     }
 
 
@@ -257,7 +351,7 @@ def serialize_product_property_value(
         primitive_value = (
             select_value.id
             if values_are_ids
-            else select_value.value_by_language_code(language=language)
+            else get_select_value_label(select_value=select_value, language=language)
         )
         value_data = serialize_property_select_value_data(
             select_value=select_value,
@@ -271,7 +365,10 @@ def serialize_product_property_value(
     if property_type == Property.TYPES.MULTISELECT:
         select_values = list(product_property.value_multi_select.all())
         primitive_value = [
-            select_value.id if values_are_ids else select_value.value_by_language_code(language=language)
+            select_value.id if values_are_ids else get_select_value_label(
+                select_value=select_value,
+                language=language,
+            )
             for select_value in select_values
         ]
         values = [

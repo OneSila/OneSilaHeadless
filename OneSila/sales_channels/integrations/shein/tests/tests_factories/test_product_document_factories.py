@@ -5,14 +5,20 @@ from django.core.files.base import ContentFile
 from model_bakery import baker
 
 from core.tests import TestCase
+from integrations.models import IntegrationLog
 from media.models import DocumentType, Media, MediaProductThrough
 from products.models import ConfigurableVariation, Product
 from sales_channels.exceptions import PreFlightCheckError
 from sales_channels.integrations.shein.factories.products import (
     SheinDocumentThroughProductUpdateFactory,
     SheinProductCreateFactory,
+    SheinProductExternalDocumentsFactory,
     SheinRemoteDocumentCreateFactory,
     SheinRemoteDocumentUpdateFactory,
+)
+from sales_channels.integrations.shein.helpers.certificate_types import (
+    PENDING_EXTERNAL_DOCUMENTS_IDENTIFIER,
+    RESOLVED_EXTERNAL_DOCUMENTS_IDENTIFIER,
 )
 from sales_channels.integrations.shein.models import (
     SheinDocument,
@@ -21,6 +27,8 @@ from sales_channels.integrations.shein.models import (
     SheinProduct,
     SheinSalesChannel,
 )
+from sales_channels.models.logs import RemoteLog
+from sales_channels.models.products import RemoteProduct
 
 
 class SheinDocumentPushFactoriesTest(TestCase):
@@ -331,8 +339,10 @@ class SheinProductFinalDocumentSyncTests(TestCase):
     @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductExternalDocumentsFactory, "apply", return_value=False)
     def test_final_process_syncs_only_document_types_required_by_remote_rules(
         self,
+        _mock_external_documents_apply,
         mock_get_certificate_rules,
         mock_sync_document_assignment,
         _mock_delete_document_assignment,
@@ -510,8 +520,140 @@ class SheinProductFinalDocumentSyncTests(TestCase):
     @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductExternalDocumentsFactory, "get_certificate_rule_by_product_spu")
+    def test_final_process_sets_pending_external_documents_for_non_uploadable_required_types(
+        self,
+        mock_external_get_certificate_rules,
+        mock_get_certificate_rules,
+        mock_sync_document_assignment,
+        _mock_delete_document_assignment,
+    ):
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            sku="SIMPLE-DOC-EXTERNAL-1",
+        )
+        remote_product = baker.make(
+            SheinProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku=product.sku,
+            remote_id="SPU-SIMPLE-EXTERNAL-1",
+            spu_name="SPU-SIMPLE-EXTERNAL-1",
+            skc_name="SKC-SIMPLE-EXTERNAL-1",
+            syncing_current_percentage=100,
+            status=RemoteProduct.STATUS_PENDING_APPROVAL,
+        )
+        self._create_document_media_through(
+            product=product,
+            document_type=self.local_document_type_a,
+            filename="external.pdf",
+        )
+        self.remote_document_type_a.uploadable = False
+        self.remote_document_type_a.save(update_fields=["uploadable"])
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateDimension": 1,
+                "certificateTypeId": 340,
+                "certificateTypeValue": "UK Agent",
+                "isRequired": True,
+                "certificateMissStatus": True,
+            },
+        ]
+        mock_external_get_certificate_rules.return_value = mock_get_certificate_rules.return_value
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_instance=remote_product,
+            skip_checks=True,
+        )
+        factory.final_process()
+
+        remote_product.refresh_from_db()
+        self.assertEqual(
+            remote_product.status,
+            RemoteProduct.STATUS_PENDING_EXTERNAL_DOCUMENTS,
+        )
+        mock_sync_document_assignment.assert_not_called()
+
+        log = RemoteLog.objects.filter(
+            remote_product=remote_product,
+            identifier=PENDING_EXTERNAL_DOCUMENTS_IDENTIFIER,
+            status=IntegrationLog.STATUS_SUCCESS,
+            user_error=True,
+        ).first()
+        self.assertIsNotNone(log)
+        self.assertIn("compliance manager", (log.response or "").lower())
+
+    @patch.object(SheinProductExternalDocumentsFactory, "get_certificate_rule_by_product_spu")
+    def test_external_documents_factory_resolves_back_to_pending_approval(
+        self,
+        mock_get_certificate_rules,
+    ):
+        product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            sku="SIMPLE-DOC-EXTERNAL-RESOLVED-1",
+        )
+        remote_product = baker.make(
+            SheinProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+            remote_sku=product.sku,
+            remote_id="SPU-SIMPLE-EXTERNAL-RESOLVED-1",
+            spu_name="SPU-SIMPLE-EXTERNAL-RESOLVED-1",
+            syncing_current_percentage=100,
+            status=RemoteProduct.STATUS_PENDING_EXTERNAL_DOCUMENTS,
+            pending_external_documents=True,
+        )
+        self.remote_document_type_a.uploadable = False
+        self.remote_document_type_a.save(update_fields=["uploadable"])
+        remote_product.add_log(
+            action=IntegrationLog.ACTION_UPDATE,
+            response="",
+            payload={"spu_name": remote_product.spu_name},
+            identifier=PENDING_EXTERNAL_DOCUMENTS_IDENTIFIER,
+            remote_product=remote_product,
+            error_message="Waiting on SHEIN external documents.",
+        )
+        mock_get_certificate_rules.return_value = [
+            {
+                "certificateDimension": 1,
+                "certificateTypeId": 340,
+                "certificateTypeValue": "UK Agent",
+                "isRequired": True,
+                "certificateMissStatus": False,
+            },
+        ]
+
+        factory = SheinProductExternalDocumentsFactory(
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+        )
+        self.assertFalse(factory.apply(log_missing=False))
+
+        remote_product.refresh_from_db()
+        self.assertEqual(remote_product.status, RemoteProduct.STATUS_PENDING_APPROVAL)
+        self.assertTrue(
+            RemoteLog.objects.filter(
+                remote_product=remote_product,
+                identifier=RESOLVED_EXTERNAL_DOCUMENTS_IDENTIFIER,
+                status=IntegrationLog.STATUS_SUCCESS,
+            ).exists()
+        )
+
+    @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
+    @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
+    @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductExternalDocumentsFactory, "apply", return_value=False)
     def test_final_process_configurable_targets_each_variation_remote_product(
         self,
+        _mock_external_documents_apply,
         mock_get_certificate_rules,
         mock_sync_document_assignment,
         _mock_delete_document_assignment,
@@ -612,8 +754,10 @@ class SheinProductFinalDocumentSyncTests(TestCase):
     @patch.object(SheinProductCreateFactory, "_delete_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "_sync_document_assignment_for_remote_product")
     @patch.object(SheinProductCreateFactory, "get_certificate_rule_by_product_spu")
+    @patch.object(SheinProductExternalDocumentsFactory, "apply", return_value=False)
     def test_final_process_configurable_deduplicates_by_skc(
         self,
+        _mock_external_documents_apply,
         mock_get_certificate_rules,
         mock_sync_document_assignment,
         _mock_delete_document_assignment,

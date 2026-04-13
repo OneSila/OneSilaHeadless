@@ -135,3 +135,23 @@ class SheinProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
             product_id=self.product.id,
         )
         task_runner_cls.return_value.run.assert_called_once()
+
+    @patch("sales_channels.integrations.shein.factories.task_queue.SheinSingleChannelAddTask")
+    def test_bulk_update_shein_product_allows_legacy_pending_creation_assigns(self, task_runner_cls):
+        self.assign.status = SalesChannelViewAssign.STATUS_PENDING_CREATION
+        self.assign.save(update_fields=["status"])
+
+        resp = self.strawberry_test_client(
+            query=BULK_UPDATE_SHEIN_PRODUCT_MUTATION,
+            variables={
+                "assigns": [{"id": self.to_global_id(self.assign)}],
+                "forceUpdate": False,
+            },
+        )
+
+        self.assertTrue(resp.errors is None)
+        task_runner_cls.assert_called_once_with(
+            task_func=update_shein_product_db_task,
+            sales_channel=self.sales_channel,
+            number_of_remote_requests=1,
+        )

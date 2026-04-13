@@ -66,6 +66,7 @@ class MultiTenantUserType(relay.Node):
 class MultiTenantCompanyType(relay.Node):
     multitenantuser_set: List[MultiTenantUserType]
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
+    mcp_api_key: Annotated['McpApiKeyType', lazy("llm.schema.types.types")] | None
 
     @field()
     def full_address(self, info) -> str:

@@ -23,9 +23,15 @@ from sales_channels.integrations.shein.factories.products.documents import (
     SheinDocumentThroughProductDeleteFactory,
     SheinDocumentThroughProductUpdateFactory,
 )
+from sales_channels.integrations.shein.factories.products.external_documents import (
+    SheinProductExternalDocumentsFactory,
+)
 from sales_channels.integrations.shein.factories.products.images import SheinMediaProductThroughUpdateFactory
 from sales_channels.integrations.shein.factories.prices import SheinPriceUpdateFactory
 from sales_channels.integrations.shein.factories.properties import SheinProductPropertyUpdateFactory
+from sales_channels.integrations.shein.helpers.certificate_types import (
+    is_certificate_type_uploadable,
+)
 from sales_channels.integrations.shein.exceptions import (
     SheinConfiguratorAttributesLimitError,
     SheinPreValidationError,
@@ -116,7 +122,7 @@ class SheinProductBaseFactory(
         get_value_only: bool = False,
         skip_checks: bool = False,
         skip_price_update: bool = False,
-        skip_property_values_category_validation: bool = True, # shein is weird, sometimes it let you even if the value is not in the approved list
+        skip_property_values_category_validation: bool = False, # shein is weird, sometimes it let you even if the value is not in the approved list
     ) -> None:
         self.get_value_only = get_value_only
         self.skip_checks = skip_checks
@@ -201,54 +207,54 @@ class SheinProductBaseFactory(
 
     def sync_documents_after_publish(self):
         target_remote_products = self._get_document_target_remote_products()
+
         if not target_remote_products:
+            self._sync_pending_external_documents(log_missing=True)
             return
 
         certificate_rule_records = self._get_certificate_rule_records_by_spu()
         allowed_remote_document_type_ids = self._get_allowed_document_type_remote_ids_by_spu(
             certificate_rule_records=certificate_rule_records,
         )
-        if not allowed_remote_document_type_ids:
-            return
-
         self._validate_required_document_types_for_spu(
             certificate_rule_records=certificate_rule_records,
         )
 
-        document_throughs = self._get_document_throughs_for_sync(
-            allowed_remote_document_type_ids=allowed_remote_document_type_ids,
-        )
-        if not document_throughs:
-            return
+        if allowed_remote_document_type_ids:
+            document_throughs = self._get_document_throughs_for_sync(
+                allowed_remote_document_type_ids=allowed_remote_document_type_ids,
+            )
+            if document_throughs:
+                used_skc: set[str] = set()
+                for target_remote_product in target_remote_products:
+                    skc_name = str(getattr(target_remote_product, "skc_name", None) or "").strip()
+                    if skc_name:
+                        if skc_name in used_skc:
+                            continue
+                        used_skc.add(skc_name)
 
-        used_skc: set[str] = set()
-        for target_remote_product in target_remote_products:
-            skc_name = str(getattr(target_remote_product, "skc_name", None) or "").strip()
-            if skc_name:
-                if skc_name in used_skc:
-                    continue
-                used_skc.add(skc_name)
+                    synced_association_ids = []
+                    for media_through in document_throughs:
+                        remote_association = self._sync_document_assignment_for_remote_product(
+                            media_through=media_through,
+                            remote_product=target_remote_product,
+                            allowed_remote_document_type_ids=allowed_remote_document_type_ids,
+                        )
+                        if remote_association is not None:
+                            synced_association_ids.append(remote_association.id)
 
-            synced_association_ids = []
-            for media_through in document_throughs:
-                remote_association = self._sync_document_assignment_for_remote_product(
-                    media_through=media_through,
-                    remote_product=target_remote_product,
-                    allowed_remote_document_type_ids=allowed_remote_document_type_ids,
-                )
-                if remote_association is not None:
-                    synced_association_ids.append(remote_association.id)
+                    stale_associations = self.remote_document_assign_model_class.objects.filter(
+                        remote_product=target_remote_product,
+                        sales_channel=self.sales_channel,
+                        local_instance__product=self.local_instance,
+                    ).exclude(id__in=synced_association_ids)
+                    for remote_document_assoc in stale_associations.iterator():
+                        self._delete_document_assignment_for_remote_product(
+                            remote_document_assoc=remote_document_assoc,
+                            remote_product=target_remote_product,
+                        )
 
-            stale_associations = self.remote_document_assign_model_class.objects.filter(
-                remote_product=target_remote_product,
-                sales_channel=self.sales_channel,
-                local_instance__product=self.local_instance,
-            ).exclude(id__in=synced_association_ids)
-            for remote_document_assoc in stale_associations.iterator():
-                self._delete_document_assignment_for_remote_product(
-                    remote_document_assoc=remote_document_assoc,
-                    remote_product=target_remote_product,
-                )
+        self._sync_pending_external_documents(log_missing=True)
 
     def _get_document_target_remote_products(self) -> list[SheinProduct]:
         if self.remote_instance is None:
@@ -338,7 +344,10 @@ class SheinProductBaseFactory(
             if not self._is_dimension_one_certificate_rule(record=record):
                 continue
             certificate_type_id = str(record.get("certificateTypeId") or "").strip()
-            if certificate_type_id:
+            if certificate_type_id and is_certificate_type_uploadable(
+                sales_channel=self.sales_channel,
+                certificate_type_id=certificate_type_id,
+            ):
                 remote_type_ids.add(certificate_type_id)
         return remote_type_ids
 
@@ -386,6 +395,11 @@ class SheinProductBaseFactory(
 
             remote_id = str(record.get("certificateTypeId") or "").strip()
             if not remote_id:
+                continue
+            if not is_certificate_type_uploadable(
+                sales_channel=self.sales_channel,
+                certificate_type_id=remote_id,
+            ):
                 continue
             if remote_id not in required_remote_ids:
                 required_remote_ids.append(remote_id)
@@ -480,6 +494,20 @@ class SheinProductBaseFactory(
             "Required Shein document types are not mapped or missing locally: "
             + ", ".join(problems)
             + ". Map these Shein document types and attach the required documents before publishing."
+        )
+
+    def _sync_pending_external_documents(self, *, log_missing: bool) -> bool:
+        root_remote_product = getattr(self, "remote_instance", None)
+        if root_remote_product is None:
+            return False
+
+        factory = SheinProductExternalDocumentsFactory(
+            sales_channel=self.sales_channel,
+            remote_product=root_remote_product,
+        )
+        return factory.apply(
+            log_missing=log_missing,
+            action=self.action_log,
         )
 
     def _get_document_type_map_by_local_instance_id(
@@ -794,10 +822,16 @@ class SheinProductBaseFactory(
             .order_by("id")
         )
         allowed_languages: list[str] = []
+        mapped_languages: dict[str, list[str]] = {}
         for entry in remote_language_qs:
             language = entry.local_instance
             if language and language not in allowed_languages:
                 allowed_languages.append(language)
+            remote_code = str(getattr(entry, "remote_code", "") or "").strip()
+            if language and remote_code:
+                mapped_languages.setdefault(language, [])
+                if remote_code not in mapped_languages[language]:
+                    mapped_languages[language].append(remote_code)
         if not allowed_languages:
             allowed_languages = [default_language]
 
@@ -843,16 +877,29 @@ class SheinProductBaseFactory(
                 if existing is None or (self._is_blank_html(existing) and not self._is_blank_html(description)):
                     desc_by_language[language] = description
 
+        def build_remote_language_entries(*, values_by_language: dict[str, str]) -> list[dict[str, str]]:
+            entries: list[dict[str, str]] = []
+            seen_remote_codes: set[str] = set()
+
+            for language, value in values_by_language.items():
+                remote_codes = mapped_languages.get(language) or [language]
+                for remote_code in remote_codes:
+                    normalized_remote_code = str(remote_code or "").strip()
+                    if not normalized_remote_code or normalized_remote_code in seen_remote_codes:
+                        continue
+                    seen_remote_codes.add(normalized_remote_code)
+                    entries.append({"language": normalized_remote_code, "name": value})
+
+            return entries
+
         if name_by_language:
-            self.multi_language_name_list = [
-                {"language": language, "name": value}
-                for language, value in name_by_language.items()
-            ]
+            self.multi_language_name_list = build_remote_language_entries(
+                values_by_language=name_by_language,
+            )
         if desc_by_language:
-            self.multi_language_desc_list = [
-                {"language": language, "name": value}
-                for language, value in desc_by_language.items()
-            ]
+            self.multi_language_desc_list = build_remote_language_entries(
+                values_by_language=desc_by_language,
+            )
 
     def _use_create_payload(self) -> bool:
         if getattr(self, "is_create", False):

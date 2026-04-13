@@ -33,6 +33,10 @@ class RemoteDocumentType(PolymorphicModel, RemoteObjectMixin, models.Model):
         null=True,
         blank=True,
     )
+    uploadable = models.BooleanField(
+        default=True,
+        help_text="Whether this remote document type can be uploaded through the integration API.",
+    )
     required_categories = models.JSONField(
         default=list,
         blank=True,

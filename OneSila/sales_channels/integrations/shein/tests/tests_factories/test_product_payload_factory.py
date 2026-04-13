@@ -345,6 +345,40 @@ class SheinProductPayloadFactoryTests(TestCase):
             [{"language": "en", "name": "Default EN desc"}],
         )
 
+    def test_build_translations_serializes_remote_language_code(self) -> None:
+        SheinRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance="en-gb",
+            remote_code="en",
+        )
+
+        ProductTranslation.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=None,
+            language="en-gb",
+            name="Default EN-GB",
+            description="Default EN-GB desc",
+        )
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+        )
+        factory._build_translations()
+
+        self.assertEqual(
+            factory.multi_language_name_list,
+            [{"language": "en", "name": "Default EN-GB"}],
+        )
+        self.assertEqual(
+            factory.multi_language_desc_list,
+            [{"language": "en", "name": "Default EN-GB desc"}],
+        )
+
     def test_shein_build_sku_list_includes_supplier_barcode_and_package_type(self) -> None:
         self._assign_supplier_code(product=self.product, value="SUP-1")
         EanCode.objects.create(

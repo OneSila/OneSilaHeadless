@@ -13,10 +13,14 @@ from .documents import (
     SheinDocumentThroughProductUpdateFactory,
     SheinDocumentThroughProductDeleteFactory,
 )
-from .assigns import SheinSalesChannelAssignFactoryMixin
+from .assigns import (
+    SheinSalesChannelAssignFactoryMixin,
+    SheinSalesChannelViewAssignUpdateFactory,
+)
 from .products import SheinProductCreateFactory, SheinProductUpdateFactory
 from .products import SheinProductDeleteFactory
 from .document_state import SheinProductDocumentStateFactory
+from .external_documents import SheinProductExternalDocumentsFactory
 from .shelf import SheinProductShelfUpdateFactory
 
 __all__ = [
@@ -30,9 +34,11 @@ __all__ = [
     "SheinDocumentThroughProductUpdateFactory",
     "SheinDocumentThroughProductDeleteFactory",
     "SheinSalesChannelAssignFactoryMixin",
+    "SheinSalesChannelViewAssignUpdateFactory",
     "SheinProductCreateFactory",
     "SheinProductUpdateFactory",
     "SheinProductDeleteFactory",
     "SheinProductDocumentStateFactory",
+    "SheinProductExternalDocumentsFactory",
     "SheinProductShelfUpdateFactory",
 ]

@@ -1,6 +1,41 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.utils.translation import gettext_lazy as _, ngettext
+
 from core.admin import ModelAdmin
-from .models import AiGenerateProcess, AiTranslationProcess, AiImportProcess
+
+from .models import AiGenerateProcess, AiTranslationProcess, AiImportProcess, McpApiKey
+
+
+@admin.action(description=_("Regenerate selected MCP API keys"))
+def regenerate_mcp_api_keys(modeladmin, request, queryset):
+    regenerated_count = 0
+
+    for mcp_api_key in queryset:
+        mcp_api_key.regenerate_key(save=True)
+        regenerated_count += 1
+
+    modeladmin.message_user(
+        request,
+        ngettext(
+            "%d MCP API key was regenerated.",
+            "%d MCP API keys were regenerated.",
+            regenerated_count,
+        ) % regenerated_count,
+        level=messages.SUCCESS,
+    )
+
+
+@admin.register(McpApiKey)
+class McpApiKeyAdmin(ModelAdmin):
+    list_display = ("multi_tenant_company", "key", "is_active", "created_at", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("multi_tenant_company__name", "key")
+    list_select_related = ("multi_tenant_company",)
+    raw_id_fields = ("multi_tenant_company",)
+    ordering = ("multi_tenant_company__name",)
+    actions = (regenerate_mcp_api_keys,)
+    readonly_fields = ("key", "created_at", "updated_at")
+    fields = ("multi_tenant_company", "key", "is_active", "created_at", "updated_at")
 
 
 @admin.register(AiGenerateProcess)

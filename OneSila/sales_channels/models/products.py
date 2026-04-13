@@ -19,6 +19,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     STATUS_COMPLETED = "COMPLETED"
     STATUS_FAILED = "FAILED"
     STATUS_APPROVAL_REJECTED = "APPROVAL_REJECTED"
+    STATUS_PENDING_EXTERNAL_DOCUMENTS = "PENDING_EXTERNAL_DOCUMENTS"
     STATUS_PARTIALLY_LISTED = "PARTIALLY_LISTED"
     STATUS_PENDING_APPROVAL = "PENDING_APPROVAL"
     STATUS_PROCESSING = "PROCESSING"
@@ -27,6 +28,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         (STATUS_COMPLETED, _("Completed")),
         (STATUS_FAILED, _("Failed")),
         (STATUS_APPROVAL_REJECTED, _("Approval rejected")),
+        (STATUS_PENDING_EXTERNAL_DOCUMENTS, _("Pending external documents")),
         (STATUS_PARTIALLY_LISTED, _("Partially listed")),
         (STATUS_PENDING_APPROVAL, _("Pending approval")),
         (STATUS_PROCESSING, _("Processing")),
@@ -43,7 +45,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         help_text="Current sync progress percentage (0-100)."
     )
     status = models.CharField(
-        max_length=17,
+        max_length=32,
         choices=STATUS_CHOICES,
         default=STATUS_PROCESSING,
         db_index=True,

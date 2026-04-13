@@ -159,6 +159,82 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
         self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
         new_product_report_mock.assert_called_once()
 
+    def test_run_marks_feed_failed_when_all_items_are_rejected_from_error_report(self):
+        submitted_feed = baker.make(
+            MiraklSalesChannelFeed,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            remote_id="2011",
+            product_remote_id="2011",
+        )
+        rejected_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="SKU-ONLY-REJECTED",
+            syncing_current_percentage=100,
+        )
+        rejected_feed_item = baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=submitted_feed,
+            remote_product=rejected_remote_product,
+            status=MiraklSalesChannelFeedItem.STATUS_PENDING,
+        )
+        baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=rejected_remote_product,
+            code="TITLE_KO",
+            main_code="TITLE_KO",
+            severity="ERROR",
+            message="Title issue - Auto Validation Failed: Title is 182 characters (max 70)|INIT",
+            raw_data={"source": "error_report_error"},
+        )
+        tracking = {
+            "import_id": 2011,
+            "import_status": "COMPLETE",
+            "reason_status": "Processed",
+            "has_error_report": True,
+            "has_new_product_report": False,
+            "has_transformation_error_report": False,
+            "has_transformed_file": False,
+            "transform_lines_read": 1,
+            "transform_lines_in_success": 1,
+            "transform_lines_in_error": 1,
+            "transform_lines_with_warning": 0,
+        }
+        download_response = Mock(
+            status_code=200,
+            content=b"report-content",
+            headers={"Content-Type": "text/csv"},
+        )
+
+        with patch.object(
+            MiraklImportStatusSyncFactory,
+            "mirakl_paginated_get",
+            return_value=[tracking],
+        ), patch.object(
+            MiraklImportStatusSyncFactory,
+            "_request",
+            side_effect=[download_response],
+        ):
+            MiraklImportStatusSyncFactory(sales_channel=self.sales_channel).run()
+
+        submitted_feed.refresh_from_db()
+        rejected_feed_item.refresh_from_db()
+        rejected_remote_product.refresh_from_db()
+
+        self.assertEqual(submitted_feed.status, MiraklSalesChannelFeed.STATUS_FAILED)
+        self.assertEqual(
+            submitted_feed.error_message,
+            "Title issue - Auto Validation Failed: Title is 182 characters (max 70)|INIT",
+        )
+        self.assertEqual(rejected_feed_item.status, MiraklSalesChannelFeedItem.STATUS_FAILED)
+        self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
     @patch("sales_channels.integrations.mirakl.factories.feeds.new_product_report.MiraklNewProductReportSyncFactory.run")
     def test_run_completes_clean_products_when_no_standard_error_report_exists(self, new_product_report_mock):
         submitted_feed = baker.make(

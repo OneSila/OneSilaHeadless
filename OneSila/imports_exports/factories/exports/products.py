@@ -9,6 +9,7 @@ from sales_prices.models import SalesPrice, SalesPriceListItem
 
 from .helpers import (
     get_product_translation_payloads,
+    get_select_value_label,
     serialize_sales_channel_payload,
     serialize_property_data,
     to_bool,
@@ -341,10 +342,16 @@ class ProductsExportFactory(AbstractExportFactory):
 
     def get_product_type_value(self, *, product, rule):
         if rule is not None:
-            return rule.product_type.value_by_language_code(language=self.language)
+            return get_select_value_label(
+                select_value=rule.product_type,
+                language=self.language,
+            )
         for product_property in product.productproperty_set.all():
             if product_property.property.is_product_type and product_property.value_select:
-                return product_property.value_select.value_by_language_code(language=self.language)
+                return get_select_value_label(
+                    select_value=product_property.value_select,
+                    language=self.language,
+                )
         return None
 
     def get_media_assignments(self, *, product):
@@ -495,7 +502,10 @@ class ProductsExportFactory(AbstractExportFactory):
                             include_translations=True,
                             language=self.language,
                         ),
-                        "value": product_property.value_select.value_by_language_code(language=self.language),
+                        "value": get_select_value_label(
+                            select_value=product_property.value_select,
+                            language=self.language,
+                        ),
                     }
                 )
         return values
@@ -530,7 +540,10 @@ class ProductsExportFactory(AbstractExportFactory):
         if not flat:
             rule = variation.get_product_rule(sales_channel=self.resolve_sales_channel())
             if rule is not None:
-                payload["product_type"] = rule.product_type.value_by_language_code(language=self.language)
+                payload["product_type"] = get_select_value_label(
+                    select_value=rule.product_type,
+                    language=self.language,
+                )
 
         return payload
 
