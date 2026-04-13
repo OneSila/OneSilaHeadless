@@ -140,6 +140,7 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
         self.assertEqual(error_issue.main_code, "1000")
         self.assertEqual(error_issue.message, "The attribute 'main_image' (Main Image) is required")
         self.assertEqual(error_issue.severity, "ERROR")
+        self.assertFalse(error_issue.is_rejected)
         self.assertEqual(error_issue.raw_data["source"], "transformation_error_report_error")
         self.assertEqual(error_issue.raw_data["line_number"], "3")
         self.assertEqual(list(error_issue.views.values_list("id", flat=True)), [self.view.id])
@@ -179,10 +180,41 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
         self.assertEqual(error_issue.main_code, "1000")
         self.assertEqual(error_issue.message, "The attribute main_image is required")
         self.assertEqual(error_issue.severity, "ERROR")
+        self.assertTrue(error_issue.is_rejected)
         self.assertEqual(error_issue.raw_data["source"], "error_report_error")
         self.assertEqual(error_issue.raw_data["line_number"], "3")
         self.assertEqual(list(error_issue.views.values_list("id", flat=True)), [self.view.id])
 
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
+    def test_run_recovers_tail_columns_from_csv_overflow_and_upserts_issues(self):
+        self.feed.error_report_file.save(
+            "mirakl-product-errors-overflow.csv",
+            ContentFile(
+                "\n".join(
+                    [
+                        "product_id,long_description,line_number,errors",
+                        "ILFD4043XS+5029+1479-58,Complete Transformation Kit, with extras,2,TITLE_KO|Title issue - Auto Validation Failed: Title is 182 characters (max 70)|INIT",
+                    ]
+                )
+            ),
+            save=True,
+        )
+
+        synced_issues = MiraklTransformationErrorReportIssueSyncFactory(feed=self.feed).run()
+
+        self.assertEqual(synced_issues, 1)
+        issue = MiraklProductIssue.objects.get(
+            remote_product=self.remote_product,
+            code="TITLE_KO",
+        )
+        self.assertEqual(
+            issue.message,
+            "Title issue - Auto Validation Failed: Title is 182 characters (max 70)|INIT",
+        )
+        self.assertEqual(issue.raw_data["line_number"], "2")
+        self.assertTrue(issue.is_rejected)
         self.remote_product.refresh_from_db()
         self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
 
