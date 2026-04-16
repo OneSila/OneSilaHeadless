@@ -37,8 +37,8 @@ class UpdateProductContentMcpTool(BaseMcpTool):
     async def execute(
         self,
         language: Annotated[str, Field(description="Target company language code for the translation update.")] = ...,
-        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID.")] = None,
-        sku: Annotated[str | None, Field(description="Exact product SKU.")] = None,
+        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID. Requires either product_id or sku.")] = None,
+        sku: Annotated[str | None, Field(description="Exact product SKU. Requires either product_id or sku.")] = None,
         sales_channel_id: Annotated[int | None, Field(ge=1, description="Optional exact sales channel database ID for a channel-specific translation override. Use search_sales_channels first to map hostnames or marketplace names to ids.")] = None,
         name: Annotated[str | None, Field(description="Updated product name for the target translation.")] = None,
         subtitle: Annotated[str | None, Field(description="Updated subtitle for the target translation.")] = None,
@@ -88,8 +88,8 @@ class UpdateProductContentMcpTool(BaseMcpTool):
             )
             return self.build_result(
                 summary=(
-                    f"Updated content for product '{response_data['product']['name']}' "
-                    f"({response_data['product']['sku']}) in language {sanitized_language}."
+                    f"Updated content for product '{response_data['name']}' "
+                    f"({response_data['sku']}) in language {sanitized_language}."
                 ),
                 structured_content=response_data,
             )
@@ -100,12 +100,6 @@ class UpdateProductContentMcpTool(BaseMcpTool):
             await ctx.error(f"Update product content failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
 
     def _sanitize_bullet_points(self, *, bullet_points: list[str] | str | None) -> list[str] | None:
         try:
@@ -185,8 +179,8 @@ class UpdateProductContentMcpTool(BaseMcpTool):
                 sales_channel=sales_channel,
             )
             return build_product_mutation_payload(
-                multi_tenant_company=multi_tenant_company,
                 product=product,
+                action=f"content update for language {language}",
             )
         except ValueError as error:
             raise McpToolError(str(error)) from error

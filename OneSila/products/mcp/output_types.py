@@ -295,6 +295,9 @@ GET_PRODUCT_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
         **PRODUCT_SUMMARY_OUTPUT_SCHEMA["properties"],
+        "global_id": {"type": "string"},
+        "onesila_path": {"type": "string"},
+        "onesila_url": {"type": "string"},
         "allow_backorder": {"type": "boolean"},
         "vat_rate_data": {
             "oneOf": [
@@ -323,6 +326,9 @@ GET_PRODUCT_OUTPUT_SCHEMA = {
     },
     "required": PRODUCT_SUMMARY_OUTPUT_SCHEMA["required"]
     + [
+        "global_id",
+        "onesila_path",
+        "onesila_url",
         "allow_backorder",
         "vat_rate_data",
         "inspector",
@@ -350,18 +356,6 @@ SEARCH_PRODUCTS_OUTPUT_SCHEMA = {
     "required": ["total_count", "has_more", "offset", "limit", "results"],
 }
 
-
-GET_PRODUCT_ONESILA_URL_OUTPUT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "integer"},
-        "sku": {"type": ["string", "null"]},
-        "global_id": {"type": "string"},
-        "onesila_path": {"type": "string"},
-        "onesila_url": {"type": "string"},
-    },
-    "required": ["id", "sku", "global_id", "onesila_path", "onesila_url"],
-}
 
 VAT_RATE_OPTION_OUTPUT_SCHEMA = {
     "type": "object",
@@ -421,9 +415,13 @@ PRODUCT_MUTATION_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
         "updated": {"type": "boolean"},
-        "product": GET_PRODUCT_OUTPUT_SCHEMA,
+        "product_id": {"type": "integer"},
+        "sku": {"type": ["string", "null"]},
+        "name": {"type": "string"},
+        "active": {"type": "boolean"},
+        "message": {"type": "string"},
     },
-    "required": ["updated", "product"],
+    "required": ["updated", "product_id", "sku", "name", "message"],
 }
 
 
@@ -431,9 +429,12 @@ PRODUCT_BATCH_MUTATION_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
         "updated_count": {"type": "integer"},
-        "product": GET_PRODUCT_OUTPUT_SCHEMA,
+        "product_id": {"type": "integer"},
+        "sku": {"type": ["string", "null"]},
+        "name": {"type": "string"},
+        "message": {"type": "string"},
     },
-    "required": ["updated_count", "product"],
+    "required": ["updated_count", "product_id", "sku", "name", "message"],
 }
 
 
@@ -442,7 +443,10 @@ CREATE_PRODUCT_OUTPUT_SCHEMA = {
     "properties": {
         "created": {"type": "boolean"},
         "sku_was_generated": {"type": "boolean"},
-        "product": GET_PRODUCT_OUTPUT_SCHEMA,
+        "product_id": {"type": "integer"},
+        "sku": {"type": ["string", "null"]},
+        "name": {"type": "string"},
+        "message": {"type": "string"},
     },
-    "required": ["created", "sku_was_generated", "product"],
+    "required": ["created", "sku_was_generated", "product_id", "sku", "name", "message"],
 }

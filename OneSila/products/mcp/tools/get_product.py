@@ -44,9 +44,6 @@ class GetProductMcpTool(BaseMcpTool):
         to have for its current product type. Only `OPTIONAL` is truly optional.
         Any other `requirement_type` should be treated as effectively required,
         especially when `has_value` is `false`.
-
-        Args:
-            sku: Exact product SKU.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

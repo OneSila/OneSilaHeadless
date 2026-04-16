@@ -91,6 +91,15 @@ class BaseMcpTool:
             raise McpToolError(f"{field_name} must be a boolean, got: {value!r}")
         return value
 
+    def sanitize_optional_string(self, *, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
+        return self.sanitize_optional_string(value=value)
+
     def sanitize_optional_int(
         self,
         *,
@@ -122,15 +131,12 @@ class BaseMcpTool:
         structured_content_text = json.dumps(
             structured_content,
             ensure_ascii=True,
-            indent=2,
-            sort_keys=True,
+            separators=(",", ":"),
             default=str,
         )
         return ToolResult(
             content=[
-                TextContent(type="text", text=summary),
                 TextContent(type="text", text=structured_content_text),
             ],
-            structured_content=structured_content,
             meta=meta,
         )

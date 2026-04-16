@@ -69,6 +69,10 @@ class PropertySummaryPayload(TypedDict):
     has_image: bool
 
 
+class PropertySearchResultPayload(PropertySummaryPayload, total=False):
+    translations: list[PropertyTranslationPayload]
+
+
 class PropertyDetailPayload(PropertySummaryPayload):
     is_product_type: bool
     translations: list[PropertyTranslationPayload]
@@ -80,7 +84,7 @@ class SearchPropertiesPayload(TypedDict):
     has_more: bool
     offset: int
     limit: int
-    results: list[PropertySummaryPayload]
+    results: list[PropertySearchResultPayload]
 
 
 class PropertyReferencePayload(TypedDict):
@@ -99,11 +103,19 @@ class PropertySelectValueSummaryPayload(TypedDict):
     usage_count: int
     thumbnail_url: str | None
     property: PropertyReferencePayload
-    translations: list[PropertySelectValueTranslationPayload]
 
 
 class PropertySelectValueDetailPayload(PropertySelectValueSummaryPayload):
-    pass
+    translations: list[PropertySelectValueTranslationPayload]
+
+
+class PropertySelectValueSearchResultPayload(TypedDict, total=False):
+    id: int
+    value: str
+    thumbnail_url: str | None
+    property: PropertyReferencePayload
+    usage_count: int
+    translations: list[PropertySelectValueTranslationPayload]
 
 
 class SearchPropertySelectValuesPayload(TypedDict):
@@ -111,7 +123,7 @@ class SearchPropertySelectValuesPayload(TypedDict):
     has_more: bool
     offset: int
     limit: int
-    results: list[PropertySelectValueSummaryPayload]
+    results: list[PropertySelectValueSearchResultPayload]
 
 
 class RecommendPropertyTypePayload(TypedDict):
@@ -125,19 +137,37 @@ class RecommendPropertyTypePayload(TypedDict):
 
 class CreatePropertyPayload(TypedDict):
     created: bool
-    property: PropertyDetailPayload
+    property_id: int
+    internal_name: str | None
+    name: str
+    type: PropertyTypeValue
+    type_label: str
+    message: str
 
 
 class EditPropertyPayload(TypedDict):
     updated: bool
-    property: PropertyDetailPayload
+    property_id: int
+    internal_name: str | None
+    name: str
+    type: PropertyTypeValue
+    type_label: str
+    message: str
 
 
 class CreatePropertySelectValuePayload(TypedDict):
     created: bool
-    select_value: PropertySelectValueDetailPayload
+    select_value_id: int
+    property_id: int
+    value: str
+    full_value_name: str
+    message: str
 
 
 class EditPropertySelectValuePayload(TypedDict):
     updated: bool
-    select_value: PropertySelectValueDetailPayload
+    select_value_id: int
+    property_id: int
+    value: str
+    full_value_name: str
+    message: str

@@ -26,7 +26,6 @@ from products.mcp.types import (
     ProductPropertyRequirementsPayload,
     ProductRequirementProductTypePayload,
     ProductTranslationPayload,
-    ProductOnesilaUrlPayload,
     ProductSummaryPayload,
     ProductVatRatePayload,
     SalesChannelReferencePayload,
@@ -332,6 +331,12 @@ def get_product_thumbnail_url(*, product: Product) -> str | None:
     return preferred_assignments[0].media.onesila_thumbnail_url()
 
 
+def build_product_onesila_paths(*, product: Product) -> tuple[str, str]:
+    onesila_path = f"/products/product/{product.global_id}"
+    onesila_url = f"{generate_absolute_url(trailing_slash=False).rstrip('/')}{onesila_path}"
+    return onesila_path, onesila_url
+
+
 def serialize_product_images(*, product: Product) -> list[ProductImagePayload]:
     return [
         _serialize_product_image(assignment=assignment)
@@ -585,8 +590,13 @@ def serialize_product_property_requirements(
     }
 
 
-def serialize_product_summary(*, product: Product) -> ProductSummaryPayload:
-    inspector_data = serialize_product_inspector(product=product)
+def serialize_product_summary(
+    *,
+    product: Product,
+    inspector_data: ProductInspectorPayload | None = None,
+) -> ProductSummaryPayload:
+    if inspector_data is None:
+        inspector_data = serialize_product_inspector(product=product)
     return {
         "id": product.id,
         "sku": product.sku,
@@ -604,12 +614,17 @@ def serialize_product_summary(*, product: Product) -> ProductSummaryPayload:
 
 
 def serialize_product_detail(*, product: Product) -> ProductDetailPayload:
+    inspector_data = serialize_product_inspector(product=product)
     serialized_properties = serialize_product_assigned_properties(product=product)
+    onesila_path, onesila_url = build_product_onesila_paths(product=product)
     return {
-        **serialize_product_summary(product=product),
+        **serialize_product_summary(product=product, inspector_data=inspector_data),
+        "global_id": product.global_id,
+        "onesila_path": onesila_path,
+        "onesila_url": onesila_url,
         "allow_backorder": product.allow_backorder,
         "vat_rate_data": serialize_vat_rate(product=product),
-        "inspector": serialize_product_inspector(product=product),
+        "inspector": inspector_data,
         "property_requirements": serialize_product_property_requirements(
             product=product,
             property_payloads=serialized_properties,
@@ -618,16 +633,4 @@ def serialize_product_detail(*, product: Product) -> ProductDetailPayload:
         "images": serialize_product_images(product=product),
         "properties": serialized_properties,
         "prices": serialize_product_prices(product=product),
-    }
-
-
-def serialize_product_onesila_url(*, product: Product) -> ProductOnesilaUrlPayload:
-    onesila_path = f"/products/product/{product.global_id}"
-    onesila_url = f"{generate_absolute_url(trailing_slash=False).rstrip('/')}{onesila_path}"
-    return {
-        "id": product.id,
-        "sku": product.sku,
-        "global_id": product.global_id,
-        "onesila_path": onesila_path,
-        "onesila_url": onesila_url,
     }

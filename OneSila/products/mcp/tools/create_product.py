@@ -74,8 +74,8 @@ class CreateProductMcpTool(BaseMcpTool):
             )
             return self.build_result(
                 summary=(
-                    f"Created product '{response_data['product']['name']}' "
-                    f"({response_data['product']['sku']})."
+                    f"Created product '{response_data['name']}' "
+                    f"({response_data['sku']})."
                 ),
                 structured_content=response_data,
             )
@@ -86,12 +86,6 @@ class CreateProductMcpTool(BaseMcpTool):
             await ctx.error(f"Create product failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
 
     @database_sync_to_async
     def _create_product(
@@ -131,7 +125,6 @@ class CreateProductMcpTool(BaseMcpTool):
                 raise ValueError("Product was not created.")
 
             return build_create_product_payload(
-                multi_tenant_company=multi_tenant_company,
                 product=import_instance.instance,
                 sku_was_generated=sku_was_generated,
             )

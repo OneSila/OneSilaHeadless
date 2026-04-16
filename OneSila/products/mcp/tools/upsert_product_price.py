@@ -35,8 +35,8 @@ class UpsertProductPriceMcpTool(BaseMcpTool):
         self,
         currency: Annotated[str, Field(description="Currency ISO code configured on this account, for example EUR or GBP.")] = ...,
         price: Annotated[str | float | int, Field(description="Net sale price or effective product price.")] = ...,
-        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID.")] = None,
-        sku: Annotated[str | None, Field(description="Exact product SKU.")] = None,
+        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID. Requires either product_id or sku.")] = None,
+        sku: Annotated[str | None, Field(description="Exact product SKU. Requires either product_id or sku.")] = None,
         rrp: Annotated[str | float | int | None, Field(description="Optional recommended retail price. Only provide this when the user explicitly asked to set or update the RRP; do not assume it should match the sale price.")] = None,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
@@ -71,7 +71,7 @@ class UpsertProductPriceMcpTool(BaseMcpTool):
             return self.build_result(
                 summary=(
                     f"Upserted {sanitized_currency} price for product "
-                    f"'{response_data['product']['name']}' ({response_data['product']['sku']})."
+                    f"'{response_data['name']}' ({response_data['sku']})."
                 ),
                 structured_content=response_data,
             )
@@ -82,12 +82,6 @@ class UpsertProductPriceMcpTool(BaseMcpTool):
             await ctx.error(f"Upsert product price failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
 
     @database_sync_to_async
     def _upsert_product_price(
@@ -124,8 +118,8 @@ class UpsertProductPriceMcpTool(BaseMcpTool):
                 },
             )
             return build_product_mutation_payload(
-                multi_tenant_company=multi_tenant_company,
                 product=product,
+                action=f"{company_currency.iso_code} price update",
             )
         except ValueError as error:
             raise McpToolError(str(error)) from error

@@ -12,10 +12,9 @@ from imports_exports.factories.properties import ImportPropertyInstance
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
 from llm.mcp.tags import TAG_CREATE, TAG_PROPERTIES, tool_tags
 from properties.mcp.helpers import (
+    build_property_mutation_payload,
     build_import_process,
-    get_property_detail_queryset,
     sanitize_property_translations_input,
-    serialize_property_detail,
     validate_translation_languages,
 )
 from properties.mcp.output_types import CREATE_PROPERTY_OUTPUT_SCHEMA
@@ -66,12 +65,7 @@ class CreatePropertyMcpTool(BaseMcpTool):
         translations: Annotated[
             list[PropertyTranslationInputPayload] | str | None,
             Field(
-                description=(
-                    "Optional list of translated property names, each with language and name. "
-                    "Translation languages must belong to the authenticated company's enabled languages. "
-                    "Use get_company_languages first to see the allowed language codes. "
-                    "If the client sends JSON-stringified arguments, a JSON string array is also accepted."
-                )
+                description="Translations as [{language, name}] pairs. Call get_company_languages for valid codes."
             )
         ] = None,
         ctx: Context = CurrentContext(),
@@ -113,14 +107,14 @@ class CreatePropertyMcpTool(BaseMcpTool):
 
             action = "Created" if response_data["created"] else "Updated existing"
             await ctx.info(
-                f"{action} property_id={response_data['property']['id']} "
-                f"internal_name={response_data['property']['internal_name']!r}."
+                f"{action} property_id={response_data['property_id']} "
+                f"internal_name={response_data['internal_name']!r}."
             )
 
             return self.build_result(
                 summary=(
-                    f"{action} property '{response_data['property']['name']}' "
-                    f"({response_data['property']['type_label']})."
+                    f"{action} property '{response_data['name']}' "
+                    f"({response_data['type_label']})."
                 ),
                 structured_content=response_data,
             )
@@ -131,12 +125,6 @@ class CreatePropertyMcpTool(BaseMcpTool):
             await ctx.error(f"Create property failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
 
     def _sanitize_type(self, *, type: PropertyTypeValue) -> PropertyTypeValue:
         allowed_types = {choice[0] for choice in Property.TYPES.ALL}
@@ -194,14 +182,10 @@ class CreatePropertyMcpTool(BaseMcpTool):
         except ValueError as error:
             raise McpToolError(str(error)) from error
 
-        property_instance = get_property_detail_queryset(
-            multi_tenant_company=multi_tenant_company,
-        ).get(id=import_instance.instance.id)
-
-        return {
-            "created": bool(getattr(import_instance, "created", False)),
-            "property": serialize_property_detail(property_instance=property_instance),
-        }
+        return build_property_mutation_payload(
+            property_instance=import_instance.instance,
+            created=bool(getattr(import_instance, "created", False)),
+        )
 
     def _build_property_data(
         self,

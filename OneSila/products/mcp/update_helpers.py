@@ -6,12 +6,11 @@ from types import SimpleNamespace
 from typing import Any
 
 from core.models.multi_tenant import MultiTenantCompany
+from django.db.models import Q
 from currencies.models import Currency
 from imports_exports.factories.products import ImportProductInstance
-from products.mcp.helpers import get_product_detail_queryset, serialize_product_detail
 from products.mcp.types import (
     ProductBatchMutationPayload,
-    ProductDetailPayload,
     ProductImageInputPayload,
     ProductMutationPayload,
     ProductPropertyTranslationInputPayload,
@@ -417,43 +416,39 @@ def run_product_import_update(
     return import_instance
 
 
-def get_product_detail_payload(
-    *,
-    multi_tenant_company: MultiTenantCompany,
-    product: Product,
-) -> ProductDetailPayload:
-    product_instance = get_product_detail_queryset(
-        multi_tenant_company=multi_tenant_company,
-    ).get(id=product.id)
-    return serialize_product_detail(product=product_instance)
+def build_product_confirmation_message(*, action: str) -> str:
+    return "Updated successfully. Use get_product for details."
 
 
 def build_product_mutation_payload(
     *,
-    multi_tenant_company: MultiTenantCompany,
     product: Product,
+    action: str,
 ) -> ProductMutationPayload:
-    return {
+    payload: ProductMutationPayload = {
         "updated": True,
-        "product": get_product_detail_payload(
-            multi_tenant_company=multi_tenant_company,
-            product=product,
-        ),
+        "product_id": product.id,
+        "sku": product.sku,
+        "name": product.name,
+        "message": build_product_confirmation_message(action=action),
     }
+    if product.active is not None:
+        payload["active"] = bool(product.active)
+    return payload
 
 
 def build_product_batch_mutation_payload(
     *,
-    multi_tenant_company: MultiTenantCompany,
     product: Product,
     updated_count: int,
+    action: str,
 ) -> ProductBatchMutationPayload:
     return {
         "updated_count": updated_count,
-        "product": get_product_detail_payload(
-            multi_tenant_company=multi_tenant_company,
-            product=product,
-        ),
+        "product_id": product.id,
+        "sku": product.sku,
+        "name": product.name,
+        "message": "Processed successfully. Use get_product for details.",
     }
 
 
@@ -462,21 +457,57 @@ def resolve_properties_for_updates(
     multi_tenant_company: MultiTenantCompany,
     updates: list[ProductPropertyValueUpdateInputPayload],
 ):
+    property_ids = {
+        int(update["property_id"])
+        for update in updates
+        if update.get("property_id") is not None
+    }
+    property_internal_names = {
+        str(update["property_internal_name"]).strip().lower()
+        for update in updates
+        if update.get("property_internal_name")
+    }
+    property_filters = Q()
+    if property_ids:
+        property_filters |= Q(id__in=property_ids)
+    for property_internal_name in property_internal_names:
+        property_filters |= Q(internal_name__iexact=property_internal_name)
+
+    properties = list(
+        Property.objects.filter(multi_tenant_company=multi_tenant_company).filter(property_filters)
+    )
+    properties_by_id = {
+        property_instance.id: property_instance
+        for property_instance in properties
+    }
+    properties_by_internal_name = {
+        str(property_instance.internal_name).strip().lower(): property_instance
+        for property_instance in properties
+        if property_instance.internal_name
+    }
+
+    missing_ids = sorted(property_ids - set(properties_by_id))
+    if missing_ids:
+        raise ValueError("Property not found for one of the provided updates.")
+
+    missing_internal_names = sorted(
+        property_internal_names - set(properties_by_internal_name)
+    )
+    if missing_internal_names:
+        raise ValueError("Property not found for one of the provided updates.")
+
     resolved_updates = []
     for update in updates:
-        queryset = Property.objects.filter(multi_tenant_company=multi_tenant_company)
+        property_instance = None
         if update.get("property_id") is not None:
-            queryset = queryset.filter(id=update["property_id"])
-        if update.get("property_internal_name"):
-            queryset = queryset.filter(internal_name__iexact=update["property_internal_name"])
-
-        property_ids = list(queryset.order_by("id").values_list("id", flat=True).distinct()[:2])
-        if not property_ids:
+            property_instance = properties_by_id.get(int(update["property_id"]))
+        if property_instance is None and update.get("property_internal_name"):
+            property_instance = properties_by_internal_name.get(
+                str(update["property_internal_name"]).strip().lower()
+            )
+        if property_instance is None:
             raise ValueError("Property not found for one of the provided updates.")
-        if len(property_ids) > 1:
-            raise ValueError("Multiple properties matched one of the provided updates.")
 
-        property_instance = queryset.get(id=property_ids[0])
         resolved_update = {
             "property": property_instance,
             "value": normalize_property_update_value(

@@ -13,10 +13,9 @@ from imports_exports.factories.properties import ImportPropertyInstance
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
 from llm.mcp.tags import TAG_EDIT, TAG_PROPERTIES, tool_tags
 from properties.mcp.helpers import (
+    build_property_mutation_payload,
     build_import_process,
-    get_property_detail_queryset,
     sanitize_property_translations_input,
-    serialize_property_detail,
     validate_translation_languages,
 )
 from properties.mcp.output_types import EDIT_PROPERTY_OUTPUT_SCHEMA
@@ -37,8 +36,8 @@ class EditPropertyMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID.")] = None,
-        internal_name: Annotated[str | None, Field(description="Exact property internal name.")] = None,
+        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID. Requires either property_id or internal_name.")] = None,
+        internal_name: Annotated[str | None, Field(description="Exact property internal name. Requires either property_id or internal_name.")] = None,
         is_public_information: Annotated[
             bool | None,
             Field(description="Update whether this property is public information.")
@@ -54,12 +53,7 @@ class EditPropertyMcpTool(BaseMcpTool):
         translations: Annotated[
             list[PropertyTranslationInputPayload] | str | None,
             Field(
-                description=(
-                    "Optional list of translated property names to update or add. "
-                    "Translation languages must belong to the authenticated company's enabled languages. "
-                    "Use get_company_languages first to see the allowed language codes. "
-                    "If the client sends JSON-stringified arguments, a JSON string array is also accepted."
-                )
+                description="Translations as [{language, name}] pairs. Call get_company_languages for valid codes."
             )
         ] = None,
         ctx: Context = CurrentContext(),
@@ -100,14 +94,14 @@ class EditPropertyMcpTool(BaseMcpTool):
             )
 
             await ctx.info(
-                f"Updated property_id={response_data['property']['id']} "
-                f"internal_name={response_data['property']['internal_name']!r}."
+                f"Updated property_id={response_data['property_id']} "
+                f"internal_name={response_data['internal_name']!r}."
             )
 
             return self.build_result(
                 summary=(
-                    f"Updated property '{response_data['property']['name']}' "
-                    f"({response_data['property']['type_label']})."
+                    f"Updated property '{response_data['name']}' "
+                    f"({response_data['type_label']})."
                 ),
                 structured_content=response_data,
             )
@@ -118,12 +112,6 @@ class EditPropertyMcpTool(BaseMcpTool):
             await ctx.error(f"Edit property failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
 
     def _sanitize_translations(
         self,
@@ -196,14 +184,10 @@ class EditPropertyMcpTool(BaseMcpTool):
         except ValueError as error:
             raise McpToolError(str(error)) from error
 
-        property_instance = get_property_detail_queryset(
-            multi_tenant_company=multi_tenant_company,
-        ).get(id=property_instance.id)
-
-        return {
-            "updated": True,
-            "property": serialize_property_detail(property_instance=property_instance),
-        }
+        return build_property_mutation_payload(
+            property_instance=property_instance,
+            created=False,
+        )
 
     def _get_property_match(
         self,

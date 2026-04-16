@@ -13,7 +13,7 @@ from products.mcp.types import (
 from properties.mcp.helpers import (
     get_property_select_value_detail_queryset,
     serialize_property_reference,
-    serialize_property_select_value_detail,
+    serialize_property_select_value_summary,
 )
 from properties.models import Property, PropertySelectValue
 from sales_channels.models import SalesChannel
@@ -45,7 +45,7 @@ def get_product_types_payload(*, multi_tenant_company: MultiTenantCompany) -> Ge
         "count": len(select_values),
         "property": serialize_property_reference(property_instance=product_type_property),
         "results": [
-            serialize_property_select_value_detail(select_value=select_value)
+            serialize_property_select_value_summary(select_value=select_value)
             for select_value in select_values
         ],
     }

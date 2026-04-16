@@ -46,11 +46,11 @@ class AddProductImagesMcpTool(BaseMcpTool):
                 )
             )
         ] = ...,
-        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID.")] = None,
-        sku: Annotated[str | None, Field(description="Exact product SKU.")] = None,
+        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID. Requires either product_id or sku.")] = None,
+        sku: Annotated[str | None, Field(description="Exact product SKU. Requires either product_id or sku.")] = None,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
-        """Add one or more images to an existing product, optionally targeting channel-specific assignments."""
+        """Add one or more images to an existing product, optionally targeting channel-specific assignments. Requires either `product_id` or `sku`."""
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
             sanitized_sku = self._sanitize_optional_string(value=sku)
@@ -68,7 +68,7 @@ class AddProductImagesMcpTool(BaseMcpTool):
             return self.build_result(
                 summary=(
                     f"Processed {response_data['updated_count']} image assignment(s) for "
-                    f"'{response_data['product']['name']}' ({response_data['product']['sku']})."
+                    f"'{response_data['name']}' ({response_data['sku']})."
                 ),
                 structured_content=response_data,
             )
@@ -79,12 +79,6 @@ class AddProductImagesMcpTool(BaseMcpTool):
             await ctx.error(f"Add product images failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
 
     def _sanitize_images(self, *, images: list[ProductImageInputPayload] | str) -> list[ProductImageInputPayload]:
         try:
@@ -123,9 +117,9 @@ class AddProductImagesMcpTool(BaseMcpTool):
                 updated_count += import_instance.images_associations_instances.count()
 
             return build_product_batch_mutation_payload(
-                multi_tenant_company=multi_tenant_company,
                 product=product,
                 updated_count=updated_count,
+                action="image update",
             )
         except ValueError as error:
             raise McpToolError(str(error)) from error

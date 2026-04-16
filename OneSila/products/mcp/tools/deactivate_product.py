@@ -32,11 +32,11 @@ class DeactivateProductMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID.")] = None,
-        sku: Annotated[str | None, Field(description="Exact product SKU.")] = None,
+        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID. Requires either product_id or sku.")] = None,
+        sku: Annotated[str | None, Field(description="Exact product SKU. Requires either product_id or sku.")] = None,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
-        """Deactivate a product by exact product ID or exact SKU."""
+        """Deactivate a product by exact product ID or exact SKU. Requires either `product_id` or `sku`."""
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
             sanitized_sku = self._sanitize_optional_string(value=sku)
@@ -50,7 +50,7 @@ class DeactivateProductMcpTool(BaseMcpTool):
                 sku=sanitized_sku,
             )
             return self.build_result(
-                summary=f"Deactivated product '{response_data['product']['name']}' ({response_data['product']['sku']}).",
+                summary=f"Deactivated product '{response_data['name']}' ({response_data['sku']}).",
                 structured_content=response_data,
             )
         except McpToolError as error:
@@ -60,12 +60,6 @@ class DeactivateProductMcpTool(BaseMcpTool):
             await ctx.error(f"Deactivate product failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
 
     @database_sync_to_async
     def _deactivate_product(self, *, multi_tenant_company, product_id: int | None, sku: str | None) -> ProductMutationPayload:
@@ -81,8 +75,8 @@ class DeactivateProductMcpTool(BaseMcpTool):
                 product_data={"active": False},
             )
             return build_product_mutation_payload(
-                multi_tenant_company=multi_tenant_company,
                 product=product,
+                action="deactivated",
             )
         except ValueError as error:
             raise McpToolError(str(error)) from error

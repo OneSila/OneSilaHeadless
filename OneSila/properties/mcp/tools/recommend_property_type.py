@@ -92,12 +92,6 @@ class RecommendPropertyTypeMcpTool(BaseMcpTool):
             self.handle_error(error=error, action=self.name)
             raise
 
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
-
     def _build_detector_payload(
         self,
         *,

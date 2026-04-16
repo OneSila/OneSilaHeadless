@@ -18,10 +18,9 @@ from llm.mcp.tags import (
     tool_tags,
 )
 from properties.mcp.helpers import (
+    build_select_value_mutation_payload,
     build_import_process,
-    get_property_select_value_detail_queryset,
     sanitize_select_value_translations_input,
-    serialize_property_select_value_detail,
     validate_select_value_translation_languages,
 )
 from properties.mcp.output_types import EDIT_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA
@@ -49,12 +48,7 @@ class EditPropertySelectValueMcpTool(BaseMcpTool):
         translations: Annotated[
             list[PropertySelectValueTranslationInputPayload] | str,
             Field(
-                description=(
-                    "Translated select-value texts to update or add. Translation languages must belong to "
-                    "the authenticated company's enabled languages. Use get_company_languages first to see "
-                    "the allowed language codes. If the client sends JSON-stringified arguments, a JSON string "
-                    "array is also accepted."
-                )
+                description="Translations as [{language, value}] pairs. Call get_company_languages for valid codes."
             ),
         ] = ...,
         ctx: Context = CurrentContext(),
@@ -84,12 +78,12 @@ class EditPropertySelectValueMcpTool(BaseMcpTool):
             )
 
             await ctx.info(
-                f"Updated property select value id={response_data['select_value']['id']} "
-                f"for property_id={response_data['select_value']['property']['id']}."
+                f"Updated property select value id={response_data['select_value_id']} "
+                f"for property_id={response_data['property_id']}."
             )
 
             return self.build_result(
-                summary=f"Updated property select value '{response_data['select_value']['full_value_name']}'.",
+                summary=f"Updated property select value '{response_data['full_value_name']}'.",
                 structured_content=response_data,
             )
         except McpToolError as error:
@@ -149,14 +143,10 @@ class EditPropertySelectValueMcpTool(BaseMcpTool):
         except ValueError as error:
             raise McpToolError(str(error)) from error
 
-        select_value_instance = get_property_select_value_detail_queryset(
-            multi_tenant_company=multi_tenant_company,
-        ).get(id=select_value_instance.id)
-
-        return {
-            "updated": True,
-            "select_value": serialize_property_select_value_detail(select_value=select_value_instance),
-        }
+        return build_select_value_mutation_payload(
+            select_value=select_value_instance,
+            created=False,
+        )
 
     def _get_select_value(
         self,

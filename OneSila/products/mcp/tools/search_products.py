@@ -17,6 +17,10 @@ from products.mcp.helpers import get_product_summary_queryset, serialize_product
 from products.mcp.output_types import SEARCH_PRODUCTS_OUTPUT_SCHEMA
 from products.mcp.types import ProductTypeValue, SearchProductsPayload
 from products.models import Product
+from products_inspector.constants import ERROR_TYPES
+from products_inspector.models import InspectorBlock
+from properties.models import ProductProperty
+from sales_channels.models import SalesChannelViewAssign
 
 
 class SearchProductsMcpTool(BaseMcpTool):
@@ -41,7 +45,12 @@ class SearchProductsMcpTool(BaseMcpTool):
         has_missing_information: Annotated[bool | None, Field(description="Filter by whether the product inspector reports any missing information, required or optional.")] = None,
         has_missing_required_information: Annotated[bool | None, Field(description="Filter by whether the product inspector reports missing required information.")] = None,
         property_id: Annotated[int | None, Field(ge=1, description="Filter products that have a value assigned for the given property database ID.")] = None,
+        exclude_property_id: Annotated[int | None, Field(ge=1, description="Filter products that do not have a value assigned for the given property database ID.")] = None,
         select_value_id: Annotated[int | None, Field(ge=1, description="Filter products that use the given property select value database ID in single-select or multiselect properties.")] = None,
+        exclude_select_value_id: Annotated[int | None, Field(ge=1, description="Filter products that do not use the given property select value database ID in single-select or multiselect properties.")] = None,
+        assigned_to_sales_channel_view_id: Annotated[int | None, Field(ge=1, description="Filter products assigned to the given sales channel view ID.")] = None,
+        not_assigned_to_sales_channel_view_id: Annotated[int | None, Field(ge=1, description="Filter products not assigned to the given sales channel view ID.")] = None,
+        inspector_not_successfully_code_error: Annotated[int | None, Field(ge=1, description="Filter products with the given unresolved inspector block error code. Use `onesila://products/inspector-error-codes` for the supported codes.")] = None,
         has_images: Annotated[bool | None, Field(description="Filter by whether the product has any image assignments.")] = None,
         limit: Annotated[int, Field(ge=1, le=100, description="Maximum number of results to return.")] = 20,
         offset: Annotated[int, Field(ge=0, description="Number of results to skip before returning matches.")] = 0,
@@ -51,20 +60,6 @@ class SearchProductsMcpTool(BaseMcpTool):
         Search company-scoped products by SKU, product type, VAT, inspector state, property assignments,
         select values, and image presence. Returns summary rows only. Use `get_product` for full detail
         once you know the exact SKU.
-
-        Args:
-            search: Search term to match against SKU and translated product names.
-            sku: Optional partial SKU filter.
-            type: Optional exact product type filter.
-            active: Optional active/inactive filter.
-            vat_rate: Optional exact VAT rate percentage filter.
-            has_missing_information: Filter by any missing information flag from the product inspector.
-            has_missing_required_information: Filter by missing required information from the product inspector.
-            property_id: Optional property database ID filter.
-            select_value_id: Optional property select value database ID filter.
-            has_images: Optional image-presence filter.
-            limit: Maximum number of results to return (default 20, max 100).
-            offset: Number of results to skip for pagination.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
@@ -88,10 +83,33 @@ class SearchProductsMcpTool(BaseMcpTool):
                     field_name="has_missing_required_information",
                 ),
                 property_id=self.sanitize_optional_int(value=property_id, field_name="property_id", minimum=1),
+                exclude_property_id=self.sanitize_optional_int(
+                    value=exclude_property_id,
+                    field_name="exclude_property_id",
+                    minimum=1,
+                ),
                 select_value_id=self.sanitize_optional_int(
                     value=select_value_id,
                     field_name="select_value_id",
                     minimum=1,
+                ),
+                exclude_select_value_id=self.sanitize_optional_int(
+                    value=exclude_select_value_id,
+                    field_name="exclude_select_value_id",
+                    minimum=1,
+                ),
+                assigned_to_sales_channel_view_id=self.sanitize_optional_int(
+                    value=assigned_to_sales_channel_view_id,
+                    field_name="assigned_to_sales_channel_view_id",
+                    minimum=1,
+                ),
+                not_assigned_to_sales_channel_view_id=self.sanitize_optional_int(
+                    value=not_assigned_to_sales_channel_view_id,
+                    field_name="not_assigned_to_sales_channel_view_id",
+                    minimum=1,
+                ),
+                inspector_not_successfully_code_error=self._sanitize_inspector_error_code(
+                    error_code=inspector_not_successfully_code_error,
                 ),
                 has_images=self.sanitize_optional_bool(value=has_images, field_name="has_images"),
                 limit=self.sanitize_limit(limit=limit),
@@ -120,6 +138,23 @@ class SearchProductsMcpTool(BaseMcpTool):
             raise McpToolError(f"Invalid type: {type!r}. Allowed types are: {sorted(allowed_types)}")
         return type
 
+    def _sanitize_inspector_error_code(self, *, error_code: int | None) -> int | None:
+        if error_code is None:
+            return None
+
+        error_code = self.sanitize_optional_int(
+            value=error_code,
+            field_name="inspector_not_successfully_code_error",
+            minimum=1,
+        )
+        allowed_error_codes = {code for code, _label in ERROR_TYPES}
+        if error_code not in allowed_error_codes:
+            raise McpToolError(
+                "Invalid inspector_not_successfully_code_error: "
+                f"{error_code!r}. Use onesila://products/inspector-error-codes for supported codes."
+            )
+        return error_code
+
     @database_sync_to_async
     def _search_products(
         self,
@@ -133,7 +168,12 @@ class SearchProductsMcpTool(BaseMcpTool):
         has_missing_information: bool | None,
         has_missing_required_information: bool | None,
         property_id: int | None,
+        exclude_property_id: int | None,
         select_value_id: int | None,
+        exclude_select_value_id: int | None,
+        assigned_to_sales_channel_view_id: int | None,
+        not_assigned_to_sales_channel_view_id: int | None,
+        inspector_not_successfully_code_error: int | None,
         has_images: bool | None,
         limit: int,
         offset: int,
@@ -182,13 +222,72 @@ class SearchProductsMcpTool(BaseMcpTool):
             )
 
         if property_id is not None:
-            queryset = queryset.filter(productproperty__property_id=property_id)
+            property_assignments = ProductProperty.objects.filter(
+                product_id=OuterRef("pk"),
+                property_id=property_id,
+            )
+            queryset = queryset.annotate(
+                has_property_assignment=Exists(property_assignments),
+            ).filter(has_property_assignment=True)
+
+        if exclude_property_id is not None:
+            excluded_property_assignments = ProductProperty.objects.filter(
+                product_id=OuterRef("pk"),
+                property_id=exclude_property_id,
+            )
+            queryset = queryset.annotate(
+                has_excluded_property_assignment=Exists(excluded_property_assignments),
+            ).filter(has_excluded_property_assignment=False)
 
         if select_value_id is not None:
-            queryset = queryset.filter(
-                Q(productproperty__value_select_id=select_value_id)
-                | Q(productproperty__value_multi_select__id=select_value_id)
+            select_value_assignments = ProductProperty.objects.filter(
+                product_id=OuterRef("pk"),
+            ).filter(
+                Q(value_select_id=select_value_id)
+                | Q(value_multi_select__id=select_value_id)
             )
+            queryset = queryset.annotate(
+                has_select_value_assignment=Exists(select_value_assignments),
+            ).filter(has_select_value_assignment=True)
+
+        if exclude_select_value_id is not None:
+            excluded_select_value_assignments = ProductProperty.objects.filter(
+                product_id=OuterRef("pk"),
+            ).filter(
+                Q(value_select_id=exclude_select_value_id)
+                | Q(value_multi_select__id=exclude_select_value_id)
+            )
+            queryset = queryset.annotate(
+                has_excluded_select_value_assignment=Exists(excluded_select_value_assignments),
+            ).filter(has_excluded_select_value_assignment=False)
+
+        if assigned_to_sales_channel_view_id is not None:
+            view_assignments = SalesChannelViewAssign.objects.filter(
+                product_id=OuterRef("pk"),
+                sales_channel_view_id=assigned_to_sales_channel_view_id,
+            )
+            queryset = queryset.annotate(
+                assigned_to_view=Exists(view_assignments),
+            ).filter(assigned_to_view=True)
+
+        if not_assigned_to_sales_channel_view_id is not None:
+            excluded_view_assignments = SalesChannelViewAssign.objects.filter(
+                product_id=OuterRef("pk"),
+                sales_channel_view_id=not_assigned_to_sales_channel_view_id,
+            )
+            queryset = queryset.annotate(
+                assigned_to_excluded_view=Exists(excluded_view_assignments),
+            ).filter(assigned_to_excluded_view=False)
+
+        if inspector_not_successfully_code_error is not None:
+            error_blocks = InspectorBlock.objects.filter(
+                inspector__product_id=OuterRef("pk"),
+                successfully_checked=False,
+                error_code=inspector_not_successfully_code_error,
+            )
+            queryset = queryset.annotate(
+                has_matching_inspector_error=Exists(error_blocks),
+            ).filter(has_matching_inspector_error=True)
 
         if has_images is not None:
             image_assignments = MediaProductThrough.objects.filter(

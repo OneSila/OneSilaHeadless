@@ -18,10 +18,10 @@ from llm.mcp.tags import (
     tool_tags,
 )
 from properties.mcp.helpers import (
+    build_select_value_mutation_payload,
     build_import_process,
-    get_property_select_value_detail_queryset,
+    resolve_property_ids,
     sanitize_select_value_translations_input,
-    serialize_property_select_value_detail,
     validate_select_value_translation_languages,
 )
 from properties.mcp.output_types import CREATE_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA
@@ -60,12 +60,7 @@ class CreatePropertySelectValueMcpTool(BaseMcpTool):
         translations: Annotated[
             list[PropertySelectValueTranslationInputPayload] | str | None,
             Field(
-                description=(
-                    "Optional list of translated select-value texts. Translation languages must belong to "
-                    "the authenticated company's enabled languages. Use get_company_languages first to see "
-                    "the allowed language codes. If the client sends JSON-stringified arguments, a JSON string "
-                    "array is also accepted."
-                )
+                description="Translations as [{language, value}] pairs. Call get_company_languages for valid codes."
             ),
         ] = None,
         ctx: Context = CurrentContext(),
@@ -101,12 +96,12 @@ class CreatePropertySelectValueMcpTool(BaseMcpTool):
 
             action = "Created" if response_data["created"] else "Updated existing"
             await ctx.info(
-                f"{action} property select value id={response_data['select_value']['id']} "
-                f"for property_id={response_data['select_value']['property']['id']}."
+                f"{action} property select value id={response_data['select_value_id']} "
+                f"for property_id={response_data['property_id']}."
             )
 
             return self.build_result(
-                summary=f"{action} property select value '{response_data['select_value']['full_value_name']}'.",
+                summary=f"{action} property select value '{response_data['full_value_name']}'.",
                 structured_content=response_data,
             )
         except McpToolError as error:
@@ -165,14 +160,10 @@ class CreatePropertySelectValueMcpTool(BaseMcpTool):
         except ValueError as error:
             raise McpToolError(str(error)) from error
 
-        select_value_instance = get_property_select_value_detail_queryset(
-            multi_tenant_company=multi_tenant_company,
-        ).get(id=import_instance.instance.id)
-
-        return {
-            "created": bool(getattr(import_instance, "created", False)),
-            "select_value": serialize_property_select_value_detail(select_value=select_value_instance),
-        }
+        return build_select_value_mutation_payload(
+            select_value=import_instance.instance,
+            created=bool(getattr(import_instance, "created", False)),
+        )
 
     def _resolve_property(
         self,
@@ -182,19 +173,14 @@ class CreatePropertySelectValueMcpTool(BaseMcpTool):
         property_internal_name: str | None,
         property_name: str | None,
     ) -> Property:
-        queryset = Property.objects.filter(multi_tenant_company=multi_tenant_company)
-
         if not any([property_id is not None, property_internal_name, property_name]):
             raise McpToolError("Provide property_id, property_internal_name, or property_name.")
-
-        if property_id is not None:
-            queryset = queryset.filter(id=property_id)
-        if property_internal_name:
-            queryset = queryset.filter(internal_name__iexact=property_internal_name)
-        if property_name:
-            queryset = queryset.filter(propertytranslation__name__iexact=property_name)
-
-        property_ids = list(queryset.order_by("id").values_list("id", flat=True).distinct()[:2])
+        property_ids = resolve_property_ids(
+            multi_tenant_company=multi_tenant_company,
+            property_id=property_id,
+            property_internal_name=property_internal_name,
+            property_name=property_name,
+        )
         if not property_ids:
             raise McpToolError("Property not found.")
         if len(property_ids) > 1:

@@ -1,9 +1,9 @@
+from products.mcp.resources import register_product_mcp_resources
 from products.mcp.tools import (
     ActivateProductMcpTool,
     AddProductImagesMcpTool,
     CreateProductMcpTool,
     DeactivateProductMcpTool,
-    GetProductOnesilaUrlMcpTool,
     GetProductMcpTool,
     GetProductTypesMcpTool,
     GetVatRatesMcpTool,
@@ -16,9 +16,9 @@ from products.mcp.tools import (
 
 
 def register_product_mcp_tools(*, mcp):
+    register_product_mcp_resources(mcp=mcp)
     SearchProductsMcpTool(mcp=mcp)
     GetProductMcpTool(mcp=mcp)
-    GetProductOnesilaUrlMcpTool(mcp=mcp)
     SearchSalesChannelsMcpTool(mcp=mcp)
     GetProductTypesMcpTool(mcp=mcp)
     GetVatRatesMcpTool(mcp=mcp)
@@ -36,7 +36,6 @@ __all__ = [
     "AddProductImagesMcpTool",
     "CreateProductMcpTool",
     "DeactivateProductMcpTool",
-    "GetProductOnesilaUrlMcpTool",
     "GetProductMcpTool",
     "GetProductTypesMcpTool",
     "GetVatRatesMcpTool",
@@ -45,5 +44,6 @@ __all__ = [
     "UpdateProductContentMcpTool",
     "UpsertProductPriceMcpTool",
     "UpsertProductPropertyValuesMcpTool",
+    "register_product_mcp_resources",
     "register_product_mcp_tools",
 ]

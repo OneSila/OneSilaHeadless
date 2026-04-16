@@ -152,6 +152,9 @@ class ProductSummaryPayload(TypedDict):
 
 
 class ProductDetailPayload(ProductSummaryPayload):
+    global_id: str
+    onesila_path: str
+    onesila_url: str
     allow_backorder: bool
     vat_rate_data: ProductVatRatePayload | None
     inspector: ProductInspectorPayload
@@ -168,14 +171,6 @@ class SearchProductsPayload(TypedDict):
     offset: int
     limit: int
     results: list[ProductSummaryPayload]
-
-
-class ProductOnesilaUrlPayload(TypedDict):
-    id: int
-    sku: str | None
-    global_id: str
-    onesila_path: str
-    onesila_url: str
 
 
 class VatRateOptionPayload(TypedDict):
@@ -203,17 +198,27 @@ class SearchSalesChannelsPayload(TypedDict):
     results: list[SalesChannelReferencePayload]
 
 
-class ProductMutationPayload(TypedDict):
+class ProductMutationPayload(TypedDict, total=False):
     updated: bool
-    product: ProductDetailPayload
+    product_id: int
+    sku: str | None
+    name: str
+    active: bool
+    message: str
 
 
-class ProductBatchMutationPayload(TypedDict):
+class ProductBatchMutationPayload(TypedDict, total=False):
     updated_count: int
-    product: ProductDetailPayload
+    product_id: int
+    sku: str | None
+    name: str
+    message: str
 
 
-class CreateProductPayload(TypedDict):
+class CreateProductPayload(TypedDict, total=False):
     created: bool
     sku_was_generated: bool
-    product: ProductDetailPayload
+    product_id: int
+    sku: str | None
+    name: str
+    message: str

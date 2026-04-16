@@ -19,14 +19,15 @@ from llm.mcp.tags import (
 )
 from properties.mcp.helpers import (
     get_property_select_value_detail_queryset,
-    serialize_property_select_value_detail,
+    resolve_property_ids,
+    serialize_property_select_value_search_result,
 )
 from properties.mcp.output_types import SEARCH_PROPERTY_SELECT_VALUES_OUTPUT_SCHEMA
 from properties.mcp.types import (
-    PropertySelectValueSummaryPayload,
+    PropertySelectValueSearchResultPayload,
     SearchPropertySelectValuesPayload,
 )
-from properties.models import Property, PropertySelectValue
+from properties.models import PropertySelectValue
 
 
 class SearchPropertySelectValuesMcpTool(BaseMcpTool):
@@ -43,7 +44,7 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        search: Annotated[str | None, Field(description="Optional free-text search across select-value translations, property names, and property internal names.")] = None,
+        search: Annotated[str | None, Field(description="Free-text search across values, property names, and internal names.")] = None,
         property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID to scope the search.")] = None,
         property_internal_name: Annotated[str | None, Field(description="Exact property internal name to scope the search.")] = None,
         property_name: Annotated[str | None, Field(description="Exact translated property name to scope the search within the authenticated company.")] = None,
@@ -51,6 +52,8 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
         missing_translations: Annotated[bool | None, Field(description="Filter by whether one or more enabled company language translations are missing.")] = None,
         used_in_products: Annotated[bool | None, Field(description="Filter by whether the select value is already used on products.")] = None,
         is_product_type: Annotated[bool | None, Field(description="Filter by whether the parent property is the product-type property.")] = None,
+        include_translations: Annotated[bool, Field(description="Include translations in each search result when needed immediately.")] = False,
+        include_usage_count: Annotated[bool, Field(description="Include usage counts in each search result.")] = False,
         limit: Annotated[int, Field(ge=1, le=100, description="Maximum number of results to return.")] = 20,
         offset: Annotated[int, Field(ge=0, description="Number of results to skip before returning matches.")] = 0,
         ctx: Context = CurrentContext(),
@@ -100,6 +103,8 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
                 missing_translations=missing_translations,
                 used_in_products=used_in_products,
                 is_product_type=is_product_type,
+                include_translations=include_translations,
+                include_usage_count=include_usage_count,
                 limit=limit,
                 offset=offset,
             )
@@ -149,34 +154,13 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
         property_internal_name: str | None,
         property_name: str | None,
     ) -> list[int] | None:
-        if not any(
-            [
-                property_id is not None,
-                property_internal_name,
-                property_name,
-            ]
-        ):
-            return None
-
-        queryset = Property.objects.filter(multi_tenant_company=multi_tenant_company)
-
-        if property_id is not None:
-            if not isinstance(property_id, int):
-                raise McpToolError(
-                    f"property_id must be an integer, got: {type(property_id).__name__}"
-                )
-            queryset = queryset.filter(id=property_id)
-
-        if property_internal_name:
-            queryset = queryset.filter(internal_name__iexact=property_internal_name)
-
-        if property_name:
-            queryset = queryset.filter(propertytranslation__name__iexact=property_name)
-
-        property_ids = list(
-            queryset.order_by("id").values_list("id", flat=True).distinct()[:2]
+        property_ids = resolve_property_ids(
+            multi_tenant_company=multi_tenant_company,
+            property_id=property_id,
+            property_internal_name=property_internal_name,
+            property_name=property_name,
         )
-        if len(property_ids) > 1:
+        if property_ids is not None and len(property_ids) > 1:
             raise McpToolError(
                 "Multiple properties matched the provided property identifiers."
             )
@@ -195,6 +179,8 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
         missing_translations: bool | None,
         used_in_products: bool | None,
         is_product_type: bool | None,
+        include_translations: bool,
+        include_usage_count: bool,
         limit: int,
         offset: int,
     ) -> SearchPropertySelectValuesPayload:
@@ -265,7 +251,11 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
             "offset": offset,
             "limit": limit,
             "results": [
-                self._serialize_select_value_summary(select_value=value)
+                self._serialize_select_value_summary(
+                    select_value=value,
+                    include_translations=include_translations,
+                    include_usage_count=include_usage_count,
+                )
                 for value in values
             ],
         }
@@ -274,5 +264,11 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
         self,
         *,
         select_value: PropertySelectValue,
-    ) -> PropertySelectValueSummaryPayload:
-        return serialize_property_select_value_detail(select_value=select_value)
+        include_translations: bool,
+        include_usage_count: bool,
+    ) -> PropertySelectValueSearchResultPayload:
+        return serialize_property_select_value_search_result(
+            select_value=select_value,
+            include_translations=include_translations,
+            include_usage_count=include_usage_count,
+        )

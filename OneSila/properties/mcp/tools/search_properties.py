@@ -11,8 +11,9 @@ from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
 from llm.mcp.tags import TAG_PROPERTIES, TAG_SEARCH, tool_tags
+from properties.mcp.helpers import serialize_property_search_result
 from properties.mcp.output_types import SEARCH_PROPERTIES_OUTPUT_SCHEMA
-from properties.mcp.types import PropertySummaryPayload, PropertyTypeValue, SearchPropertiesPayload
+from properties.mcp.types import PropertySearchResultPayload, PropertyTypeValue, SearchPropertiesPayload
 from properties.models import Property
 
 
@@ -30,13 +31,14 @@ class SearchPropertiesMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        search: Annotated[str | None, Field(description="Optional free-text search across translated property names and internal names.")] = None,
+        search: Annotated[str | None, Field(description="Free-text search across translated names and internal names.")] = None,
         internal_name: Annotated[str | None, Field(description="Optional partial internal name filter.")] = None,
-        is_public: Annotated[bool | None, Field(description="Filter public-information properties only, private properties only, or omit for both.")] = None,
+        is_public: Annotated[bool | None, Field(description="Filter public, private, or both.")] = None,
         missing_main_translation: Annotated[bool | None, Field(description="Filter by whether the company default-language translation is missing.")] = None,
         missing_translations: Annotated[bool | None, Field(description="Filter by whether one or more enabled company language translations are missing.")] = None,
         used_in_products: Annotated[bool | None, Field(description="Filter by whether the property is already used on products.")] = None,
         type: Annotated[PropertyTypeValue | None, Field(description="Optional exact property type filter.")] = None,
+        include_translations: Annotated[bool, Field(description="Include property translations in each search result.")] = False,
         limit: Annotated[int, Field(ge=1, le=100, description="Maximum number of results to return.")] = 20,
         offset: Annotated[int, Field(ge=0, description="Number of results to skip before returning matches.")] = 0,
         ctx: Context = CurrentContext(),
@@ -46,17 +48,6 @@ class SearchPropertiesMcpTool(BaseMcpTool):
         Use this tool to narrow down candidate properties by translated name, internal name,
         type, translation completeness, and whether the property is already used on products.
         Returns summary records only. Use `get_property` for full details on a specific property.
-
-        Args:
-            search: Search term to match against translated property names and internal names.
-            internal_name: Optional partial internal name filter.
-            is_public: Optional filter for public-information properties.
-            missing_main_translation: Filter by whether the company default-language translation is missing.
-            missing_translations: Filter by whether translations are missing for one or more company languages.
-            used_in_products: Filter by whether the property is already used on products.
-            type: Optional property type filter.
-            limit: Maximum number of results to return (default 20, max 100).
-            offset: Number of results to skip for pagination.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
@@ -89,6 +80,7 @@ class SearchPropertiesMcpTool(BaseMcpTool):
                 missing_translations=missing_translations,
                 used_in_products=used_in_products,
                 property_type=property_type,
+                include_translations=include_translations,
                 limit=limit,
                 offset=offset,
             )
@@ -128,6 +120,7 @@ class SearchPropertiesMcpTool(BaseMcpTool):
         missing_translations: bool | None,
         used_in_products: bool | None,
         property_type: PropertyTypeValue | None,
+        include_translations: bool,
         limit: int,
         offset: int,
     ) -> SearchPropertiesPayload:
@@ -187,17 +180,22 @@ class SearchPropertiesMcpTool(BaseMcpTool):
             "has_more": has_more,
             "offset": offset,
             "limit": limit,
-            "results": [self._serialize_property_summary(property_instance=property) for property in properties],
+            "results": [
+                self._serialize_property_summary(
+                    property_instance=property,
+                    include_translations=include_translations,
+                )
+                for property in properties
+            ],
         }
 
-    def _serialize_property_summary(self, *, property_instance: Property) -> PropertySummaryPayload:
-        return {
-            "id": property_instance.id,
-            "name": property_instance.name,
-            "internal_name": property_instance.internal_name,
-            "type": property_instance.type,
-            "type_label": property_instance.get_type_display(),
-            "is_public_information": property_instance.is_public_information,
-            "add_to_filters": property_instance.add_to_filters,
-            "has_image": property_instance.has_image,
-        }
+    def _serialize_property_summary(
+        self,
+        *,
+        property_instance: Property,
+        include_translations: bool,
+    ) -> PropertySearchResultPayload:
+        return serialize_property_search_result(
+            property_instance=property_instance,
+            include_translations=include_translations,
+        )

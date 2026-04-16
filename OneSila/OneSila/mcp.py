@@ -14,6 +14,7 @@ mcp = FastMCP(
         "Use write tools only after confirming the intended changes."
     ),
     auth=McpApiKeyAuth(),
+    mask_error_details=True,
 )
 
 register_property_mcp_tools(mcp=mcp)
