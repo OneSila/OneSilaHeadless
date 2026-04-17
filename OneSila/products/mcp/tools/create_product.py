@@ -53,10 +53,16 @@ class CreateProductsMcpTool(BaseMcpTool):
             Field(
                 description=(
                     "One product object or an array of product objects to create. "
-                    "This tool supports creating up to 10 products per call. "
-                    "Use a single object for one product or an array for bulk creation. "
-                    "Each product can also include initial active status, EAN, translations, prices, properties, "
-                    "images, and sales_channel_view_ids."
+                    "Supports up to 10 products per call. Use a single object for one product or an array for bulk creation. "
+                    "Each product requires type and name. Optional create-time fields are sku, product_type_id, product_type_value, vat_rate_id, vat_rate, "
+                    "active, ean_code, translations, prices, properties, images, and sales_channel_view_ids. "
+                    "Nested section shapes match upsert_products: "
+                    "translations: [{language, sales_channel_id?, name?, subtitle?, short_description?, description?, bullet_points?}], "
+                    "prices: [{currency, price, rrp?}], "
+                    "properties: [{property_id? or property_internal_name?, value, value_is_id?, translations?: [{language, value}]}], "
+                    "images: [{image_url? or image_content?, title?, description?, type?, is_main_image?, sort_order?, sales_channel_id?}], "
+                    "sales_channel_view_ids: [view_id, ...]. "
+                    "Use image_content for base64 chat-uploaded images."
                 )
             ),
         ] = ...,
@@ -71,8 +77,17 @@ class CreateProductsMcpTool(BaseMcpTool):
         Limits:
         - up to 10 products per call
 
-        Use this when the user wants new products created, optionally with initial enrichment in the same call:
-        active status, EAN, translations, prices, properties, images, and storefront assignments.
+        Use this when the user wants new products created, optionally with full initial enrichment in the
+        same call: active status, EAN, translations, prices, properties, images, and storefront assignments.
+
+        Required per product:
+        - `type`: SIMPLE, BUNDLE, CONFIGURABLE, or ALIAS
+        - `name`
+
+        Examples:
+        - Minimal create: `{type: "SIMPLE", name: "Red Mug"}`
+        - Create with price: `{type: "SIMPLE", name: "Red Mug", prices: [{currency: "GBP", price: "9.99"}]}`
+        - Create with uploaded image: `{type: "SIMPLE", name: "Red Mug", images: [{image_content: "<base64>", is_main_image: true}]}`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

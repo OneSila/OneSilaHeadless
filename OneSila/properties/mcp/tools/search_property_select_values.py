@@ -52,7 +52,7 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
         missing_translations: Annotated[bool | None, Field(description="Filter by whether one or more enabled company language translations are missing.")] = None,
         used_in_products: Annotated[bool | None, Field(description="Filter by whether the select value is already used on products.")] = None,
         is_product_type: Annotated[bool | None, Field(description="Filter by whether the parent property is the product-type property.")] = None,
-        include_translations: Annotated[bool, Field(description="Include translations in each search result when needed immediately.")] = False,
+        include_translations: Annotated[bool, Field(description="Include translations in each search result as translations:[{language,value}].")] = False,
         include_usage_count: Annotated[bool, Field(description="Include usage counts in each search result.")] = False,
         limit: Annotated[int, Field(ge=1, le=100, description="Maximum number of results to return.")] = 20,
         offset: Annotated[int, Field(ge=0, description="Number of results to skip before returning matches.")] = 0,
@@ -66,6 +66,12 @@ class SearchPropertySelectValuesMcpTool(BaseMcpTool):
 
         When you need a deterministic detail lookup, search first and then call `get_property_select_value`
         with the returned select-value ID.
+
+        Each result contains:
+        - id, value
+        - property: {id, name, internal_name, type, type_label, is_product_type}
+        - optional translations when `include_translations=true`
+        - optional usage_count when `include_usage_count=true`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

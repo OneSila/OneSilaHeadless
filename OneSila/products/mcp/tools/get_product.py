@@ -73,7 +73,7 @@ class GetProductMcpTool(BaseMcpTool):
         ] = False,
         show_images: Annotated[
             bool,
-            Field(description="Include assigned product images."),
+            Field(description="Include assigned product images. Each image entry returns image_url, thumbnail_url, type, title, description, is_main_image, sort_order, and optional sales_channel."),
         ] = False,
         show_properties: Annotated[
             bool,
@@ -106,7 +106,7 @@ class GetProductMcpTool(BaseMcpTool):
         - show_property_requirements: when the inspector is not enough and you need the full required or optional property map.
         - show_translations: when reviewing, creating, or updating translated product content.
         - show_vat_rate_data: when the VAT configuration details are needed, not just the top-level rate.
-        - show_images: when reviewing or updating assigned product images.
+        - show_images: when reviewing or updating assigned product images. This is the exact runtime image shape used by create_products and upsert_products.
         - show_properties: when reviewing or updating assigned property values.
         - show_prices: when reviewing or updating product prices.
         - show_brand_voice: when writing or translating content and the copy should follow the product brand style.

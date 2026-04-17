@@ -51,8 +51,8 @@ class EditPropertySelectValuesMcpTool(BaseMcpTool):
             Field(
                 description=(
                     "One select-value update object or an array of select-value update objects. "
-                    "This tool supports up to 50 select values per call. "
-                    "Use a single object for one select value or an array for bulk updates."
+                    "Supports up to 50 select values per call. Use a single object for one select value or an array for bulk updates. "
+                    "Each item requires select_value_id and translations:[{language, value}] with at least one translation entry."
                 )
             ),
         ] = ...,
@@ -66,6 +66,10 @@ class EditPropertySelectValuesMcpTool(BaseMcpTool):
 
         Limits:
         - up to 50 select values per call
+
+        Update item shape:
+        - `select_value_id`
+        - `translations: [{language, value}]`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

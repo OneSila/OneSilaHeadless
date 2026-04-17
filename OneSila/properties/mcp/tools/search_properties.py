@@ -38,7 +38,7 @@ class SearchPropertiesMcpTool(BaseMcpTool):
         missing_translations: Annotated[bool | None, Field(description="Filter by whether one or more enabled company language translations are missing.")] = None,
         used_in_products: Annotated[bool | None, Field(description="Filter by whether the property is already used on products.")] = None,
         type: Annotated[PropertyTypeValue | None, Field(description="Optional exact property type filter.")] = None,
-        include_translations: Annotated[bool, Field(description="Include property translations in each search result.")] = False,
+        include_translations: Annotated[bool, Field(description="Include property translations in each search result as translations:[{language,name}].")] = False,
         limit: Annotated[int, Field(ge=1, le=100, description="Maximum number of results to return.")] = 20,
         offset: Annotated[int, Field(ge=0, description="Number of results to skip before returning matches.")] = 0,
         ctx: Context = CurrentContext(),
@@ -48,6 +48,12 @@ class SearchPropertiesMcpTool(BaseMcpTool):
         Use this tool to narrow down candidate properties by translated name, internal name,
         type, translation completeness, and whether the property is already used on products.
         Returns summary records only. Use `get_property` for full details on a specific property.
+
+        Each result contains:
+        - id, name, internal_name
+        - type and type_label
+        - is_public_information, add_to_filters, has_image
+        - optional translations when `include_translations=true`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

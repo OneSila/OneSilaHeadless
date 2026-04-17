@@ -31,15 +31,20 @@ class GetPropertyMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID.")] = None,
-        internal_name: Annotated[str | None, Field(description="Exact property internal name.")] = None,
-        name: Annotated[str | None, Field(description="Exact translated property name within the authenticated company.")] = None,
+        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID. Prefer this when you already know it.")] = None,
+        internal_name: Annotated[str | None, Field(description="Exact property internal name. Use this when ids are not known yet.")] = None,
+        name: Annotated[str | None, Field(description="Exact translated property name within the authenticated company. Use only for exact lookup, not fuzzy search.")] = None,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
         Get a single company-scoped property by exact identifier.
         Use this when you already know the property ID, exact internal name, or exact translated name
         and you need the full property details, translations, and select values.
+
+        Returned detail includes:
+        - summary property fields
+        - translations: `[{language, name}]`
+        - values: `[{id, value, translations:[{language, value}]}]`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

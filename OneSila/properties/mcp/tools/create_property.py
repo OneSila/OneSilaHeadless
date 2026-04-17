@@ -46,8 +46,9 @@ class CreatePropertiesMcpTool(BaseMcpTool):
             Field(
                 description=(
                     "One property object or an array of property objects to create. "
-                    "This tool supports up to 25 properties per call. "
-                    "Use a single object for one property or an array for bulk creation."
+                    "Supports up to 25 properties per call. Use a single object for one property or an array for bulk creation. "
+                    "Each item requires type and either name or internal_name. Optional fields are is_public_information, add_to_filters, has_image, is_product_type, "
+                    "and translations:[{language, name}]."
                 )
             ),
         ] = ...,
@@ -63,6 +64,12 @@ class CreatePropertiesMcpTool(BaseMcpTool):
         - up to 25 properties per call
 
         The caller must infer the best property type from the user context and confirm it when there is ambiguity.
+
+        Create item shape:
+        - `type`: INT, FLOAT, TEXT, DESCRIPTION, BOOLEAN, DATE, DATETIME, SELECT, or MULTISELECT
+        - `name` or `internal_name`
+        - optional `translations: [{language, name}]`
+        - optional booleans: `is_public_information`, `add_to_filters`, `has_image`, `is_product_type`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

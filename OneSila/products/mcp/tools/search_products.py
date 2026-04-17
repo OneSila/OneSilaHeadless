@@ -50,7 +50,7 @@ class SearchProductsMcpTool(BaseMcpTool):
         exclude_select_value_id: Annotated[int | None, Field(ge=1, description="Filter products that do not use the given property select value database ID in single-select or multiselect properties.")] = None,
         assigned_to_sales_channel_view_id: Annotated[int | None, Field(ge=1, description="Filter products assigned to the given sales channel view ID.")] = None,
         not_assigned_to_sales_channel_view_id: Annotated[int | None, Field(ge=1, description="Filter products not assigned to the given sales channel view ID.")] = None,
-        inspector_not_successfully_code_error: Annotated[int | None, Field(ge=1, description="Filter products with the given unresolved inspector block error code. Use `onesila://products/inspector-error-codes` for the supported codes.")] = None,
+        inspector_not_successfully_code_error: Annotated[int | None, Field(ge=1, description="Filter products with the given unresolved inspector block error code. Use `onesila://products/inspector-error-codes` for supported codes such as missing images or missing prices.")] = None,
         has_images: Annotated[bool | None, Field(description="Filter by whether the product has any image assignments.")] = None,
         limit: Annotated[int, Field(ge=1, le=100, description="Maximum number of results to return.")] = 20,
         offset: Annotated[int, Field(ge=0, description="Number of results to skip before returning matches.")] = 0,
@@ -60,6 +60,22 @@ class SearchProductsMcpTool(BaseMcpTool):
         Search company-scoped products by SKU, product type, VAT, inspector state, property assignments,
         select values, and image presence. Returns summary rows only. Use `get_product` for full detail
         once you know the exact SKU.
+
+        Each summary result contains:
+        - id, sku, name
+        - type and type_label
+        - active
+        - vat_rate
+        - thumbnail_url
+        - has_images
+        - missing-information flags
+
+        Common workflows:
+        - missing images: `has_images=false`
+        - missing a property assignment: `exclude_property_id=<id>`
+        - missing a select value: `exclude_select_value_id=<id>`
+        - assigned to a storefront view: `assigned_to_sales_channel_view_id=<view_id>`
+        - unresolved inspector issue such as missing images: `inspector_not_successfully_code_error=<code>`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

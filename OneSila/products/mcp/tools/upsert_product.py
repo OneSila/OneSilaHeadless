@@ -50,10 +50,15 @@ class UpsertProductsMcpTool(BaseMcpTool):
             Field(
                 description=(
                     "One product update object or an array of product update objects. "
-                    "This tool supports updating up to 10 products per call. "
-                    "Use a single object for one product or an array for bulk updates. "
-                    "Each item can update active status, EAN, translations, prices, properties, images, "
-                    "and sales_channel_view_ids."
+                    "Supports up to 10 products per call. Use a single object for one product or an array for bulk updates. "
+                    "Each item requires product_id or sku and can include any of these sections: "
+                    "active: bool; ean_code: string; "
+                    "translations: [{language, sales_channel_id?, name?, subtitle?, short_description?, description?, bullet_points?}] with at least one content field per entry; "
+                    "prices: [{currency, price, rrp?}]; "
+                    "properties: [{property_id? or property_internal_name?, value, value_is_id?, translations?: [{language, value}]}]; "
+                    "images: [{image_url? or image_content?, title?, description?, type?, is_main_image?, sort_order?, sales_channel_id?}]; "
+                    "sales_channel_view_ids: [view_id, ...]. "
+                    "Use image_content for base64 chat-uploaded images."
                 )
             ),
         ] = ...,
@@ -68,8 +73,24 @@ class UpsertProductsMcpTool(BaseMcpTool):
         Limits:
         - up to 10 products per call
 
-        Use this when one or more products need coordinated updates such as active status, EAN code,
-        translations, prices, properties, images, or website/storefront assignments.
+        This is the main product write tool. Use it when one or more existing products need coordinated
+        updates such as active status, EAN code, translations, prices, properties, images, or
+        website/storefront assignments.
+
+        Per-product rules:
+        - Requires `product_id` or `sku`.
+        - Include only the sections you want to change.
+        - Each product must include at least one update section.
+        - One invalid item fails the whole call.
+
+        Section shapes:
+        - translations: `{language: "fr", description: "...", bullet_points: ["a", "b"]}`
+        - prices: `{currency: "GBP", price: "12.50", rrp: "15.00"}`
+        - properties: `{property_id: 12, value: 44, value_is_id: true}`
+        - images: `{image_url: "https://...", type: "PACK", is_main_image: true, sort_order: 1}`
+
+        `images` adds image assignments and does not require reading the current image list first.
+        `sales_channel_view_ids` adds storefront assignments and does not remove existing ones.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

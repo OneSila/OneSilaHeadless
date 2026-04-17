@@ -42,8 +42,9 @@ class EditPropertiesMcpTool(BaseMcpTool):
             Field(
                 description=(
                     "One property update object or an array of property update objects. "
-                    "This tool supports up to 25 properties per call. "
-                    "Use a single object for one property or an array for bulk updates."
+                    "Supports up to 25 properties per call. Use a single object for one property or an array for bulk updates. "
+                    "Each item requires property_id or internal_name and at least one editable field: "
+                    "is_public_information, add_to_filters, has_image, or translations:[{language, name}]."
                 )
             ),
         ] = ...,
@@ -57,6 +58,11 @@ class EditPropertiesMcpTool(BaseMcpTool):
 
         Limits:
         - up to 25 properties per call
+
+        Update item shape:
+        - target by `property_id` or `internal_name`
+        - optional booleans: `is_public_information`, `add_to_filters`, `has_image`
+        - optional `translations: [{language, name}]`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

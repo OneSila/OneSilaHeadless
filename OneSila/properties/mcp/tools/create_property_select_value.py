@@ -52,8 +52,9 @@ class CreatePropertySelectValuesMcpTool(BaseMcpTool):
             Field(
                 description=(
                     "One select-value object or an array of select-value objects to create. "
-                    "This tool supports up to 50 select values per call. "
-                    "Use a single object for one select value or an array for bulk creation."
+                    "Supports up to 50 select values per call. Use a single object for one select value or an array for bulk creation. "
+                    "Each item requires value and a property identifier: property_id, property_internal_name, or property_name. "
+                    "Optional translations are translations:[{language, value}]."
                 )
             ),
         ] = ...,
@@ -67,6 +68,11 @@ class CreatePropertySelectValuesMcpTool(BaseMcpTool):
 
         Limits:
         - up to 50 select values per call
+
+        Create item shape:
+        - `value`
+        - one of `property_id`, `property_internal_name`, or `property_name`
+        - optional `translations: [{language, value}]`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

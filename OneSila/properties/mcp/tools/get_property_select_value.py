@@ -40,11 +40,11 @@ class GetPropertySelectValueMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        select_value_id: Annotated[int | None, Field(ge=1, description="Exact property select-value database ID.")] = None,
+        select_value_id: Annotated[int | None, Field(ge=1, description="Exact property select-value database ID. Prefer this when you already know it.")] = None,
         value: Annotated[str | None, Field(description="Exact translated select-value text for natural-key lookup.")] = None,
-        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID for natural-key lookup.")] = None,
-        property_internal_name: Annotated[str | None, Field(description="Exact property internal name for natural-key lookup.")] = None,
-        property_name: Annotated[str | None, Field(description="Exact translated property name for natural-key lookup.")] = None,
+        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID for natural-key lookup when select_value_id is unknown.")] = None,
+        property_internal_name: Annotated[str | None, Field(description="Exact property internal name for natural-key lookup when select_value_id is unknown.")] = None,
+        property_name: Annotated[str | None, Field(description="Exact translated property name for natural-key lookup when select_value_id is unknown.")] = None,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
@@ -56,6 +56,12 @@ class GetPropertySelectValueMcpTool(BaseMcpTool):
 
         When you are not sure which value is the correct one, call `search_property_select_values`
         first and then use the returned `select_value_id` here.
+
+        Returned detail includes:
+        - id, value, full_value_name
+        - usage_count, thumbnail_url
+        - parent property summary
+        - translations: `[{language, value}]`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

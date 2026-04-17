@@ -28,12 +28,12 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        show_languages: Annotated[bool, Field(description="Include enabled company languages and the default language.")] = False,
-        show_product_types: Annotated[bool, Field(description="Include product-type values available for this company.")] = False,
-        show_product_types_translations: Annotated[bool, Field(description="Include product-type translations. Automatically enables show_product_types.")] = False,
-        show_product_types_usage_counts: Annotated[bool, Field(description="Include product-type usage counts. Automatically enables show_product_types.")] = False,
-        show_vat_rates: Annotated[bool, Field(description="Include configured VAT rates.")] = False,
-        show_currencies: Annotated[bool, Field(description="Include configured company currencies.")] = False,
+        show_languages: Annotated[bool, Field(description="Include enabled company languages and the default language. Returns {default_language_code, enabled_languages:[{code,name,name_local,name_translated,bidi,is_default}]}.")] = False,
+        show_product_types: Annotated[bool, Field(description="Include product-type values available for this company. Returns {count, property, results:[{id,value,...}]}.")] = False,
+        show_product_types_translations: Annotated[bool, Field(description="Include product-type translations inside each product-type result. Automatically enables show_product_types.")] = False,
+        show_product_types_usage_counts: Annotated[bool, Field(description="Include product-type usage counts inside each product-type result. Automatically enables show_product_types.")] = False,
+        show_vat_rates: Annotated[bool, Field(description="Include configured VAT rates. Returns {count, results:[{id,name,rate}]}.")] = False,
+        show_currencies: Annotated[bool, Field(description="Include configured company currencies. Returns {count, default_currency_code, results:[{id,iso_code,name,symbol,is_default,inherits_from_iso_code}]}.")] = False,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
@@ -42,6 +42,9 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
         Set only the show_* flags you need. This tool is intentionally sparse so the client can
         request just languages, product types, VAT rates, or currencies
         without paying for unrelated output.
+
+        Use this tool before writes when you need valid reference data such as languages, product-type
+        ids, VAT rates, or currencies.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
