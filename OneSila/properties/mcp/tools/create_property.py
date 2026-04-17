@@ -92,7 +92,6 @@ class CreatePropertiesMcpTool(BaseMcpTool):
                 multi_tenant_company=multi_tenant_company,
                 payload_content={"properties": sanitized_properties},
                 total_records=len(sanitized_properties),
-                create_only=True,
             )
             response_data = await self._create_properties(
                 multi_tenant_company=multi_tenant_company,

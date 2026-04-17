@@ -110,7 +110,6 @@ class CreateProductsMcpTool(BaseMcpTool):
                 multi_tenant_company=multi_tenant_company,
                 payload_content={"products": sanitized_products},
                 total_records=len(sanitized_products),
-                create_only=True,
             )
             response_data = await self._create_products(
                 multi_tenant_company=multi_tenant_company,

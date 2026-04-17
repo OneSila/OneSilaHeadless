@@ -156,18 +156,12 @@ class BaseMcpTool:
         multi_tenant_company,
         payload_content: dict[str, Any],
         total_records: int,
-        create_only: bool = False,
-        update_only: bool = False,
-        override_only: bool = False,
-        skip_broken_records: bool = False,
+        skip_broken_records: bool = True,
     ) -> McpToolRun:
         return await database_sync_to_async(self._create_mcp_tool_run)(
             multi_tenant_company=multi_tenant_company,
             payload_content=payload_content,
             total_records=total_records,
-            create_only=create_only,
-            update_only=update_only,
-            override_only=override_only,
             skip_broken_records=skip_broken_records,
         )
 
@@ -177,9 +171,6 @@ class BaseMcpTool:
         multi_tenant_company,
         payload_content: dict[str, Any],
         total_records: int,
-        create_only: bool,
-        update_only: bool,
-        override_only: bool,
         skip_broken_records: bool,
     ) -> McpToolRun:
         return McpToolRun.objects.create(
@@ -189,9 +180,6 @@ class BaseMcpTool:
             total_records=total_records,
             processed_records=0,
             percentage=0,
-            create_only=create_only,
-            update_only=update_only,
-            override_only=override_only,
             skip_broken_records=skip_broken_records,
             status=Import.STATUS_NEW,
         )

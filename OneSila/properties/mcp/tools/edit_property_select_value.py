@@ -92,7 +92,6 @@ class EditPropertySelectValuesMcpTool(BaseMcpTool):
                 multi_tenant_company=multi_tenant_company,
                 payload_content={"select_values": sanitized_values},
                 total_records=len(sanitized_values),
-                update_only=True,
             )
             response_data = await self._edit_property_select_values(
                 multi_tenant_company=multi_tenant_company,
