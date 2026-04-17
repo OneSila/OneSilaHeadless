@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _, ngettext
 
 from core.admin import ModelAdmin
 
-from .models import AiGenerateProcess, AiTranslationProcess, AiImportProcess, McpApiKey
+from .models import AiGenerateProcess, AiTranslationProcess, AiImportProcess, McpApiKey, McpToolRun
 
 
 @admin.action(description=_("Regenerate selected MCP API keys"))
@@ -57,3 +57,33 @@ class AiImportProcessAdmin(ModelAdmin):
     list_display = ('transaction', 'get_type_display', 'cost', 'result_time')
     list_filter = ('transaction__transaction_type', 'type')
     search_fields = ('prompt', 'result')
+
+
+@admin.register(McpToolRun)
+class McpToolRunAdmin(ModelAdmin):
+    list_display = ("tool_name", "multi_tenant_company", "status", "percentage", "created_at")
+    list_filter = ("tool_name", "status")
+    search_fields = ("tool_name", "name", "multi_tenant_company__name")
+    list_select_related = ("multi_tenant_company",)
+    raw_id_fields = ("multi_tenant_company",)
+    readonly_fields = ("created_at", "updated_at")
+    fields = (
+        "multi_tenant_company",
+        "tool_name",
+        "name",
+        "status",
+        "percentage",
+        "create_only",
+        "update_only",
+        "override_only",
+        "skip_broken_records",
+        "total_records",
+        "processed_records",
+        "assigned_views",
+        "payload_content",
+        "response_content",
+        "broken_records",
+        "error_traceback",
+        "created_at",
+        "updated_at",
+    )

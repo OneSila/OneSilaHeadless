@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from types import SimpleNamespace
 from typing import Any
 
 from core.models.multi_tenant import MultiTenantCompany
@@ -10,6 +9,7 @@ from django.db import transaction
 from django.db.models import Prefetch, Q
 from currencies.models import Currency
 from imports_exports.factories.products import ImportProductInstance
+from llm.models import McpToolRun
 from products.mcp.types import (
     ProductImageInputPayload,
     ProductPriceUpsertInputPayload,
@@ -22,7 +22,7 @@ from products.mcp.types import (
 from products.models import Product, ProductTranslation
 from properties.mcp.helpers import get_company_language_codes
 from properties.models import Property
-from sales_channels.models import SalesChannel
+from sales_channels.models import SalesChannel, SalesChannelView, SalesChannelViewAssign
 
 
 def parse_boolean_input(*, value, field_name: str) -> bool:
@@ -78,16 +78,6 @@ def normalize_property_update_value(
             ) from error
 
     return value
-
-
-def build_product_import_process(*, multi_tenant_company: MultiTenantCompany):
-    return SimpleNamespace(
-        multi_tenant_company=multi_tenant_company,
-        create_only=False,
-        update_only=False,
-        override_only=False,
-    )
-
 
 def get_product_match(
     *,
@@ -283,12 +273,15 @@ def sanitize_product_images_input(
             raise ValueError("Each image entry must be an object.")
 
         image_url = str(image.get("image_url", "")).strip()
-        if not image_url:
-            raise ValueError("Each image entry must include image_url.")
+        image_content = str(image.get("image_content", "")).strip()
+        if not image_url and not image_content:
+            raise ValueError("Each image entry must include image_url or image_content.")
 
-        sanitized_image: ProductImageInputPayload = {
-            "image_url": image_url,
-        }
+        sanitized_image: ProductImageInputPayload = {}
+        if image_url:
+            sanitized_image["image_url"] = image_url
+        if image_content:
+            sanitized_image["image_content"] = image_content
         for optional_key in ["title", "description", "type"]:
             if image.get(optional_key) not in (None, ""):
                 sanitized_image[optional_key] = str(image[optional_key]).strip()
@@ -300,6 +293,40 @@ def sanitize_product_images_input(
         sanitized_images.append(sanitized_image)
 
     return sanitized_images
+
+
+def sanitize_sales_channel_view_ids_input(
+    *,
+    sales_channel_view_ids: list[int] | str | None,
+) -> list[int] | None:
+    if sales_channel_view_ids is None:
+        return None
+    if isinstance(sales_channel_view_ids, str):
+        try:
+            sales_channel_view_ids = json.loads(sales_channel_view_ids)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "sales_channel_view_ids must be a list of ids, or a JSON string encoding that list."
+            ) from error
+
+    if not isinstance(sales_channel_view_ids, list) or not sales_channel_view_ids:
+        raise ValueError("sales_channel_view_ids must be a non-empty list of ids.")
+
+    sanitized_ids: list[int] = []
+    seen_ids: set[int] = set()
+    for raw_id in sales_channel_view_ids:
+        try:
+            view_id = int(raw_id)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Each sales_channel_view_id must be an integer.") from error
+        if view_id < 1:
+            raise ValueError("Each sales_channel_view_id must be greater than or equal to 1.")
+        if view_id in seen_ids:
+            continue
+        seen_ids.add(view_id)
+        sanitized_ids.append(view_id)
+
+    return sanitized_ids
 
 
 def sanitize_product_prices_input(
@@ -590,14 +617,14 @@ def build_translation_update_groups(
 
 def run_product_import_update(
     *,
-    multi_tenant_company: MultiTenantCompany,
+    import_process: McpToolRun,
     product: Product,
     product_data: dict[str, Any],
     sales_channel=None,
 ):
     import_instance = ImportProductInstance(
         product_data,
-        import_process=build_product_import_process(multi_tenant_company=multi_tenant_company),
+        import_process=import_process,
         instance=product,
         sales_channel=sales_channel,
     )
@@ -716,8 +743,60 @@ def group_images_by_sales_channel_id(
     return grouped_images
 
 
+def resolve_sales_channel_views_map(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    sales_channel_view_ids: list[int],
+) -> dict[int, SalesChannelView]:
+    if not sales_channel_view_ids:
+        return {}
+
+    views = list(
+        SalesChannelView.objects.select_related("sales_channel").filter(
+            multi_tenant_company=multi_tenant_company,
+            id__in=sales_channel_view_ids,
+        )
+    )
+    views_by_id = {view.id: view for view in views}
+    missing_view_ids = sorted(set(sales_channel_view_ids) - set(views_by_id))
+    if missing_view_ids:
+        raise ValueError(
+            "Sales channel view not found. Use search_sales_channels to find valid website/storefront view ids."
+        )
+
+    return views_by_id
+
+
+def assign_product_to_sales_channel_views(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    product: Product,
+    sales_channel_view_ids: list[int],
+) -> int:
+    views_by_id = resolve_sales_channel_views_map(
+        multi_tenant_company=multi_tenant_company,
+        sales_channel_view_ids=sales_channel_view_ids,
+    )
+    created_count = 0
+    for view_id in sales_channel_view_ids:
+        sales_channel_view = views_by_id[view_id]
+        _, created = SalesChannelViewAssign.objects.get_or_create(
+            product=product,
+            sales_channel_view=sales_channel_view,
+            defaults={
+                "multi_tenant_company": multi_tenant_company,
+                "sales_channel": sales_channel_view.sales_channel,
+            },
+        )
+        if created:
+            created_count += 1
+
+    return created_count
+
+
 def run_upsert_product_updates(
     *,
+    import_process: McpToolRun,
     multi_tenant_company: MultiTenantCompany,
     product: Product,
     active: bool | None,
@@ -726,6 +805,7 @@ def run_upsert_product_updates(
     prices: list[ProductPriceUpsertInputPayload] | None,
     properties: list[ProductPropertyValueUpdateInputPayload] | None,
     images: list[ProductImageInputPayload] | None,
+    sales_channel_view_ids: list[int] | None,
 ) -> ProductUpsertPayload:
     applied_updates: ProductUpsertAppliedUpdatesPayload = {}
 
@@ -751,7 +831,7 @@ def run_upsert_product_updates(
             applied_updates["properties"] = len(properties)
         if core_product_data:
             run_product_import_update(
-                multi_tenant_company=multi_tenant_company,
+                import_process=import_process,
                 product=product,
                 product_data=core_product_data,
             )
@@ -764,7 +844,7 @@ def run_upsert_product_updates(
             )
             for sales_channel, grouped_payload in translation_groups:
                 run_product_import_update(
-                    multi_tenant_company=multi_tenant_company,
+                    import_process=import_process,
                     product=product,
                     product_data={"translations": grouped_payload},
                     sales_channel=sales_channel,
@@ -784,13 +864,20 @@ def run_upsert_product_updates(
             grouped_images = group_images_by_sales_channel_id(images=images)
             for sales_channel_id, grouped_payload in grouped_images.items():
                 import_instance = run_product_import_update(
-                    multi_tenant_company=multi_tenant_company,
+                    import_process=import_process,
                     product=product,
                     product_data={"images": grouped_payload},
                     sales_channel=sales_channels_by_id.get(sales_channel_id),
                 )
                 updated_images_count += import_instance.images_associations_instances.count()
             applied_updates["images"] = updated_images_count
+
+        if sales_channel_view_ids:
+            applied_updates["website_views_assignments"] = assign_product_to_sales_channel_views(
+                multi_tenant_company=multi_tenant_company,
+                product=product,
+                sales_channel_view_ids=sales_channel_view_ids,
+            )
 
     product.refresh_from_db()
     return build_product_upsert_payload(

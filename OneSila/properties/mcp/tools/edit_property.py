@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from channels.db import database_sync_to_async
 from fastmcp import Context
@@ -12,104 +12,89 @@ from core.models.multi_tenant import MultiTenantCompany
 from imports_exports.factories.properties import ImportPropertyInstance
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
 from llm.mcp.tags import TAG_EDIT, TAG_PROPERTIES, tool_tags
+from llm.models import McpToolRun
 from properties.mcp.helpers import (
     build_property_mutation_payload,
-    build_import_process,
     sanitize_property_translations_input,
     validate_translation_languages,
 )
-from properties.mcp.output_types import EDIT_PROPERTY_OUTPUT_SCHEMA
-from properties.mcp.types import EditPropertyPayload, PropertyTranslationInputPayload
+from properties.mcp.output_types import EDIT_PROPERTIES_OUTPUT_SCHEMA
+from properties.mcp.types import EditPropertiesPayload, EditPropertyInputPayload, PropertyTranslationInputPayload
 from properties.models import Property
 
 
-class EditPropertyMcpTool(BaseMcpTool):
-    name = "edit_property"
-    title = "Edit Property"
+class EditPropertiesMcpTool(BaseMcpTool):
+    name = "edit_properties"
+    title = "Edit Properties"
     tags = tool_tags(TAG_EDIT, TAG_PROPERTIES)
-    output_schema = EDIT_PROPERTY_OUTPUT_SCHEMA
+    output_schema = EDIT_PROPERTIES_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": False,
         "destructiveHint": False,
         "openWorldHint": False,
     }
+    maximum_items = 25
 
     async def execute(
         self,
-        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID. Requires either property_id or internal_name.")] = None,
-        internal_name: Annotated[str | None, Field(description="Exact property internal name. Requires either property_id or internal_name.")] = None,
-        is_public_information: Annotated[
-            bool | None,
-            Field(description="Update whether this property is public information.")
-        ] = None,
-        add_to_filters: Annotated[
-            bool | None,
-            Field(description="Update whether this property should be available in filters.")
-        ] = None,
-        has_image: Annotated[
-            bool | None,
-            Field(description="Update whether this property expects image-backed select values.")
-        ] = None,
-        translations: Annotated[
-            list[PropertyTranslationInputPayload] | str | None,
+        properties: Annotated[
+            list[EditPropertyInputPayload] | EditPropertyInputPayload | str,
             Field(
-                description="Translations as [{language, name}] pairs. Call get_company_details with show_languages=true for valid codes."
-            )
-        ] = None,
+                description=(
+                    "One property update object or an array of property update objects. "
+                    "This tool supports up to 25 properties per call. "
+                    "Use a single object for one property or an array for bulk updates."
+                )
+            ),
+        ] = ...,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
-        Edit an existing company-scoped property by exact property ID or exact internal name.
-        This tool updates only the supported property fields: public-information flag,
-        filter visibility, image support, and translations. Translation entries are upserted,
-        so existing languages are updated and new languages are added through the import flow.
+        Edit one or more existing company-scoped properties.
+
+        Pass `properties` as either a single object or an array of objects. A single object is normalized
+        to a one-item batch, and the response always returns an array in `results`.
+
+        Limits:
+        - up to 25 properties per call
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
-            sanitized_internal_name = self._sanitize_optional_string(value=internal_name)
-            translations_payload = self._sanitize_translations(
-                translations=translations,
-                multi_tenant_company=multi_tenant_company,
+            raw_items = self.normalize_bulk_input(
+                value=properties,
+                field_name="properties",
+                maximum=self.maximum_items,
             )
-            self._validate_update_request(
-                is_public_information=is_public_information,
-                add_to_filters=add_to_filters,
-                has_image=has_image,
-                translations=translations_payload,
-            )
-
+            sanitized_properties = [
+                self._sanitize_property_item(
+                    property_data=item,
+                    multi_tenant_company=multi_tenant_company,
+                )
+                for item in raw_items
+            ]
             await ctx.info(
-                f"Editing property for company_id={multi_tenant_company.id} "
-                f"with property_id={property_id!r}, internal_name={sanitized_internal_name!r}."
+                f"Editing {len(sanitized_properties)} propertie(s) for company_id={multi_tenant_company.id}."
             )
-
-            response_data = await self._edit_property(
+            tool_run = await self.create_mcp_tool_run(
                 multi_tenant_company=multi_tenant_company,
-                property_id=property_id,
-                internal_name=sanitized_internal_name,
-                is_public_information=is_public_information,
-                add_to_filters=add_to_filters,
-                has_image=has_image,
-                translations=translations_payload,
+                payload_content={"properties": sanitized_properties},
+                total_records=len(sanitized_properties),
+                update_only=True,
             )
-
-            await ctx.info(
-                f"Updated property_id={response_data['property_id']} "
-                f"internal_name={response_data['internal_name']!r}."
+            response_data = await self._edit_properties(
+                multi_tenant_company=multi_tenant_company,
+                tool_run_id=tool_run.id,
+                properties=sanitized_properties,
             )
-
             return self.build_result(
-                summary=(
-                    f"Updated property '{response_data['name']}' "
-                    f"({response_data['type_label']})."
-                ),
+                summary=f"Processed {response_data['processed_count']} property update request(s).",
                 structured_content=response_data,
             )
         except McpToolError as error:
             await ctx.warning(str(error))
             raise
         except Exception as error:
-            await ctx.error(f"Edit property failed: {error}")
+            await ctx.error(f"Edit properties failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
 
@@ -129,66 +114,6 @@ class EditPropertyMcpTool(BaseMcpTool):
         except ValueError as error:
             raise McpToolError(str(error)) from error
 
-    def _validate_update_request(
-        self,
-        *,
-        is_public_information: bool | None,
-        add_to_filters: bool | None,
-        has_image: bool | None,
-        translations: list[PropertyTranslationInputPayload] | None,
-    ) -> None:
-        if not any(
-            [
-                is_public_information is not None,
-                add_to_filters is not None,
-                has_image is not None,
-                translations is not None,
-            ]
-        ):
-            raise McpToolError(
-                "Provide at least one editable field: is_public_information, add_to_filters, has_image, or translations."
-            )
-
-    @database_sync_to_async
-    def _edit_property(
-        self,
-        *,
-        multi_tenant_company: MultiTenantCompany,
-        property_id: int | None,
-        internal_name: str | None,
-        is_public_information: bool | None,
-        add_to_filters: bool | None,
-        has_image: bool | None,
-        translations: list[PropertyTranslationInputPayload] | None,
-    ) -> EditPropertyPayload:
-        property_instance = self._get_property_match(
-            multi_tenant_company=multi_tenant_company,
-            property_id=property_id,
-            internal_name=internal_name,
-        )
-        property_data = self._build_property_data(
-            property_instance=property_instance,
-            is_public_information=is_public_information,
-            add_to_filters=add_to_filters,
-            has_image=has_image,
-            translations=translations,
-        )
-
-        try:
-            import_instance = ImportPropertyInstance(
-                property_data,
-                import_process=build_import_process(multi_tenant_company=multi_tenant_company),
-                instance=property_instance,
-            )
-            import_instance.process()
-        except ValueError as error:
-            raise McpToolError(str(error)) from error
-
-        return build_property_mutation_payload(
-            property_instance=property_instance,
-            created=False,
-        )
-
     def _get_property_match(
         self,
         *,
@@ -199,17 +124,14 @@ class EditPropertyMcpTool(BaseMcpTool):
         queryset = Property.objects.filter(multi_tenant_company=multi_tenant_company)
 
         if not any([property_id is not None, internal_name]):
-            raise McpToolError("Provide property_id or internal_name.")
+            raise McpToolError("Each property update must provide property_id or internal_name.")
 
         if property_id is not None:
             queryset = queryset.filter(id=property_id)
         if internal_name:
             queryset = queryset.filter(internal_name__iexact=internal_name)
 
-        property_ids = list(
-            queryset.order_by("id").values_list("id", flat=True).distinct()[:2]
-        )
-
+        property_ids = list(queryset.order_by("id").values_list("id", flat=True).distinct()[:2])
         if not property_ids:
             raise McpToolError("Property not found.")
         if len(property_ids) > 1:
@@ -217,32 +139,131 @@ class EditPropertyMcpTool(BaseMcpTool):
 
         return queryset.get(id=property_ids[0])
 
-    def _build_property_data(
+    def _sanitize_property_item(
         self,
         *,
-        property_instance: Property,
-        is_public_information: bool | None,
-        add_to_filters: bool | None,
-        has_image: bool | None,
-        translations: list[PropertyTranslationInputPayload] | None,
-    ) -> dict:
-        property_data = {
-            "type": property_instance.type,
-            "is_product_type": property_instance.is_product_type,
-        }
+        property_data: dict[str, Any],
+        multi_tenant_company,
+    ) -> EditPropertyInputPayload:
+        sanitized_property_id = self.sanitize_optional_int(
+            value=property_data.get("property_id"),
+            field_name="property_id",
+            minimum=1,
+        )
+        sanitized_internal_name = self._sanitize_optional_string(value=property_data.get("internal_name"))
+        sanitized_is_public_information = self.sanitize_optional_bool(
+            value=property_data.get("is_public_information"),
+            field_name="is_public_information",
+        )
+        sanitized_add_to_filters = self.sanitize_optional_bool(
+            value=property_data.get("add_to_filters"),
+            field_name="add_to_filters",
+        )
+        sanitized_has_image = self.sanitize_optional_bool(
+            value=property_data.get("has_image"),
+            field_name="has_image",
+        )
+        sanitized_translations = self._sanitize_translations(
+            translations=property_data.get("translations"),
+            multi_tenant_company=multi_tenant_company,
+        )
 
-        if property_instance.internal_name:
-            property_data["internal_name"] = property_instance.internal_name
-        else:
-            property_data["name"] = property_instance.name
+        if sanitized_property_id is None and not sanitized_internal_name:
+            raise McpToolError("Each property update must provide property_id or internal_name.")
+        if not any(
+            [
+                sanitized_is_public_information is not None,
+                sanitized_add_to_filters is not None,
+                sanitized_has_image is not None,
+                sanitized_translations is not None,
+            ]
+        ):
+            raise McpToolError(
+                "Each property update must include at least one editable field: is_public_information, add_to_filters, has_image, or translations."
+            )
 
-        if is_public_information is not None:
-            property_data["is_public_information"] = is_public_information
-        if add_to_filters is not None:
-            property_data["add_to_filters"] = add_to_filters
-        if has_image is not None:
-            property_data["has_image"] = has_image
-        if translations is not None:
-            property_data["translations"] = translations
+        sanitized_property: EditPropertyInputPayload = {}
+        if sanitized_property_id is not None:
+            sanitized_property["property_id"] = sanitized_property_id
+        if sanitized_internal_name:
+            sanitized_property["internal_name"] = sanitized_internal_name
+        if sanitized_is_public_information is not None:
+            sanitized_property["is_public_information"] = sanitized_is_public_information
+        if sanitized_add_to_filters is not None:
+            sanitized_property["add_to_filters"] = sanitized_add_to_filters
+        if sanitized_has_image is not None:
+            sanitized_property["has_image"] = sanitized_has_image
+        if sanitized_translations is not None:
+            sanitized_property["translations"] = sanitized_translations
 
-        return property_data
+        return sanitized_property
+
+    @database_sync_to_async
+    def _edit_properties(
+        self,
+        *,
+        multi_tenant_company: MultiTenantCompany,
+        tool_run_id: int,
+        properties: list[EditPropertyInputPayload],
+    ) -> EditPropertiesPayload:
+        tool_run = McpToolRun.objects.get(id=tool_run_id)
+        self.start_mcp_tool_run(tool_run=tool_run)
+        results = []
+
+        try:
+            for index, property_data in enumerate(properties, start=1):
+                property_instance = self._get_property_match(
+                    multi_tenant_company=multi_tenant_company,
+                    property_id=property_data.get("property_id"),
+                    internal_name=property_data.get("internal_name"),
+                )
+                import_payload = {
+                    "type": property_instance.type,
+                    "is_product_type": property_instance.is_product_type,
+                }
+                if property_instance.internal_name:
+                    import_payload["internal_name"] = property_instance.internal_name
+                else:
+                    import_payload["name"] = property_instance.name
+                if property_data.get("is_public_information") is not None:
+                    import_payload["is_public_information"] = property_data["is_public_information"]
+                if property_data.get("add_to_filters") is not None:
+                    import_payload["add_to_filters"] = property_data["add_to_filters"]
+                if property_data.get("has_image") is not None:
+                    import_payload["has_image"] = property_data["has_image"]
+                if property_data.get("translations") is not None:
+                    import_payload["translations"] = property_data["translations"]
+
+                import_instance = ImportPropertyInstance(
+                    import_payload,
+                    import_process=tool_run,
+                    instance=property_instance,
+                )
+                import_instance.process()
+                results.append(
+                    build_property_mutation_payload(
+                        property_instance=property_instance,
+                        created=False,
+                    )
+                )
+                self.update_mcp_tool_run_progress(
+                    tool_run=tool_run,
+                    processed_records=index,
+                    total_records=len(properties),
+                )
+        except Exception as error:
+            self.fail_mcp_tool_run(tool_run=tool_run, error=error)
+            raise
+
+        response = self.build_bulk_response(
+            requested_count=len(properties),
+            processed_count=len(results),
+            updated_count=len(results),
+            results=results,
+        )
+        self.complete_mcp_tool_run(
+            tool_run=tool_run,
+            response_content=response,
+            processed_records=len(results),
+        )
+        return response

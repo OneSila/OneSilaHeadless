@@ -6,6 +6,7 @@ from imports_exports.factories.exports.helpers import serialize_sales_channel_pa
 from products.mcp.types import (
     GetProductTypesPayload,
     SearchSalesChannelsPayload,
+    SalesChannelViewSummaryPayload,
     GetVatRatesPayload,
     SalesChannelReferencePayload,
     VatRateOptionPayload,
@@ -59,9 +60,22 @@ def serialize_vat_rate_option(*, vat_rate: VatRate) -> VatRateOptionPayload:
     }
 
 
+def serialize_sales_channel_view_option(*, view) -> SalesChannelViewSummaryPayload:
+    real_view = view.get_real_instance()
+    return {
+        "id": view.id,
+        "name": view.name,
+        "is_default": getattr(real_view, "is_default", None),
+    }
+
+
 def serialize_sales_channel_option(*, sales_channel: SalesChannel) -> SalesChannelReferencePayload:
     payload = serialize_sales_channel_payload(sales_channel=sales_channel)
     payload["active"] = bool(sales_channel.active)
+    payload["views"] = [
+        serialize_sales_channel_view_option(view=view)
+        for view in sorted(sales_channel.saleschannelview_set.all(), key=lambda item: item.id)
+    ]
     return payload
 
 
@@ -76,7 +90,7 @@ def search_sales_channels_payload(
 ) -> SearchSalesChannelsPayload:
     queryset = SalesChannel.objects.filter(
         multi_tenant_company=multi_tenant_company,
-    )
+    ).prefetch_related("saleschannelview_set")
     if search:
         queryset = queryset.filter(hostname__icontains=search)
     if active is not None:

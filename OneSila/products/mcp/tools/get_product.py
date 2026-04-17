@@ -41,6 +41,16 @@ class GetProductMcpTool(BaseMcpTool):
                 )
             ),
         ] = False,
+        show_website_views_assign: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include website-view assignments for this product. "
+                    "Use this when checking which storefront views the product is assigned to "
+                    "and which remote product URLs already exist there."
+                )
+            ),
+        ] = False,
         show_property_requirements: Annotated[
             bool,
             Field(
@@ -92,6 +102,7 @@ class GetProductMcpTool(BaseMcpTool):
 
         Use the show_* flags carefully:
         - show_inspector: when checking data quality, missing information, or why the product is not ready.
+        - show_website_views_assign: when checking which website/storefront views the product is assigned to and their remote URLs.
         - show_property_requirements: when the inspector is not enough and you need the full required or optional property map.
         - show_translations: when reviewing, creating, or updating translated product content.
         - show_vat_rate_data: when the VAT configuration details are needed, not just the top-level rate.
@@ -112,6 +123,10 @@ class GetProductMcpTool(BaseMcpTool):
                 multi_tenant_company=multi_tenant_company,
                 sku=sku,
                 show_inspector=self.sanitize_optional_bool(value=show_inspector, field_name="show_inspector") or False,
+                show_website_views_assign=self.sanitize_optional_bool(
+                    value=show_website_views_assign,
+                    field_name="show_website_views_assign",
+                ) or False,
                 show_property_requirements=self.sanitize_optional_bool(
                     value=show_property_requirements,
                     field_name="show_property_requirements",
@@ -163,6 +178,7 @@ class GetProductMcpTool(BaseMcpTool):
         multi_tenant_company: MultiTenantCompany,
         sku: str,
         show_inspector: bool,
+        show_website_views_assign: bool,
         show_property_requirements: bool,
         show_translations: bool,
         show_vat_rate_data: bool,
@@ -181,6 +197,7 @@ class GetProductMcpTool(BaseMcpTool):
         return serialize_product_detail(
             product=product,
             show_inspector=show_inspector,
+            show_website_views_assign=show_website_views_assign,
             show_property_requirements=show_property_requirements,
             show_translations=show_translations,
             show_vat_rate_data=show_vat_rate_data,

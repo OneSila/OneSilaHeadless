@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from channels.db import database_sync_to_async
 from fastmcp import Context
@@ -10,13 +10,15 @@ from pydantic import Field
 
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
 from llm.mcp.tags import TAG_CONTENT, TAG_EDIT, TAG_IMAGES, TAG_PRICES, TAG_PRODUCTS, TAG_PROPERTIES, tool_tags
-from products.mcp.output_types import PRODUCT_UPSERT_OUTPUT_SCHEMA
+from llm.models import McpToolRun
+from products.mcp.output_types import UPSERT_PRODUCTS_OUTPUT_SCHEMA
 from products.mcp.types import (
     ProductImageInputPayload,
     ProductPriceUpsertInputPayload,
     ProductPropertyValueUpdateInputPayload,
     ProductTranslationUpsertInputPayload,
-    ProductUpsertPayload,
+    UpsertProductInputPayload,
+    UpsertProductsPayload,
 )
 from products.mcp.update_helpers import (
     get_product_match,
@@ -24,165 +26,88 @@ from products.mcp.update_helpers import (
     sanitize_product_images_input,
     sanitize_product_prices_input,
     sanitize_product_property_updates_input,
+    sanitize_sales_channel_view_ids_input,
     sanitize_product_translation_updates_input,
 )
 
 
-class UpsertProductMcpTool(BaseMcpTool):
-    name = "upsert_product"
-    title = "Upsert Product"
+class UpsertProductsMcpTool(BaseMcpTool):
+    name = "upsert_products"
+    title = "Upsert Products"
     tags = tool_tags(TAG_EDIT, TAG_PRODUCTS, TAG_CONTENT, TAG_PRICES, TAG_PROPERTIES, TAG_IMAGES)
-    output_schema = PRODUCT_UPSERT_OUTPUT_SCHEMA
+    output_schema = UPSERT_PRODUCTS_OUTPUT_SCHEMA
     annotations = {
         "idempotentHint": False,
         "destructiveHint": False,
         "openWorldHint": False,
     }
+    maximum_items = 10
 
     async def execute(
         self,
-        product_id: Annotated[int | None, Field(ge=1, description="Exact product database ID. Requires either product_id or sku.")] = None,
-        sku: Annotated[str | None, Field(description="Exact product SKU. Requires either product_id or sku.")] = None,
-        active: Annotated[
-            bool | None,
-            Field(description="Set product active status. true activates, false deactivates. Omit to leave unchanged."),
-        ] = None,
-        ean_code: Annotated[
-            str | None,
+        products: Annotated[
+            list[UpsertProductInputPayload] | UpsertProductInputPayload | str,
             Field(
                 description=(
-                    "Optional EAN code to assign to the product. Only include this when the user explicitly wants to "
-                    "set or change the product EAN code. Omit to leave the current EAN unchanged."
+                    "One product update object or an array of product update objects. "
+                    "This tool supports updating up to 10 products per call. "
+                    "Use a single object for one product or an array for bulk updates. "
+                    "Each item can update active status, EAN, translations, prices, properties, images, "
+                    "and sales_channel_view_ids."
                 )
             ),
-        ] = None,
-        translations: Annotated[
-            list[ProductTranslationUpsertInputPayload] | str | None,
-            Field(
-                description=(
-                    "Optional list of translation updates. Use this for content changes such as name, subtitle, "
-                    "short_description, description, and bullet_points. Each entry must include language and may "
-                    "optionally include sales_channel_id for a channel-specific override. Omit to leave translations unchanged. "
-                    "A JSON-stringified list is also accepted."
-                )
-            ),
-        ] = None,
-        prices: Annotated[
-            list[ProductPriceUpsertInputPayload] | str | None,
-            Field(
-                description=(
-                    "Optional list of price updates. Each entry must include currency and price, and may include rrp. "
-                    "Use get_company_details with show_currencies=true when you need the allowed company currencies. "
-                    "Omit to leave prices unchanged. A JSON-stringified list is also accepted."
-                )
-            ),
-        ] = None,
-        properties: Annotated[
-            list[ProductPropertyValueUpdateInputPayload] | str | None,
-            Field(
-                description=(
-                    "Optional list of property value updates. Each entry must include property_id or "
-                    "property_internal_name, plus value. For SELECT and MULTISELECT, prefer select-value IDs with "
-                    "value_is_id=true. Omit to leave properties unchanged. A JSON-stringified list is also accepted."
-                )
-            ),
-        ] = None,
-        images: Annotated[
-            list[ProductImageInputPayload] | str | None,
-            Field(
-                description=(
-                    "Optional list of image assignments to add. Each image must include image_url and may include "
-                    "title, description, type, is_main_image, sort_order, and sales_channel_id. "
-                    "Use search_sales_channels first when you need to map a website or marketplace to sales_channel_id. "
-                    "Omit to leave images unchanged. A JSON-stringified list is also accepted."
-                )
-            ),
-        ] = None,
+        ] = ...,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
-        Create one or more updates on an existing product in a single call.
+        Update one or more existing products in a single call.
 
-        This is the main product write tool. Use it when a product needs one or more updates together,
-        such as active status, EAN code, translations, prices, properties, or images.
+        Pass `products` as either a single object or an array of objects. A single object is normalized
+        to a one-item batch, and the response always returns an array in `results`.
 
-        Use this tool to reduce repeated write calls:
-        - set active=true or active=false to activate or deactivate the product
-        - set ean_code to assign or change the product EAN code
-        - use translations to create or update product content
-        - use prices to create or update one or more currency prices
-        - use properties to create or update assigned property values
-        - use images to add one or more product images
+        Limits:
+        - up to 10 products per call
 
-        Rules:
-        - Requires either product_id or sku.
-        - Include only the sections you want to change.
-        - At least one update section must be provided.
-        - The call is atomic: if one part is invalid, the whole update fails.
-        - For translation work, use get_product(show_translations=true) first if you need the current translations.
-        - For content writing or translation, use get_product(show_brand_voice=true) if brand voice guidance may matter.
-        - For allowed company languages, currencies, or product types, use get_company_details first.
-        - For product data quality or missing-information checks, use get_product(show_inspector=true).
-
-        Do not send unchanged sections just because they exist. Keep the request limited to the fields
-        the user actually wants to modify.
+        Use this when one or more products need coordinated updates such as active status, EAN code,
+        translations, prices, properties, images, or website/storefront assignments.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
-            sanitized_sku = self._sanitize_optional_string(value=sku)
-            sanitized_active = self.sanitize_optional_bool(value=active, field_name="active")
-            sanitized_ean_code = self._sanitize_optional_string(value=ean_code)
-            sanitized_translations = self._sanitize_translations(
-                translations=translations,
-                multi_tenant_company=multi_tenant_company,
+            raw_items = self.normalize_bulk_input(
+                value=products,
+                field_name="products",
+                maximum=self.maximum_items,
             )
-            sanitized_prices = self._sanitize_prices(prices=prices)
-            sanitized_properties = self._sanitize_properties(
-                properties=properties,
-                multi_tenant_company=multi_tenant_company,
-            )
-            sanitized_images = self._sanitize_images(images=images)
-            self._validate_has_updates(
-                active=sanitized_active,
-                ean_code=sanitized_ean_code,
-                translations=sanitized_translations,
-                prices=sanitized_prices,
-                properties=sanitized_properties,
-                images=sanitized_images,
-            )
-            requested_sections = {
-                "active": sanitized_active,
-                "ean_code": sanitized_ean_code,
-                "translations": sanitized_translations,
-                "prices": sanitized_prices,
-                "properties": sanitized_properties,
-                "images": sanitized_images,
-            }
+            sanitized_products = [
+                self._sanitize_product_item(
+                    product=item,
+                    multi_tenant_company=multi_tenant_company,
+                )
+                for item in raw_items
+            ]
             await ctx.info(
-                f"Upserting product for company_id={multi_tenant_company.id} with "
-                f"product_id={product_id!r}, sku={sanitized_sku!r}, "
-                f"sections={[key for key, value in requested_sections.items() if value is not None]}."
+                f"Upserting {len(sanitized_products)} product(s) for company_id={multi_tenant_company.id}."
             )
-            response_data = await self._upsert_product(
+            tool_run = await self.create_mcp_tool_run(
                 multi_tenant_company=multi_tenant_company,
-                product_id=product_id,
-                sku=sanitized_sku,
-                active=sanitized_active,
-                ean_code=sanitized_ean_code,
-                translations=sanitized_translations,
-                prices=sanitized_prices,
-                properties=sanitized_properties,
-                images=sanitized_images,
+                payload_content={"products": sanitized_products},
+                total_records=len(sanitized_products),
+                update_only=True,
+            )
+            response_data = await self._upsert_products(
+                multi_tenant_company=multi_tenant_company,
+                tool_run_id=tool_run.id,
+                products=sanitized_products,
             )
             return self.build_result(
-                summary=f"Updated product '{response_data['name']}' ({response_data['sku']}).",
+                summary=f"Processed {response_data['processed_count']} product update request(s).",
                 structured_content=response_data,
             )
         except McpToolError as error:
             await ctx.warning(str(error))
             raise
         except Exception as error:
-            await ctx.error(f"Upsert product failed: {error}")
+            await ctx.error(f"Upsert products failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
 
@@ -238,6 +163,18 @@ class UpsertProductMcpTool(BaseMcpTool):
         except ValueError as error:
             raise McpToolError(str(error)) from error
 
+    def _sanitize_sales_channel_view_ids(
+        self,
+        *,
+        sales_channel_view_ids,
+    ) -> list[int] | None:
+        try:
+            return sanitize_sales_channel_view_ids_input(
+                sales_channel_view_ids=sales_channel_view_ids,
+            )
+        except ValueError as error:
+            raise McpToolError(str(error)) from error
+
     def _validate_has_updates(
         self,
         *,
@@ -247,6 +184,7 @@ class UpsertProductMcpTool(BaseMcpTool):
         prices: list[ProductPriceUpsertInputPayload] | None,
         properties: list[ProductPropertyValueUpdateInputPayload] | None,
         images: list[ProductImageInputPayload] | None,
+        sales_channel_view_ids: list[int] | None,
     ) -> None:
         if not any(
             [
@@ -256,41 +194,130 @@ class UpsertProductMcpTool(BaseMcpTool):
                 prices is not None,
                 properties is not None,
                 images is not None,
+                sales_channel_view_ids is not None,
             ]
         ):
             raise McpToolError(
-                "Provide at least one update section: active, ean_code, translations, prices, properties, or images."
+                "Each product update must include at least one section: active, ean_code, translations, prices, properties, images, or sales_channel_view_ids."
             )
 
+    def _sanitize_product_item(
+        self,
+        *,
+        product: dict[str, Any],
+        multi_tenant_company,
+    ) -> UpsertProductInputPayload:
+        sanitized_product: UpsertProductInputPayload = {}
+
+        sanitized_product_id = self.sanitize_optional_int(
+            value=product.get("product_id"),
+            field_name="product_id",
+            minimum=1,
+        )
+        sanitized_sku = self._sanitize_optional_string(value=product.get("sku"))
+        if sanitized_product_id is None and not sanitized_sku:
+            raise McpToolError("Each product update must provide product_id or sku.")
+
+        sanitized_active = self.sanitize_optional_bool(value=product.get("active"), field_name="active")
+        sanitized_ean_code = self._sanitize_optional_string(value=product.get("ean_code"))
+        sanitized_translations = self._sanitize_translations(
+            translations=product.get("translations"),
+            multi_tenant_company=multi_tenant_company,
+        )
+        sanitized_prices = self._sanitize_prices(prices=product.get("prices"))
+        sanitized_properties = self._sanitize_properties(
+            properties=product.get("properties"),
+            multi_tenant_company=multi_tenant_company,
+        )
+        sanitized_images = self._sanitize_images(images=product.get("images"))
+        sanitized_sales_channel_view_ids = self._sanitize_sales_channel_view_ids(
+            sales_channel_view_ids=product.get("sales_channel_view_ids"),
+        )
+
+        self._validate_has_updates(
+            active=sanitized_active,
+            ean_code=sanitized_ean_code,
+            translations=sanitized_translations,
+            prices=sanitized_prices,
+            properties=sanitized_properties,
+            images=sanitized_images,
+            sales_channel_view_ids=sanitized_sales_channel_view_ids,
+        )
+
+        if sanitized_product_id is not None:
+            sanitized_product["product_id"] = sanitized_product_id
+        if sanitized_sku:
+            sanitized_product["sku"] = sanitized_sku
+        if sanitized_active is not None:
+            sanitized_product["active"] = sanitized_active
+        if sanitized_ean_code:
+            sanitized_product["ean_code"] = sanitized_ean_code
+        if sanitized_translations is not None:
+            sanitized_product["translations"] = sanitized_translations
+        if sanitized_prices is not None:
+            sanitized_product["prices"] = sanitized_prices
+        if sanitized_properties is not None:
+            sanitized_product["properties"] = sanitized_properties
+        if sanitized_images is not None:
+            sanitized_product["images"] = sanitized_images
+        if sanitized_sales_channel_view_ids is not None:
+            sanitized_product["sales_channel_view_ids"] = sanitized_sales_channel_view_ids
+
+        return sanitized_product
+
     @database_sync_to_async
-    def _upsert_product(
+    def _upsert_products(
         self,
         *,
         multi_tenant_company,
-        product_id: int | None,
-        sku: str | None,
-        active: bool | None,
-        ean_code: str | None,
-        translations: list[ProductTranslationUpsertInputPayload] | None,
-        prices: list[ProductPriceUpsertInputPayload] | None,
-        properties: list[ProductPropertyValueUpdateInputPayload] | None,
-        images: list[ProductImageInputPayload] | None,
-    ) -> ProductUpsertPayload:
+        tool_run_id: int,
+        products: list[UpsertProductInputPayload],
+    ) -> UpsertProductsPayload:
+        tool_run = McpToolRun.objects.get(id=tool_run_id)
+        self.start_mcp_tool_run(tool_run=tool_run)
+        results = []
+        assigned_view_ids: set[int] = set()
+
         try:
-            product = get_product_match(
-                multi_tenant_company=multi_tenant_company,
-                product_id=product_id,
-                sku=sku,
-            )
-            return run_upsert_product_updates(
-                multi_tenant_company=multi_tenant_company,
-                product=product,
-                active=active,
-                ean_code=ean_code,
-                translations=translations,
-                prices=prices,
-                properties=properties,
-                images=images,
-            )
-        except ValueError as error:
-            raise McpToolError(str(error)) from error
+            for index, product in enumerate(products, start=1):
+                product_instance = get_product_match(
+                    multi_tenant_company=multi_tenant_company,
+                    product_id=product.get("product_id"),
+                    sku=product.get("sku"),
+                )
+                result = run_upsert_product_updates(
+                    import_process=tool_run,
+                    multi_tenant_company=multi_tenant_company,
+                    product=product_instance,
+                    active=product.get("active"),
+                    ean_code=product.get("ean_code"),
+                    translations=product.get("translations"),
+                    prices=product.get("prices"),
+                    properties=product.get("properties"),
+                    images=product.get("images"),
+                    sales_channel_view_ids=product.get("sales_channel_view_ids"),
+                )
+                results.append(result)
+                assigned_view_ids.update(product.get("sales_channel_view_ids", []))
+                self.update_mcp_tool_run_progress(
+                    tool_run=tool_run,
+                    processed_records=index,
+                    total_records=len(products),
+                )
+        except Exception as error:
+            self.fail_mcp_tool_run(tool_run=tool_run, error=error)
+            raise
+
+        response = self.build_bulk_response(
+            requested_count=len(products),
+            processed_count=len(results),
+            updated_count=len(results),
+            results=results,
+        )
+        self.complete_mcp_tool_run(
+            tool_run=tool_run,
+            response_content=response,
+            processed_records=len(results),
+            assigned_view_ids=sorted(assigned_view_ids),
+        )
+        return response

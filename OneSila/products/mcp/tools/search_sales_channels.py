@@ -40,6 +40,9 @@ class SearchSalesChannelsMcpTool(BaseMcpTool):
         Search or list the sales channels configured for the authenticated company.
         Use this when you need to resolve a hostname or marketplace name to the
         exact sales_channel_id before calling channel-specific product tools.
+        Each result also includes channel views. Use sales_channel_view_id when assigning
+        a product to a storefront or website view. Use sales_channel_id for channel-specific
+        content, images, prices, or other sales-channel-scoped product data.
         When called without filters, it returns the company sales channels as a paginated list.
         """
         try:

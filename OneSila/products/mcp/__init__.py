@@ -1,11 +1,11 @@
 from products.mcp.resources import register_product_mcp_resources
 from products.mcp.tools import (
-    CreateProductMcpTool,
+    CreateProductsMcpTool,
     GetCompanyDetailsMcpTool,
     GetProductMcpTool,
     SearchSalesChannelsMcpTool,
     SearchProductsMcpTool,
-    UpsertProductMcpTool,
+    UpsertProductsMcpTool,
 )
 
 
@@ -15,17 +15,17 @@ def register_product_mcp_tools(*, mcp):
     SearchProductsMcpTool(mcp=mcp)
     GetProductMcpTool(mcp=mcp)
     SearchSalesChannelsMcpTool(mcp=mcp)
-    CreateProductMcpTool(mcp=mcp)
-    UpsertProductMcpTool(mcp=mcp)
+    CreateProductsMcpTool(mcp=mcp)
+    UpsertProductsMcpTool(mcp=mcp)
 
 
 __all__ = [
-    "CreateProductMcpTool",
+    "CreateProductsMcpTool",
     "GetCompanyDetailsMcpTool",
     "GetProductMcpTool",
     "SearchSalesChannelsMcpTool",
     "SearchProductsMcpTool",
-    "UpsertProductMcpTool",
+    "UpsertProductsMcpTool",
     "register_product_mcp_resources",
     "register_product_mcp_tools",
 ]

@@ -52,6 +52,39 @@ class PropertySelectValueTranslationInputPayload(TypedDict):
     value: str
 
 
+class CreatePropertyInputPayload(TypedDict, total=False):
+    type: PropertyTypeValue
+    name: str
+    internal_name: str
+    is_public_information: bool
+    add_to_filters: bool
+    has_image: bool
+    is_product_type: bool
+    translations: list["PropertyTranslationInputPayload"]
+
+
+class EditPropertyInputPayload(TypedDict, total=False):
+    property_id: int
+    internal_name: str
+    is_public_information: bool
+    add_to_filters: bool
+    has_image: bool
+    translations: list["PropertyTranslationInputPayload"]
+
+
+class CreatePropertySelectValueInputPayload(TypedDict, total=False):
+    value: str
+    property_id: int
+    property_internal_name: str
+    property_name: str
+    translations: list["PropertySelectValueTranslationInputPayload"]
+
+
+class EditPropertySelectValueInputPayload(TypedDict):
+    select_value_id: int
+    translations: list["PropertySelectValueTranslationInputPayload"]
+
+
 class PropertyValuePayload(TypedDict):
     id: int
     value: str
@@ -162,3 +195,33 @@ class EditPropertySelectValuePayload(TypedDict):
     value: str
     full_value_name: str
     message: str
+
+
+class CreatePropertiesPayload(TypedDict):
+    requested_count: int
+    processed_count: int
+    created_count: int
+    updated_existing_count: int
+    results: list[CreatePropertyPayload]
+
+
+class EditPropertiesPayload(TypedDict):
+    requested_count: int
+    processed_count: int
+    updated_count: int
+    results: list[EditPropertyPayload]
+
+
+class CreatePropertySelectValuesPayload(TypedDict):
+    requested_count: int
+    processed_count: int
+    created_count: int
+    updated_existing_count: int
+    results: list[CreatePropertySelectValuePayload]
+
+
+class EditPropertySelectValuesPayload(TypedDict):
+    requested_count: int
+    processed_count: int
+    updated_count: int
+    results: list[EditPropertySelectValuePayload]

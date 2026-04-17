@@ -32,6 +32,7 @@ from products.mcp.types import (
     ProductSearchSummaryPayload,
     ProductTranslationPayload,
     ProductVatRatePayload,
+    ProductWebsiteViewAssignPayload,
     SalesChannelReferencePayload,
 )
 from products.models import Product, ProductTranslation
@@ -39,6 +40,7 @@ from products_inspector.models import InspectorBlock
 from products_inspector.constants import GREEN, ORANGE, RED
 from properties.mcp.helpers import serialize_property_reference
 from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem, ProductProperty
+from sales_channels.models import SalesChannelViewAssign
 from sales_prices.models import SalesPrice
 
 
@@ -218,6 +220,13 @@ def get_product_detail_queryset(*, multi_tenant_company: MultiTenantCompany) -> 
         .order_by("language", "sales_channel_id", "id")
     )
     inspector_block_queryset = InspectorBlock.objects.order_by("error_code", "id")
+    website_view_assign_queryset = (
+        SalesChannelViewAssign.objects.select_related(
+            "sales_channel_view",
+            "sales_channel",
+            "remote_product",
+        ).order_by("sales_channel_view__name", "id")
+    )
 
     return get_product_summary_queryset(
         multi_tenant_company=multi_tenant_company,
@@ -226,6 +235,7 @@ def get_product_detail_queryset(*, multi_tenant_company: MultiTenantCompany) -> 
         Prefetch("salesprice_set", queryset=sales_price_queryset),
         Prefetch("translations", queryset=translation_queryset),
         Prefetch("inspector__blocks", queryset=inspector_block_queryset),
+        Prefetch("saleschannelviewassign_set", queryset=website_view_assign_queryset),
     )
 
 
@@ -684,10 +694,22 @@ def serialize_product_brand_voice(*, product: Product) -> ProductBrandVoicePaylo
     return payload
 
 
+def serialize_product_website_views_assign(*, product: Product) -> list[ProductWebsiteViewAssignPayload]:
+    return [
+        {
+            "id": assignment.id,
+            "view_name": assignment.sales_channel_view.name,
+            "remote_url": assignment.remote_url,
+        }
+        for assignment in product.saleschannelviewassign_set.all()
+    ]
+
+
 def serialize_product_detail(
     *,
     product: Product,
     show_inspector: bool,
+    show_website_views_assign: bool,
     show_property_requirements: bool,
     show_translations: bool,
     show_vat_rate_data: bool,
@@ -705,6 +727,8 @@ def serialize_product_detail(
     if show_inspector:
         inspector_data = serialize_product_inspector(product=product)
         payload["inspector"] = inspector_data
+    if show_website_views_assign:
+        payload["website_views_assign"] = serialize_product_website_views_assign(product=product)
     if show_vat_rate_data:
         payload["vat_rate_data"] = serialize_vat_rate(product=product)
     if show_translations:

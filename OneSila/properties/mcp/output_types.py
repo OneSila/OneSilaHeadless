@@ -237,6 +237,27 @@ CREATE_PROPERTY_OUTPUT_SCHEMA = {
     "required": ["created", "property_id", "internal_name", "name", "type", "type_label", "message"],
 }
 
+CREATE_PROPERTIES_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requested_count": {"type": "integer"},
+        "processed_count": {"type": "integer"},
+        "created_count": {"type": "integer"},
+        "updated_existing_count": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": CREATE_PROPERTY_OUTPUT_SCHEMA,
+        },
+    },
+    "required": [
+        "requested_count",
+        "processed_count",
+        "created_count",
+        "updated_existing_count",
+        "results",
+    ],
+}
+
 EDIT_PROPERTY_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -252,6 +273,20 @@ EDIT_PROPERTY_OUTPUT_SCHEMA = {
         "message": {"type": "string"},
     },
     "required": ["updated", "property_id", "internal_name", "name", "type", "type_label", "message"],
+}
+
+EDIT_PROPERTIES_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requested_count": {"type": "integer"},
+        "processed_count": {"type": "integer"},
+        "updated_count": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": EDIT_PROPERTY_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["requested_count", "processed_count", "updated_count", "results"],
 }
 
 GET_COMPANY_LANGUAGES_OUTPUT_SCHEMA = {
@@ -279,6 +314,27 @@ CREATE_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA = {
     "required": ["created", "select_value_id", "property_id", "value", "full_value_name", "message"],
 }
 
+CREATE_PROPERTY_SELECT_VALUES_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requested_count": {"type": "integer"},
+        "processed_count": {"type": "integer"},
+        "created_count": {"type": "integer"},
+        "updated_existing_count": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": CREATE_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA,
+        },
+    },
+    "required": [
+        "requested_count",
+        "processed_count",
+        "created_count",
+        "updated_existing_count",
+        "results",
+    ],
+}
+
 EDIT_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -290,4 +346,18 @@ EDIT_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA = {
         "message": {"type": "string"},
     },
     "required": ["updated", "select_value_id", "property_id", "value", "full_value_name", "message"],
+}
+
+EDIT_PROPERTY_SELECT_VALUES_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requested_count": {"type": "integer"},
+        "processed_count": {"type": "integer"},
+        "updated_count": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": EDIT_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["requested_count", "processed_count", "updated_count", "results"],
 }

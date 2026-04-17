@@ -1,8 +1,8 @@
 from properties.mcp.tools import (
-    CreatePropertyMcpTool,
-    CreatePropertySelectValueMcpTool,
-    EditPropertyMcpTool,
-    EditPropertySelectValueMcpTool,
+    CreatePropertiesMcpTool,
+    CreatePropertySelectValuesMcpTool,
+    EditPropertiesMcpTool,
+    EditPropertySelectValuesMcpTool,
     GetPropertyMcpTool,
     GetPropertySelectValueMcpTool,
     SearchPropertiesMcpTool,
@@ -15,17 +15,17 @@ def register_property_mcp_tools(*, mcp):
     GetPropertyMcpTool(mcp=mcp)
     SearchPropertySelectValuesMcpTool(mcp=mcp)
     GetPropertySelectValueMcpTool(mcp=mcp)
-    CreatePropertyMcpTool(mcp=mcp)
-    EditPropertyMcpTool(mcp=mcp)
-    CreatePropertySelectValueMcpTool(mcp=mcp)
-    EditPropertySelectValueMcpTool(mcp=mcp)
+    CreatePropertiesMcpTool(mcp=mcp)
+    EditPropertiesMcpTool(mcp=mcp)
+    CreatePropertySelectValuesMcpTool(mcp=mcp)
+    EditPropertySelectValuesMcpTool(mcp=mcp)
 
 
 __all__ = [
-    "CreatePropertyMcpTool",
-    "CreatePropertySelectValueMcpTool",
-    "EditPropertyMcpTool",
-    "EditPropertySelectValueMcpTool",
+    "CreatePropertiesMcpTool",
+    "CreatePropertySelectValuesMcpTool",
+    "EditPropertiesMcpTool",
+    "EditPropertySelectValuesMcpTool",
     "GetPropertyMcpTool",
     "GetPropertySelectValueMcpTool",
     "SearchPropertiesMcpTool",

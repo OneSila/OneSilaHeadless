@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, patch
 
 from core.tests import TestCase
 from llm.mcp.runtime import AccessToken
-from properties.mcp.tools.create_property import CreatePropertyMcpTool
-from properties.mcp.tools.create_property_select_value import CreatePropertySelectValueMcpTool
-from properties.mcp.tools.edit_property import EditPropertyMcpTool
-from properties.mcp.tools.edit_property_select_value import EditPropertySelectValueMcpTool
+from properties.mcp.tools.create_property import CreatePropertiesMcpTool
+from properties.mcp.tools.create_property_select_value import CreatePropertySelectValuesMcpTool
+from properties.mcp.tools.edit_property import EditPropertiesMcpTool
+from properties.mcp.tools.edit_property_select_value import EditPropertySelectValuesMcpTool
 from properties.mcp.tools.get_property import GetPropertyMcpTool
 from properties.mcp.tools.get_property_select_value import GetPropertySelectValueMcpTool
 from properties.mcp.tools.search_properties import SearchPropertiesMcpTool
@@ -236,22 +236,29 @@ class PropertyMcpToolAsyncTestCase(TestCase):
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = CreatePropertyMcpTool(mcp=DummyMcp())
+        tool = CreatePropertiesMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
-            type=Property.TYPES.TEXT,
-            internal_name="material",
-            name="Material",
-            translations='[{"language":"fr","name":"Materiau"}]',
+            properties={
+                "type": Property.TYPES.TEXT,
+                "internal_name": "material",
+                "name": "Material",
+                "translations": '[{"language":"fr","name":"Materiau"}]',
+            },
             ctx=ctx,
         )
 
         payload = self._get_payload(result=result)
-        created_property = Property.objects.get(id=payload["property_id"])
-        self.assertTrue(payload["created"])
-        self.assertEqual(payload["internal_name"], "material")
+        self.assertEqual(payload["requested_count"], 1)
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["created_count"], 1)
+        self.assertEqual(payload["updated_existing_count"], 0)
+        result_item = payload["results"][0]
+        created_property = Property.objects.get(id=result_item["property_id"])
+        self.assertTrue(result_item["created"])
+        self.assertEqual(result_item["internal_name"], "material")
         self.assertEqual(created_property.name, "Material")
-        self.assertEqual(payload["message"], "Saved successfully. Use get_property for details.")
+        self.assertEqual(result_item["message"], "Saved successfully. Use get_property for details.")
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
@@ -260,21 +267,27 @@ class PropertyMcpToolAsyncTestCase(TestCase):
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = EditPropertyMcpTool(mcp=DummyMcp())
+        tool = EditPropertiesMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
-            property_id=self.property.id,
-            add_to_filters=False,
-            translations='[{"language":"fr","name":"Teinte"}]',
+            properties={
+                "property_id": self.property.id,
+                "add_to_filters": False,
+                "translations": '[{"language":"fr","name":"Teinte"}]',
+            },
             ctx=ctx,
         )
 
         payload = self._get_payload(result=result)
         self.property.refresh_from_db()
-        self.assertTrue(payload["updated"])
-        self.assertEqual(payload["property_id"], self.property.id)
+        self.assertEqual(payload["requested_count"], 1)
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["updated_count"], 1)
+        result_item = payload["results"][0]
+        self.assertTrue(result_item["updated"])
+        self.assertEqual(result_item["property_id"], self.property.id)
         self.assertFalse(self.property.add_to_filters)
-        self.assertEqual(payload["message"], "Saved successfully. Use get_property for details.")
+        self.assertEqual(result_item["message"], "Saved successfully. Use get_property for details.")
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
@@ -283,21 +296,28 @@ class PropertyMcpToolAsyncTestCase(TestCase):
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = CreatePropertySelectValueMcpTool(mcp=DummyMcp())
+        tool = CreatePropertySelectValuesMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
-            value="Blue",
-            property_id=self.property.id,
-            translations='[{"language":"fr","value":"Bleu"}]',
+            select_values={
+                "value": "Blue",
+                "property_id": self.property.id,
+                "translations": '[{"language":"fr","value":"Bleu"}]',
+            },
             ctx=ctx,
         )
 
         payload = self._get_payload(result=result)
-        created_value = PropertySelectValue.objects.get(id=payload["select_value_id"])
-        self.assertTrue(payload["created"])
-        self.assertEqual(payload["property_id"], self.property.id)
+        self.assertEqual(payload["requested_count"], 1)
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["created_count"], 1)
+        self.assertEqual(payload["updated_existing_count"], 0)
+        result_item = payload["results"][0]
+        created_value = PropertySelectValue.objects.get(id=result_item["select_value_id"])
+        self.assertTrue(result_item["created"])
+        self.assertEqual(result_item["property_id"], self.property.id)
         self.assertEqual(created_value.value, "Blue")
-        self.assertEqual(payload["message"], "Saved successfully. Use get_property_select_value for details.")
+        self.assertEqual(result_item["message"], "Saved successfully. Use get_property_select_value for details.")
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
@@ -306,11 +326,13 @@ class PropertyMcpToolAsyncTestCase(TestCase):
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = EditPropertySelectValueMcpTool(mcp=DummyMcp())
+        tool = EditPropertySelectValuesMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
-            select_value_id=self.property_value.id,
-            translations='[{"language":"fr","value":"Rouge vif"}]',
+            select_values={
+                "select_value_id": self.property_value.id,
+                "translations": '[{"language":"fr","value":"Rouge vif"}]',
+            },
             ctx=ctx,
         )
 
@@ -319,8 +341,58 @@ class PropertyMcpToolAsyncTestCase(TestCase):
             propertyselectvalue=self.property_value,
             language="fr",
         )
-        self.assertTrue(payload["updated"])
-        self.assertEqual(payload["select_value_id"], self.property_value.id)
+        self.assertEqual(payload["requested_count"], 1)
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["updated_count"], 1)
+        result_item = payload["results"][0]
+        self.assertTrue(result_item["updated"])
+        self.assertEqual(result_item["select_value_id"], self.property_value.id)
         self.assertEqual(updated_translation.value, "Rouge vif")
-        self.assertEqual(payload["message"], "Saved successfully. Use get_property_select_value for details.")
+        self.assertEqual(result_item["message"], "Saved successfully. Use get_property_select_value for details.")
         ctx.error.assert_not_awaited()
+
+    @patch("llm.mcp.auth.get_access_token")
+    def test_create_properties_rejects_more_than_twenty_five_items(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        ctx = DummyContext()
+        tool = CreatePropertiesMcpTool(mcp=DummyMcp())
+
+        with self.assertRaisesMessage(
+            Exception,
+            "properties supports up to 25 items per call; received 26.",
+        ):
+            async_to_sync(tool.execute)(
+                properties=[
+                    {
+                        "type": Property.TYPES.TEXT,
+                        "internal_name": f"material_{index}",
+                    }
+                    for index in range(26)
+                ],
+                ctx=ctx,
+            )
+
+    @patch("llm.mcp.auth.get_access_token")
+    def test_create_property_select_values_rejects_more_than_fifty_items(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        ctx = DummyContext()
+        tool = CreatePropertySelectValuesMcpTool(mcp=DummyMcp())
+
+        with self.assertRaisesMessage(
+            Exception,
+            "select_values supports up to 50 items per call; received 51.",
+        ):
+            async_to_sync(tool.execute)(
+                select_values=[
+                    {
+                        "value": f"Value {index}",
+                        "property_id": self.property.id,
+                    }
+                    for index in range(51)
+                ],
+                ctx=ctx,
+            )

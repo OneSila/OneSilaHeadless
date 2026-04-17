@@ -52,6 +52,19 @@ class SalesChannelReferencePayload(TypedDict, total=False):
     active: bool
     type: str
     subtype: str | None
+    views: list["SalesChannelViewSummaryPayload"]
+
+
+class SalesChannelViewSummaryPayload(TypedDict):
+    id: int
+    name: str | None
+    is_default: bool | None
+
+
+class ProductWebsiteViewAssignPayload(TypedDict):
+    id: int
+    view_name: str | None
+    remote_url: str | None
 
 
 class ProductImagePayload(TypedDict):
@@ -86,6 +99,7 @@ class ProductPropertyValueUpdateInputPayload(TypedDict, total=False):
 
 class ProductImageInputPayload(TypedDict, total=False):
     image_url: str
+    image_content: str
     title: str
     description: str
     type: str
@@ -108,6 +122,35 @@ class ProductPriceUpsertInputPayload(TypedDict, total=False):
     currency: str
     price: str | float | int
     rrp: str | float | int | None
+
+
+class CreateProductInputPayload(TypedDict, total=False):
+    type: ProductTypeValue
+    name: str
+    sku: str
+    product_type_id: int
+    product_type_value: str
+    vat_rate_id: int
+    vat_rate: int
+    active: bool
+    ean_code: str
+    translations: list[ProductTranslationUpsertInputPayload]
+    prices: list[ProductPriceUpsertInputPayload]
+    properties: list[ProductPropertyValueUpdateInputPayload]
+    images: list[ProductImageInputPayload]
+    sales_channel_view_ids: list[int]
+
+
+class UpsertProductInputPayload(TypedDict, total=False):
+    product_id: int
+    sku: str
+    active: bool
+    ean_code: str
+    translations: list[ProductTranslationUpsertInputPayload]
+    prices: list[ProductPriceUpsertInputPayload]
+    properties: list[ProductPropertyValueUpdateInputPayload]
+    images: list[ProductImageInputPayload]
+    sales_channel_view_ids: list[int]
 
 
 class ProductTranslationPayload(TypedDict, total=False):
@@ -201,6 +244,7 @@ class ProductBrandVoicePayload(TypedDict, total=False):
 class ProductDetailPayload(ProductBaseDetailPayload, total=False):
     vat_rate_data: ProductVatRatePayload | None
     inspector: ProductInspectorPayload
+    website_views_assign: list[ProductWebsiteViewAssignPayload]
     property_requirements: ProductPropertyRequirementsPayload
     translations: list[ProductTranslationPayload]
     images: list[ProductImagePayload]
@@ -285,6 +329,7 @@ class ProductUpsertAppliedUpdatesPayload(TypedDict, total=False):
     prices: int
     properties: int
     images: int
+    website_views_assignments: int
 
 
 class ProductUpsertPayload(TypedDict, total=False):
@@ -304,3 +349,17 @@ class CreateProductPayload(TypedDict, total=False):
     sku: str | None
     name: str
     message: str
+
+
+class CreateProductsPayload(TypedDict):
+    requested_count: int
+    processed_count: int
+    created_count: int
+    results: list[CreateProductPayload]
+
+
+class UpsertProductsPayload(TypedDict):
+    requested_count: int
+    processed_count: int
+    updated_count: int
+    results: list[ProductUpsertPayload]

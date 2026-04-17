@@ -1,8 +1,9 @@
+from django.test import SimpleTestCase
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
 from core.tests import TestCase
-from llm.models import ChatGptProductFeedConfig
+from llm.models import ChatGptProductFeedConfig, McpToolRun
 from properties.models import Property, PropertySelectValue
 
 
@@ -77,3 +78,46 @@ class ChatGptProductFeedConfigModelTestCase(TestCase):
 
         with self.assertRaises(IntegrityError):
             duplicate.save(force_save=True)
+
+
+class McpToolRunModelTestCase(SimpleTestCase):
+    def test_sanitize_json_content_truncates_nested_string_values(self):
+        long_value = "x" * (McpToolRun.MAX_JSON_VALUE_LENGTH + 25)
+
+        result = McpToolRun.sanitize_json_content(
+            value={
+                "payload": long_value,
+                "nested": [
+                    {"message": long_value},
+                ],
+            }
+        )
+
+        self.assertTrue(result["payload"].endswith(McpToolRun.TRUNCATED_SUFFIX))
+        self.assertEqual(
+            len(result["payload"]),
+            McpToolRun.MAX_JSON_VALUE_LENGTH,
+        )
+        self.assertTrue(
+            result["nested"][0]["message"].endswith(McpToolRun.TRUNCATED_SUFFIX)
+        )
+
+    def test_sanitize_json_content_omits_image_content_base64(self):
+        image_content = "a" * 5000
+
+        result = McpToolRun.sanitize_json_content(
+            value={
+                "images": [
+                    {
+                        "image_content": image_content,
+                        "title": "Chat upload",
+                    }
+                ]
+            }
+        )
+
+        self.assertEqual(
+            result["images"][0]["image_content"],
+            McpToolRun.OMITTED_IMAGE_CONTENT_TEMPLATE.format(length=len(image_content)),
+        )
+        self.assertEqual(result["images"][0]["title"], "Chat upload")

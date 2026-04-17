@@ -10,15 +10,15 @@ from core.tests import TransactionTestCase
 from eancodes.models import EanCode
 from llm.models import BrandCustomPrompt
 from llm.mcp.runtime import AccessToken
-from products.mcp.output_types import PRODUCT_UPSERT_OUTPUT_SCHEMA
+from products.mcp.output_types import UPSERT_PRODUCTS_OUTPUT_SCHEMA
 from products.mcp.resources import build_product_inspector_error_codes_payload
 from media.models import Media, MediaProductThrough
-from products.mcp.tools.create_product import CreateProductMcpTool
+from products.mcp.tools.create_product import CreateProductsMcpTool
 from products.mcp.tools.get_company_details import GetCompanyDetailsMcpTool
 from products.mcp.tools.get_product import GetProductMcpTool
 from products.mcp.tools.search_sales_channels import SearchSalesChannelsMcpTool
 from products.mcp.tools.search_products import SearchProductsMcpTool
-from products.mcp.tools.upsert_product import UpsertProductMcpTool
+from products.mcp.tools.upsert_product import UpsertProductsMcpTool
 from products.models import Product, ProductTranslation, ProductTranslationBulletPoint
 from products_inspector.constants import (
     HAS_IMAGES_ERROR,
@@ -589,6 +589,7 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         self.assertNotIn("properties", payload)
         self.assertNotIn("prices", payload)
         self.assertNotIn("vat_rate_data", payload)
+        self.assertNotIn("website_views_assign", payload)
         self.assertNotIn("brand_voice", payload)
         ctx.error.assert_not_awaited()
 
@@ -599,10 +600,24 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         )
         ctx = DummyContext()
         tool = GetProductMcpTool(mcp=DummyMcp())
+        website_view = SalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            name="Main website",
+            url="https://amazon-nice-prints.example.com",
+        )
+        website_view_assign = SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=self.product,
+            sales_channel_view=website_view,
+            link="https://amazon-nice-prints.example.com/products/book-page",
+        )
 
         result = async_to_sync(tool.execute)(
             sku="BOOK-001",
             show_inspector=True,
+            show_website_views_assign=True,
             show_property_requirements=True,
             show_translations=True,
             show_vat_rate_data=True,
@@ -646,6 +661,16 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
                 "type": "magento",
                 "subtype": None,
             },
+        )
+        self.assertEqual(
+            payload["website_views_assign"],
+            [
+                {
+                    "id": website_view_assign.id,
+                    "view_name": "Main website",
+                    "remote_url": "https://amazon-nice-prints.example.com/products/book-page",
+                }
+            ],
         )
         properties_by_internal_name = {
             item["property"]["internal_name"]: item
@@ -722,6 +747,12 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         mock_get_access_token.return_value = self._build_access_token(
             company_id=self.multi_tenant_company.id,
         )
+        view = SalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            name="Main website",
+            url="https://amazon-nice-prints.example.com/en",
+        )
         ctx = DummyContext()
         tool = SearchSalesChannelsMcpTool(mcp=DummyMcp())
 
@@ -740,12 +771,28 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         self.assertEqual(payload["results"][0]["hostname"], self.sales_channel.hostname)
         self.assertEqual(payload["results"][0]["type"], "magento")
         self.assertTrue(payload["results"][0]["active"])
+        self.assertEqual(
+            payload["results"][0]["views"],
+            [
+                {
+                    "id": view.id,
+                    "name": "Main website",
+                    "is_default": None,
+                }
+            ],
+        )
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
     def test_search_sales_channels_lists_all_without_filters(self, mock_get_access_token):
         mock_get_access_token.return_value = self._build_access_token(
             company_id=self.multi_tenant_company.id,
+        )
+        view = SalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            name="Main website",
+            url="https://amazon-nice-prints.example.com/en",
         )
         ctx = DummyContext()
         tool = SearchSalesChannelsMcpTool(mcp=DummyMcp())
@@ -760,6 +807,16 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         self.assertEqual(payload["total_count"], 1)
         self.assertEqual(len(payload["results"]), 1)
         self.assertEqual(payload["results"][0]["id"], self.sales_channel.id)
+        self.assertEqual(
+            payload["results"][0]["views"],
+            [
+                {
+                    "id": view.id,
+                    "name": "Main website",
+                    "is_default": None,
+                }
+            ],
+        )
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
@@ -768,23 +825,25 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = UpsertProductMcpTool(mcp=DummyMcp())
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
-            sku="BOOK-001",
-            active=False,
-            ean_code="999888777",
-            translations=(
-                '[{"language": "fr", "short_description": "Résumé court mis à jour", '
-                '"bullet_points": ["Premier point", "Deuxième point"]}]'
-            ),
-            prices=(
-                f'[{{"currency": "{self.currency.iso_code}", "price": "13.50", "rrp": "16.00"}}]'
-            ),
-            properties=(
-                f'[{{"property_id": {self.property.id}, "value": {self.other_select_value.id}, '
-                f'"value_is_id": true}}]'
-            ),
+            products={
+                "sku": "BOOK-001",
+                "active": False,
+                "ean_code": "999888777",
+                "translations": (
+                    '[{"language": "fr", "short_description": "Résumé court mis à jour", '
+                    '"bullet_points": ["Premier point", "Deuxième point"]}]'
+                ),
+                "prices": (
+                    f'[{{"currency": "{self.currency.iso_code}", "price": "13.50", "rrp": "16.00"}}]'
+                ),
+                "properties": (
+                    f'[{{"property_id": {self.property.id}, "value": {self.other_select_value.id}, '
+                    f'"value_is_id": true}}]'
+                ),
+            },
             ctx=ctx,
         )
 
@@ -808,7 +867,11 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         )
         payload = self._get_payload(result=result)
         self.assertFalse(self.product.active)
-        self.assertFalse(payload["active"])
+        self.assertEqual(payload["requested_count"], 1)
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["updated_count"], 1)
+        result_item = payload["results"][0]
+        self.assertFalse(result_item["active"])
         self.assertEqual(translation.name, "Page du livre")
         self.assertEqual(translation.short_description, "Résumé court mis à jour")
         self.assertEqual(bullet_points, ["Premier point", "Deuxième point"])
@@ -816,10 +879,10 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         self.assertEqual(sales_price.rrp, Decimal("16.00"))
         self.assertEqual(ean_code.ean_code, "999888777")
         self.assertEqual(product_property.value_select_id, self.other_select_value.id)
-        self.assertEqual(payload["product_id"], self.product.id)
-        self.assertEqual(payload["sku"], "BOOK-001")
+        self.assertEqual(result_item["product_id"], self.product.id)
+        self.assertEqual(result_item["sku"], "BOOK-001")
         self.assertEqual(
-            payload["applied_updates"],
+            result_item["applied_updates"],
             {
                 "active": False,
                 "ean_code": True,
@@ -836,16 +899,65 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = UpsertProductMcpTool(mcp=DummyMcp())
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
 
         with self.assertRaisesMessage(
             Exception,
-            "Provide at least one update section: active, ean_code, translations, prices, properties, or images.",
+            "Each product update must include at least one section: active, ean_code, translations, prices, properties, images, or sales_channel_view_ids.",
         ):
             async_to_sync(tool.execute)(
-                sku="BOOK-001",
+                products={"sku": "BOOK-001"},
                 ctx=ctx,
             )
+
+    @patch("llm.mcp.auth.get_access_token")
+    def test_upsert_product_assigns_missing_website_views_only(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        existing_view = SalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            name="Existing website",
+            url="https://amazon-nice-prints.example.com/existing",
+        )
+        new_view = SalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            name="French website",
+            url="https://amazon-nice-prints.example.com/fr",
+        )
+        SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=self.product,
+            sales_channel_view=existing_view,
+        )
+        ctx = DummyContext()
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
+
+        result = async_to_sync(tool.execute)(
+            products={
+                "sku": "BOOK-001",
+                "sales_channel_view_ids": json.dumps([existing_view.id, new_view.id]),
+            },
+            ctx=ctx,
+        )
+
+        payload = self._get_payload(result=result)
+        result_item = payload["results"][0]
+        self.assertEqual(
+            SalesChannelViewAssign.objects.filter(
+                product=self.product,
+                sales_channel_view__in=[existing_view, new_view],
+            ).count(),
+            2,
+        )
+        self.assertEqual(
+            result_item["applied_updates"]["website_views_assignments"],
+            1,
+        )
+        ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
     def test_upsert_product_rejects_inherited_currency(self, mock_get_access_token):
@@ -860,15 +972,17 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             inherits_from=self.currency,
         )
         ctx = DummyContext()
-        tool = UpsertProductMcpTool(mcp=DummyMcp())
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
 
         with self.assertRaisesMessage(
             Exception,
             "Currency 'EUR' inherits its price from 'GBP' and cannot be edited directly. Update the base currency price instead.",
         ):
             async_to_sync(tool.execute)(
-                sku="BOOK-001",
-                prices=f'[{{"currency": "{inherited_currency.iso_code}", "price": "10.00"}}]',
+                products={
+                    "sku": "BOOK-001",
+                    "prices": f'[{{"currency": "{inherited_currency.iso_code}", "price": "10.00"}}]',
+                },
                 ctx=ctx,
             )
 
@@ -878,15 +992,17 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = UpsertProductMcpTool(mcp=DummyMcp())
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
 
         with self.assertRaisesMessage(
             Exception,
             "Currency 'ZZZ' is not configured for this account.",
         ):
             async_to_sync(tool.execute)(
-                sku="BOOK-001",
-                prices='[{"currency": "ZZZ", "price": "10.00"}]',
+                products={
+                    "sku": "BOOK-001",
+                    "prices": '[{"currency": "ZZZ", "price": "10.00"}]',
+                },
                 ctx=ctx,
             )
 
@@ -914,11 +1030,13 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         )
 
         ctx = DummyContext()
-        tool = UpsertProductMcpTool(mcp=DummyMcp())
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
 
         async_to_sync(tool.execute)(
-            sku="BOOK-001",
-            properties=f'[{{"property_id": {boolean_property.id}, "value": "false"}}]',
+            products={
+                "sku": "BOOK-001",
+                "properties": f'[{{"property_id": {boolean_property.id}, "value": "false"}}]',
+            },
             ctx=ctx,
         )
 
@@ -967,14 +1085,16 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         )
 
         ctx = DummyContext()
-        tool = UpsertProductMcpTool(mcp=DummyMcp())
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
 
         async_to_sync(tool.execute)(
-            sku="BOOK-001",
-            properties=(
-                f'[{{"property_id": {multiselect_property.id}, "value": "{ebook_value.id}, {audio_value.id}", '
-                f'"value_is_id": "true"}}]'
-            ),
+            products={
+                "sku": "BOOK-001",
+                "properties": (
+                    f'[{{"property_id": {multiselect_property.id}, "value": "{ebook_value.id}, {audio_value.id}", '
+                    f'"value_is_id": "true"}}]'
+                ),
+            },
             ctx=ctx,
         )
 
@@ -1005,18 +1125,20 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         )
 
         ctx = DummyContext()
-        tool = UpsertProductMcpTool(mcp=DummyMcp())
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
-            sku="BOOK-001",
-            properties=f'[{{"property_id": {float_property.id}, "value": "10.0"}}]',
+            products={
+                "sku": "BOOK-001",
+                "properties": f'[{{"property_id": {float_property.id}, "value": "10.0"}}]',
+            },
             ctx=ctx,
         )
 
         payload = self._get_payload(result=result)
         jsonschema_validate(
             instance=payload,
-            schema=PRODUCT_UPSERT_OUTPUT_SCHEMA,
+            schema=UPSERT_PRODUCTS_OUTPUT_SCHEMA,
         )
         ctx.error.assert_not_awaited()
 
@@ -1030,17 +1152,46 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             images_associations_instances=SimpleNamespace(count=lambda: 1),
         )
         ctx = DummyContext()
-        tool = UpsertProductMcpTool(mcp=DummyMcp())
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
-            sku="BOOK-001",
-            images='[{"image_url": "https://example.com/book.jpg", "title": "Alt cover"}]',
+            products={
+                "sku": "BOOK-001",
+                "images": '[{"image_url": "https://example.com/book.jpg", "title": "Alt cover"}]',
+            },
             ctx=ctx,
         )
 
         payload = self._get_payload(result=result)
-        self.assertEqual(payload["applied_updates"]["images"], 1)
+        self.assertEqual(payload["results"][0]["applied_updates"]["images"], 1)
         mock_run_product_import_update.assert_called_once()
+        ctx.error.assert_not_awaited()
+
+    @patch("products.mcp.update_helpers.run_product_import_update")
+    @patch("llm.mcp.auth.get_access_token")
+    def test_upsert_product_accepts_image_content_without_image_url(self, mock_get_access_token, mock_run_product_import_update):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        mock_run_product_import_update.return_value = SimpleNamespace(
+            images_associations_instances=SimpleNamespace(count=lambda: 1),
+        )
+        ctx = DummyContext()
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
+
+        async_to_sync(tool.execute)(
+            products={
+                "sku": "BOOK-001",
+                "images": '[{"image_content": "aW1nMQ==", "title": "Chat upload"}]',
+            },
+            ctx=ctx,
+        )
+
+        _, kwargs = mock_run_product_import_update.call_args
+        self.assertEqual(
+            kwargs["product_data"]["images"],
+            [{"image_content": "aW1nMQ==", "title": "Chat upload"}],
+        )
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
@@ -1049,25 +1200,38 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             company_id=self.multi_tenant_company.id,
         )
         ctx = DummyContext()
-        tool = CreateProductMcpTool(mcp=DummyMcp())
+        tool = CreateProductsMcpTool(mcp=DummyMcp())
 
         result = async_to_sync(tool.execute)(
-            type=Product.SIMPLE,
-            name="Created Book",
-            product_type_id=self.product_type_select_value.id,
-            price="19.95",
-            rrp="24.95",
-            vat_rate_id=self.vat_rate.id,
+            products={
+                "type": Product.SIMPLE,
+                "name": "Created Book",
+                "product_type_id": self.product_type_select_value.id,
+                "vat_rate_id": self.vat_rate.id,
+                "active": True,
+                "ean_code": "555666777",
+                "translations": '[{"language": "fr", "name": "Livre cree"}]',
+                "prices": f'[{{"currency": "{self.currency.iso_code}", "price": "19.95", "rrp": "24.95"}}]',
+                "properties": (
+                    f'[{{"property_id": {self.property.id}, "value": {self.select_value.id}, '
+                    f'"value_is_id": true}}]'
+                ),
+            },
             ctx=ctx,
         )
 
         payload = self._get_payload(result=result)
-        created_product = Product.objects.get(id=payload["product_id"])
+        self.assertEqual(payload["requested_count"], 1)
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["created_count"], 1)
+        result_item = payload["results"][0]
+        created_product = Product.objects.get(id=result_item["product_id"])
         self.assertEqual(created_product.type, Product.SIMPLE)
-        self.assertTrue(payload["created"])
-        self.assertTrue(payload["sku_was_generated"])
+        self.assertTrue(result_item["created"])
+        self.assertTrue(result_item["sku_was_generated"])
         self.assertTrue(created_product.sku)
-        self.assertEqual(payload["name"], "Created Book")
+        self.assertEqual(result_item["name"], "Created Book")
+        self.assertTrue(created_product.active)
 
         product_type_assignment = ProductProperty.objects.get(
             product=created_product,
@@ -1075,10 +1239,41 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         )
         self.assertEqual(product_type_assignment.value_select_id, self.product_type_select_value.id)
 
+        product_property = ProductProperty.objects.get(
+            product=created_product,
+            property=self.property,
+        )
+        self.assertEqual(product_property.value_select_id, self.select_value.id)
+
         created_price = SalesPrice.objects.get(
             product=created_product,
             currency=self.currency,
         )
         self.assertEqual(created_price.price, Decimal("19.95"))
         self.assertEqual(created_price.rrp, Decimal("24.95"))
+        created_translation = ProductTranslation.objects.get(
+            product=created_product,
+            language="fr",
+            sales_channel=None,
+        )
+        self.assertEqual(created_translation.name, "Livre cree")
+        created_ean = EanCode.objects.get(product=created_product)
+        self.assertEqual(created_ean.ean_code, "555666777")
         ctx.error.assert_not_awaited()
+
+    @patch("llm.mcp.auth.get_access_token")
+    def test_upsert_products_rejects_more_than_ten_products(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        ctx = DummyContext()
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
+
+        with self.assertRaisesMessage(
+            Exception,
+            "products supports up to 10 items per call; received 11.",
+        ):
+            async_to_sync(tool.execute)(
+                products=[{"sku": "BOOK-001", "active": False} for _ in range(11)],
+                ctx=ctx,
+            )
