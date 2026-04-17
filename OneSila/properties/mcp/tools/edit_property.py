@@ -53,7 +53,7 @@ class EditPropertyMcpTool(BaseMcpTool):
         translations: Annotated[
             list[PropertyTranslationInputPayload] | str | None,
             Field(
-                description="Translations as [{language, name}] pairs. Call get_company_languages for valid codes."
+                description="Translations as [{language, name}] pairs. Call get_company_details with show_languages=true for valid codes."
             )
         ] = None,
         ctx: Context = CurrentContext(),

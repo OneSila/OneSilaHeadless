@@ -132,7 +132,7 @@ def validate_translation_languages(
     if invalid_languages:
         raise ValueError(
             "Unsupported translation languages: "
-            f"{invalid_languages}. Use get_company_languages to see the allowed company languages."
+            f"{invalid_languages}. Use get_company_details with show_languages=true to see the allowed company languages."
         )
 
 
@@ -192,7 +192,7 @@ def validate_select_value_translation_languages(
     if invalid_languages:
         raise ValueError(
             "Unsupported translation languages: "
-            f"{invalid_languages}. Use get_company_languages to see the allowed company languages."
+            f"{invalid_languages}. Use get_company_details with show_languages=true to see the allowed company languages."
         )
 
 

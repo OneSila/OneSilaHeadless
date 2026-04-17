@@ -32,18 +32,75 @@ class GetProductMcpTool(BaseMcpTool):
     async def execute(
         self,
         sku: Annotated[str, Field(description="Exact SKU for the product within the authenticated company.")] ,
+        show_inspector: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include product data-quality and readiness inspector status and issue blocks. "
+                    "Use this when checking what information is missing or why the product is not ready."
+                )
+            ),
+        ] = False,
+        show_property_requirements: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include the expected property map for the current product type. "
+                    "This can be large. Use it when inspector issues do not show which properties are missing, "
+                    "or when you need the full required and optional property list."
+                )
+            ),
+        ] = False,
+        show_translations: Annotated[
+            bool,
+            Field(
+                description="Include product translations. Use this when editing or creating translations."
+            ),
+        ] = False,
+        show_vat_rate_data: Annotated[
+            bool,
+            Field(description="Include detailed VAT rate data in addition to the top-level vat_rate percentage."),
+        ] = False,
+        show_images: Annotated[
+            bool,
+            Field(description="Include assigned product images."),
+        ] = False,
+        show_properties: Annotated[
+            bool,
+            Field(description="Include assigned product properties and values."),
+        ] = False,
+        show_prices: Annotated[
+            bool,
+            Field(description="Include product prices."),
+        ] = False,
+        show_brand_voice: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include brand voice guidance resolved for this product's assigned brand. "
+                    "Use this when drafting or translating product content so the copy follows the brand style."
+                )
+            ),
+        ] = False,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
-        Get a single company-scoped product by exact SKU.
-        Use this when you already know the SKU and need the product detail, pricing,
-        assigned property values, images, VAT data, inspector status, and
-        property_requirements guidance for the current product type.
+        Get one product by exact SKU for the authenticated company.
 
-        `property_requirements` explains which properties the product is expected
-        to have for its current product type. Only `OPTIONAL` is truly optional.
-        Any other `requirement_type` should be treated as effectively required,
-        especially when `has_value` is `false`.
+        This is the main product-inspection and product-editing read tool. The default response is
+        intentionally small so the caller only pays for the fields needed for the current step.
+
+        Use the show_* flags carefully:
+        - show_inspector: when checking data quality, missing information, or why the product is not ready.
+        - show_property_requirements: when the inspector is not enough and you need the full required or optional property map.
+        - show_translations: when reviewing, creating, or updating translated product content.
+        - show_vat_rate_data: when the VAT configuration details are needed, not just the top-level rate.
+        - show_images: when reviewing or updating assigned product images.
+        - show_properties: when reviewing or updating assigned property values.
+        - show_prices: when reviewing or updating product prices.
+        - show_brand_voice: when writing or translating content and the copy should follow the product brand style.
+
+        Prefer enabling only the sections needed for the current task.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
@@ -54,6 +111,35 @@ class GetProductMcpTool(BaseMcpTool):
             response_data = await self._get_product_detail(
                 multi_tenant_company=multi_tenant_company,
                 sku=sku,
+                show_inspector=self.sanitize_optional_bool(value=show_inspector, field_name="show_inspector") or False,
+                show_property_requirements=self.sanitize_optional_bool(
+                    value=show_property_requirements,
+                    field_name="show_property_requirements",
+                ) or False,
+                show_translations=self.sanitize_optional_bool(
+                    value=show_translations,
+                    field_name="show_translations",
+                ) or False,
+                show_vat_rate_data=self.sanitize_optional_bool(
+                    value=show_vat_rate_data,
+                    field_name="show_vat_rate_data",
+                ) or False,
+                show_images=self.sanitize_optional_bool(
+                    value=show_images,
+                    field_name="show_images",
+                ) or False,
+                show_properties=self.sanitize_optional_bool(
+                    value=show_properties,
+                    field_name="show_properties",
+                ) or False,
+                show_prices=self.sanitize_optional_bool(
+                    value=show_prices,
+                    field_name="show_prices",
+                ) or False,
+                show_brand_voice=self.sanitize_optional_bool(
+                    value=show_brand_voice,
+                    field_name="show_brand_voice",
+                ) or False,
             )
             await ctx.info(
                 f"Loaded product_id={response_data['id']} sku={response_data['sku']!r}."
@@ -76,6 +162,14 @@ class GetProductMcpTool(BaseMcpTool):
         *,
         multi_tenant_company: MultiTenantCompany,
         sku: str,
+        show_inspector: bool,
+        show_property_requirements: bool,
+        show_translations: bool,
+        show_vat_rate_data: bool,
+        show_images: bool,
+        show_properties: bool,
+        show_prices: bool,
+        show_brand_voice: bool,
     ) -> ProductDetailPayload:
         try:
             product = get_product_detail_queryset(
@@ -84,4 +178,14 @@ class GetProductMcpTool(BaseMcpTool):
         except Product.DoesNotExist as error:
             raise McpToolError("Product not found.") from error
 
-        return serialize_product_detail(product=product)
+        return serialize_product_detail(
+            product=product,
+            show_inspector=show_inspector,
+            show_property_requirements=show_property_requirements,
+            show_translations=show_translations,
+            show_vat_rate_data=show_vat_rate_data,
+            show_images=show_images,
+            show_properties=show_properties,
+            show_prices=show_prices,
+            show_brand_voice=show_brand_voice,
+        )

@@ -220,29 +220,6 @@ GET_PROPERTY_OUTPUT_SCHEMA = {
 
 GET_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA = PROPERTY_SELECT_VALUE_DETAIL_OUTPUT_SCHEMA
 
-RECOMMEND_PROPERTY_TYPE_OUTPUT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "recommended_type": {
-            "type": "string",
-            "enum": PROPERTY_TYPE_ENUM,
-        },
-        "recommended_type_label": {"type": "string"},
-        "requires_confirmation": {"type": "boolean"},
-        "message": {"type": "string"},
-        "name": {"type": ["string", "null"]},
-        "internal_name": {"type": ["string", "null"]},
-    },
-    "required": [
-        "recommended_type",
-        "recommended_type_label",
-        "requires_confirmation",
-        "message",
-        "name",
-        "internal_name",
-    ],
-}
-
 CREATE_PROPERTY_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {

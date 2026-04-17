@@ -39,8 +39,8 @@ class CreatePropertyMcpTool(BaseMcpTool):
             PropertyTypeValue,
             Field(
                 description=(
-                    "Exact OneSila property type. This is required before creation. "
-                    "If you are unsure, call recommend_property_type first."
+                    "Exact OneSila property type. Infer the best type from the user request and "
+                    "confirm it before creating when there is any ambiguity."
                 )
             ),
         ] = ...,
@@ -65,15 +65,15 @@ class CreatePropertyMcpTool(BaseMcpTool):
         translations: Annotated[
             list[PropertyTranslationInputPayload] | str | None,
             Field(
-                description="Translations as [{language, name}] pairs. Call get_company_languages for valid codes."
+                description="Translations as [{language, name}] pairs. Call get_company_details with show_languages=true for valid codes."
             )
         ] = None,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
         Create or update a company-scoped property using the existing import factory flow.
-        This tool requires an explicit property type. If the correct type is unclear,
-        call `recommend_property_type` first and confirm the recommendation before creating.
+        This tool requires an explicit property type. The caller should infer the most likely type
+        from the user context and ask for confirmation before creating when the correct type is not clear.
 
         The import flow will reuse an existing property when the identifiers already match,
         or create a new one when no matching property exists.

@@ -13,7 +13,7 @@ from core.models.multi_tenant import MultiTenantCompany
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
 from llm.mcp.tags import TAG_PRODUCTS, TAG_SEARCH, tool_tags
 from media.models import Media, MediaProductThrough
-from products.mcp.helpers import get_product_summary_queryset, serialize_product_summary
+from products.mcp.helpers import get_product_summary_queryset, serialize_product_search_summary
 from products.mcp.output_types import SEARCH_PRODUCTS_OUTPUT_SCHEMA
 from products.mcp.types import ProductTypeValue, SearchProductsPayload
 from products.models import Product
@@ -315,7 +315,7 @@ class SearchProductsMcpTool(BaseMcpTool):
             "offset": offset,
             "limit": limit,
             "results": [
-                serialize_product_summary(product=product)
+                serialize_product_search_summary(product=product)
                 for product in products
             ],
         }

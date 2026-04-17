@@ -9,7 +9,6 @@ from properties.mcp.tools.create_property import CreatePropertyMcpTool
 from properties.mcp.tools.create_property_select_value import CreatePropertySelectValueMcpTool
 from properties.mcp.tools.edit_property import EditPropertyMcpTool
 from properties.mcp.tools.edit_property_select_value import EditPropertySelectValueMcpTool
-from properties.mcp.tools.get_company_languages import GetCompanyLanguagesMcpTool
 from properties.mcp.tools.get_property import GetPropertyMcpTool
 from properties.mcp.tools.get_property_select_value import GetPropertySelectValueMcpTool
 from properties.mcp.tools.search_properties import SearchPropertiesMcpTool
@@ -151,21 +150,6 @@ class PropertyMcpToolAsyncTestCase(TestCase):
         self.assertEqual(payload["internal_name"], "color")
         self.assertSetEqual(translation_names, {"Color", "Couleur"})
         self.assertSetEqual(value_translations, {"Red", "Rouge"})
-        ctx.error.assert_not_awaited()
-
-    @patch("llm.mcp.auth.get_access_token")
-    def test_get_company_languages_executes_from_async_context(self, mock_get_access_token):
-        mock_get_access_token.return_value = self._build_access_token(
-            company_id=self.multi_tenant_company.id,
-        )
-        ctx = DummyContext()
-        tool = GetCompanyLanguagesMcpTool(mcp=DummyMcp())
-
-        result = async_to_sync(tool.execute)(ctx=ctx)
-
-        payload = self._get_payload(result=result)
-        self.assertEqual(payload["default_language_code"], "en")
-        self.assertEqual({item["code"] for item in payload["enabled_languages"]}, {"en", "fr"})
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")

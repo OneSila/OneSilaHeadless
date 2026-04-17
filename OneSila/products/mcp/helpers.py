@@ -6,6 +6,7 @@ from core.models.multi_tenant import MultiTenantCompany
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Exists, OuterRef, Prefetch, QuerySet
 from get_absolute_url.helpers import generate_absolute_url
+from llm.models import BrandCustomPrompt
 
 from imports_exports.factories.exports.helpers import (
     serialize_product_translation_payload,
@@ -17,6 +18,9 @@ from products.mcp.types import (
     ProductAssignedPropertyPayload,
     ProductAssignedPropertyValuePayload,
     ProductAssignedPropertyValueTranslationPayload,
+    ProductBaseDetailPayload,
+    ProductBrandVoiceLanguagePromptPayload,
+    ProductBrandVoicePayload,
     ProductDetailPayload,
     ProductImagePayload,
     ProductInspectorIssuePayload,
@@ -25,8 +29,8 @@ from products.mcp.types import (
     ProductPropertyRequirementPayload,
     ProductPropertyRequirementsPayload,
     ProductRequirementProductTypePayload,
+    ProductSearchSummaryPayload,
     ProductTranslationPayload,
-    ProductSummaryPayload,
     ProductVatRatePayload,
     SalesChannelReferencePayload,
 )
@@ -590,11 +594,11 @@ def serialize_product_property_requirements(
     }
 
 
-def serialize_product_summary(
+def serialize_product_search_summary(
     *,
     product: Product,
     inspector_data: ProductInspectorPayload | None = None,
-) -> ProductSummaryPayload:
+) -> ProductSearchSummaryPayload:
     if inspector_data is None:
         inspector_data = serialize_product_inspector(product=product)
     return {
@@ -613,24 +617,112 @@ def serialize_product_summary(
     }
 
 
-def serialize_product_detail(*, product: Product) -> ProductDetailPayload:
-    inspector_data = serialize_product_inspector(product=product)
-    serialized_properties = serialize_product_assigned_properties(product=product)
-    onesila_path, onesila_url = build_product_onesila_paths(product=product)
+def serialize_product_base_detail(*, product: Product) -> ProductBaseDetailPayload:
+    _onesila_path, onesila_url = build_product_onesila_paths(product=product)
     return {
-        **serialize_product_summary(product=product, inspector_data=inspector_data),
-        "global_id": product.global_id,
-        "onesila_path": onesila_path,
+        "id": product.id,
+        "sku": product.sku,
+        "name": product.name,
+        "type": product.type,
+        "type_label": get_product_type_label(type_value=product.type),
+        "active": product.active,
+        "vat_rate": product.vat_rate.rate if product.vat_rate_id else None,
+        "thumbnail_url": get_product_thumbnail_url(product=product),
+        "has_images": bool(getattr(product, "has_images", False) or _get_image_assignments(product=product)),
         "onesila_url": onesila_url,
         "allow_backorder": product.allow_backorder,
-        "vat_rate_data": serialize_vat_rate(product=product),
-        "inspector": inspector_data,
-        "property_requirements": serialize_product_property_requirements(
-            product=product,
-            property_payloads=serialized_properties,
-        ),
-        "translations": serialize_product_translations(product=product),
-        "images": serialize_product_images(product=product),
-        "properties": serialized_properties,
-        "prices": serialize_product_prices(product=product),
     }
+
+
+def serialize_product_brand_voice(*, product: Product) -> ProductBrandVoicePayload | None:
+    brand_property = next(
+        (
+            product_property
+            for product_property in product.productproperty_set.all()
+            if product_property.property.internal_name == "brand" and product_property.value_select_id is not None
+        ),
+        None,
+    )
+    if brand_property is None or brand_property.value_select is None:
+        return None
+
+    prompts = list(
+        BrandCustomPrompt.objects.filter(
+            multi_tenant_company=product.multi_tenant_company,
+            brand_value=brand_property.value_select,
+        ).order_by("language", "id")
+    )
+    if not prompts:
+        return None
+
+    default_language_code = str(product.multi_tenant_company.language).lower()
+    default_prompt = next(
+        (
+            prompt.prompt
+            for prompt in prompts
+            if prompt.language is None
+        ),
+        None,
+    )
+    language_prompts: list[ProductBrandVoiceLanguagePromptPayload] = [
+        {
+            "language": prompt.language,
+            "prompt": prompt.prompt,
+        }
+        for prompt in prompts
+        if prompt.language is not None
+    ]
+
+    payload: ProductBrandVoicePayload = {
+        "brand_value_id": brand_property.value_select_id,
+        "brand_value": brand_property.value_select.value_by_language_code(language=default_language_code),
+    }
+    if default_prompt is not None:
+        payload["default_prompt"] = default_prompt
+    if language_prompts:
+        payload["language_prompts"] = language_prompts
+    return payload
+
+
+def serialize_product_detail(
+    *,
+    product: Product,
+    show_inspector: bool,
+    show_property_requirements: bool,
+    show_translations: bool,
+    show_vat_rate_data: bool,
+    show_images: bool,
+    show_properties: bool,
+    show_prices: bool,
+    show_brand_voice: bool,
+) -> ProductDetailPayload:
+    payload: ProductDetailPayload = {
+        **serialize_product_base_detail(product=product),
+    }
+    inspector_data: ProductInspectorPayload | None = None
+    serialized_properties: list[ProductAssignedPropertyPayload] | None = None
+
+    if show_inspector:
+        inspector_data = serialize_product_inspector(product=product)
+        payload["inspector"] = inspector_data
+    if show_vat_rate_data:
+        payload["vat_rate_data"] = serialize_vat_rate(product=product)
+    if show_translations:
+        payload["translations"] = serialize_product_translations(product=product)
+    if show_images:
+        payload["images"] = serialize_product_images(product=product)
+    if show_properties or show_property_requirements:
+        serialized_properties = serialize_product_assigned_properties(product=product)
+    if show_properties and serialized_properties is not None:
+        payload["properties"] = serialized_properties
+    if show_property_requirements:
+        payload["property_requirements"] = serialize_product_property_requirements(
+            product=product,
+            property_payloads=serialized_properties or [],
+        )
+    if show_prices:
+        payload["prices"] = serialize_product_prices(product=product)
+    if show_brand_voice:
+        payload["brand_voice"] = serialize_product_brand_voice(product=product)
+
+    return payload

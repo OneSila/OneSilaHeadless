@@ -153,11 +153,11 @@ def get_product_type_match(
     )
     if not matching_ids:
         raise ValueError(
-            f"Product type {product_type_value!r} not found. Use get_product_types first."
+            f"Product type {product_type_value!r} not found. Use get_company_details with show_product_types=true first."
         )
     if len(matching_ids) > 1:
         raise ValueError(
-            f"Multiple product types matched {product_type_value!r}. Use get_product_types and pass product_type_id."
+            f"Multiple product types matched {product_type_value!r}. Use get_company_details with show_product_types=true and pass product_type_id."
         )
     return queryset.get(id=matching_ids[0])
 
@@ -182,6 +182,6 @@ def get_vat_rate_match(
     vat_rate_instance = queryset.filter(rate=vat_rate).first()
     if vat_rate_instance is None:
         raise ValueError(
-            f"VAT rate {vat_rate!r} not found. Use get_vat_rates first."
+            f"VAT rate {vat_rate!r} not found. Use get_company_details with show_vat_rates=true first."
         )
     return vat_rate_instance

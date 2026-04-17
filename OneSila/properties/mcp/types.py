@@ -126,15 +126,6 @@ class SearchPropertySelectValuesPayload(TypedDict):
     results: list[PropertySelectValueSearchResultPayload]
 
 
-class RecommendPropertyTypePayload(TypedDict):
-    recommended_type: PropertyTypeValue
-    recommended_type_label: str
-    requires_confirmation: bool
-    message: str
-    name: str | None
-    internal_name: str | None
-
-
 class CreatePropertyPayload(TypedDict):
     created: bool
     property_id: int

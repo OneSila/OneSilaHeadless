@@ -48,7 +48,7 @@ class EditPropertySelectValueMcpTool(BaseMcpTool):
         translations: Annotated[
             list[PropertySelectValueTranslationInputPayload] | str,
             Field(
-                description="Translations as [{language, value}] pairs. Call get_company_languages for valid codes."
+                description="Translations as [{language, value}] pairs. Call get_company_details with show_languages=true for valid codes."
             ),
         ] = ...,
         ctx: Context = CurrentContext(),

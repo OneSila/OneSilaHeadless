@@ -6,17 +6,20 @@ from types import SimpleNamespace
 from typing import Any
 
 from core.models.multi_tenant import MultiTenantCompany
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Prefetch, Q
 from currencies.models import Currency
 from imports_exports.factories.products import ImportProductInstance
 from products.mcp.types import (
-    ProductBatchMutationPayload,
     ProductImageInputPayload,
-    ProductMutationPayload,
+    ProductPriceUpsertInputPayload,
     ProductPropertyTranslationInputPayload,
     ProductPropertyValueUpdateInputPayload,
+    ProductTranslationUpsertInputPayload,
+    ProductUpsertAppliedUpdatesPayload,
+    ProductUpsertPayload,
 )
-from products.models import Product
+from products.models import Product, ProductTranslation
 from properties.mcp.helpers import get_company_language_codes
 from properties.models import Property
 from sales_channels.models import SalesChannel
@@ -112,23 +115,6 @@ def get_product_match(
     return queryset.get(id=product_ids[0])
 
 
-def get_sales_channel_match(
-    *,
-    multi_tenant_company: MultiTenantCompany,
-    sales_channel_id: int | None,
-):
-    if sales_channel_id is None:
-        return None
-
-    try:
-        return SalesChannel.objects.get(
-            id=sales_channel_id,
-            multi_tenant_company=multi_tenant_company,
-        )
-    except SalesChannel.DoesNotExist as error:
-        raise ValueError("Sales channel not found.") from error
-
-
 def validate_company_language(
     *,
     language: str,
@@ -142,39 +128,10 @@ def validate_company_language(
     if normalized_language not in allowed_languages:
         raise ValueError(
             f"Unsupported language: {normalized_language!r}. "
-            "Use get_company_languages to see the allowed company languages."
+            "Use get_company_details with show_languages=true to see the allowed company languages."
         )
 
     return normalized_language
-
-
-def get_company_currency_match(
-    *,
-    multi_tenant_company: MultiTenantCompany,
-    iso_code: str,
-) -> Currency:
-    normalized_iso_code = str(iso_code or "").strip().upper()
-    if not normalized_iso_code:
-        raise ValueError("currency is required.")
-
-    try:
-        currency = Currency.objects.select_related("inherits_from").get(
-            multi_tenant_company=multi_tenant_company,
-            iso_code=normalized_iso_code,
-        )
-    except Currency.DoesNotExist as error:
-        raise ValueError(
-            f"Currency {normalized_iso_code!r} is not configured for this account. "
-            "Use get_vat_rates or account currency settings to confirm available configuration before editing prices."
-        ) from error
-
-    if currency.inherits_from_id is not None:
-        raise ValueError(
-            f"Currency {normalized_iso_code!r} inherits its price from {currency.inherits_from.iso_code!r} "
-            "and cannot be edited directly. Update the base currency price instead."
-        )
-
-    return currency
 
 
 def sanitize_bullet_points_input(
@@ -234,7 +191,7 @@ def sanitize_product_property_translations_input(
         if language not in allowed_languages:
             raise ValueError(
                 f"Unsupported translation language: {language!r}. "
-                "Use get_company_languages to see the allowed company languages."
+                "Use get_company_details with show_languages=true to see the allowed company languages."
             )
         if value in (None, ""):
             raise ValueError("Each translation must include a non-empty value.")
@@ -335,12 +292,125 @@ def sanitize_product_images_input(
         for optional_key in ["title", "description", "type"]:
             if image.get(optional_key) not in (None, ""):
                 sanitized_image[optional_key] = str(image[optional_key]).strip()
-        for optional_key in ["is_main_image", "sort_order", "sales_channel_id"]:
+        for optional_key in ["is_main_image", "sort_order"]:
             if optional_key in image and image[optional_key] is not None:
                 sanitized_image[optional_key] = image[optional_key]
+        if "sales_channel_id" in image and image["sales_channel_id"] is not None:
+            sanitized_image["sales_channel_id"] = int(image["sales_channel_id"])
         sanitized_images.append(sanitized_image)
 
     return sanitized_images
+
+
+def sanitize_product_prices_input(
+    *,
+    prices: list[ProductPriceUpsertInputPayload] | str | None,
+) -> list[ProductPriceUpsertInputPayload] | None:
+    if prices is None:
+        return None
+    if isinstance(prices, str):
+        try:
+            prices = json.loads(prices)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "prices must be a list of price update objects, or a JSON string encoding that list."
+            ) from error
+
+    if not isinstance(prices, list) or not prices:
+        raise ValueError("prices must be a non-empty list of price update objects.")
+
+    sanitized_prices: list[ProductPriceUpsertInputPayload] = []
+    seen_currencies: set[str] = set()
+    for price_update in prices:
+        if not isinstance(price_update, dict):
+            raise ValueError("Each price update must be an object.")
+
+        currency = str(price_update.get("currency", "")).strip().upper()
+        if not currency:
+            raise ValueError("Each price update must include currency.")
+        if price_update.get("price") is None:
+            raise ValueError("Each price update must include price.")
+        if currency in seen_currencies:
+            raise ValueError("Duplicate currency in price updates.")
+        seen_currencies.add(currency)
+
+        sanitized_price: ProductPriceUpsertInputPayload = {
+            "currency": currency,
+            "price": price_update["price"],
+        }
+        if "rrp" in price_update:
+            sanitized_price["rrp"] = price_update.get("rrp")
+        sanitized_prices.append(sanitized_price)
+
+    return sanitized_prices
+
+
+def sanitize_product_translation_updates_input(
+    *,
+    translations: list[ProductTranslationUpsertInputPayload] | str | None,
+    multi_tenant_company: MultiTenantCompany,
+) -> list[ProductTranslationUpsertInputPayload] | None:
+    if translations is None:
+        return None
+    if isinstance(translations, str):
+        try:
+            translations = json.loads(translations)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "translations must be a list of translation update objects, or a JSON string encoding that list."
+            ) from error
+
+    if not isinstance(translations, list) or not translations:
+        raise ValueError("translations must be a non-empty list of translation update objects.")
+
+    sanitized_translations: list[ProductTranslationUpsertInputPayload] = []
+    seen_translation_targets: set[tuple[str, int | None]] = set()
+    for translation in translations:
+        if not isinstance(translation, dict):
+            raise ValueError("Each translation update must be an object.")
+
+        language = validate_company_language(
+            language=str(translation.get("language", "")),
+            multi_tenant_company=multi_tenant_company,
+        )
+        sales_channel_id = translation.get("sales_channel_id")
+        if sales_channel_id is not None:
+            sales_channel_id = int(sales_channel_id)
+
+        content_keys = [
+            "name",
+            "subtitle",
+            "short_description",
+            "description",
+            "bullet_points",
+        ]
+        if not any(key in translation for key in content_keys):
+            raise ValueError(
+                "Each translation update must include at least one content field: "
+                "name, subtitle, short_description, description, or bullet_points."
+            )
+
+        translation_key = (language, sales_channel_id)
+        if translation_key in seen_translation_targets:
+            raise ValueError("Duplicate translation target in updates.")
+        seen_translation_targets.add(translation_key)
+
+        sanitized_translation: ProductTranslationUpsertInputPayload = {
+            "language": language,
+        }
+        if sales_channel_id is not None:
+            sanitized_translation["sales_channel_id"] = sales_channel_id
+        for field_name in ["name", "subtitle", "short_description", "description"]:
+            if field_name in translation:
+                sanitized_translation[field_name] = translation.get(field_name)
+        if "bullet_points" in translation:
+            sanitized_translation["bullet_points"] = sanitize_bullet_points_input(
+                bullet_points=translation.get("bullet_points"),
+            ) or []
+
+        sanitized_translations.append(sanitized_translation)
+
+    return sanitized_translations
 
 
 def get_existing_translation_seed(
@@ -399,6 +469,125 @@ def get_existing_translation_seed(
     }
 
 
+def get_translation_seed_product(*, product: Product) -> Product:
+    return Product.objects.prefetch_related(
+        Prefetch(
+            "translations",
+            queryset=ProductTranslation.objects.select_related("sales_channel")
+            .prefetch_related("bullet_points")
+            .order_by("language", "sales_channel_id", "id"),
+        )
+    ).get(id=product.id)
+
+
+def resolve_sales_channels_map(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    sales_channel_ids: set[int],
+) -> dict[int, SalesChannel]:
+    if not sales_channel_ids:
+        return {}
+
+    sales_channels = list(
+        SalesChannel.objects.filter(
+            multi_tenant_company=multi_tenant_company,
+            id__in=sales_channel_ids,
+        )
+    )
+    sales_channels_by_id = {
+        sales_channel.id: sales_channel
+        for sales_channel in sales_channels
+    }
+    missing_sales_channel_ids = sorted(sales_channel_ids - set(sales_channels_by_id))
+    if missing_sales_channel_ids:
+        raise ValueError("Sales channel not found.")
+
+    return sales_channels_by_id
+
+
+def resolve_price_updates(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    prices: list[ProductPriceUpsertInputPayload],
+) -> list[dict[str, Any]]:
+    currencies_by_iso = {
+        currency.iso_code: currency
+        for currency in Currency.objects.select_related("inherits_from").filter(
+            multi_tenant_company=multi_tenant_company,
+            iso_code__in={price_update["currency"] for price_update in prices},
+        )
+    }
+
+    resolved_prices: list[dict[str, Any]] = []
+    for price_update in prices:
+        iso_code = price_update["currency"]
+        currency = currencies_by_iso.get(iso_code)
+        if currency is None:
+            raise ValueError(
+                f"Currency {iso_code!r} is not configured for this account. "
+                "Use get_company_details with show_currencies=true to confirm available currencies before editing prices."
+            )
+        if currency.inherits_from_id is not None:
+            raise ValueError(
+                f"Currency {iso_code!r} inherits its price from {currency.inherits_from.iso_code!r} "
+                "and cannot be edited directly. Update the base currency price instead."
+            )
+
+        resolved_price = {
+            "currency": currency.iso_code,
+            "price": price_update["price"],
+            "rrp": price_update.get("rrp"),
+        }
+        resolved_prices.append(resolved_price)
+
+    return resolved_prices
+
+
+def build_translation_update_groups(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    product: Product,
+    translations: list[ProductTranslationUpsertInputPayload],
+) -> list[tuple[SalesChannel | None, list[dict[str, Any]]]]:
+    sales_channel_ids = {
+        int(translation["sales_channel_id"])
+        for translation in translations
+        if translation.get("sales_channel_id") is not None
+    }
+    sales_channels_by_id = resolve_sales_channels_map(
+        multi_tenant_company=multi_tenant_company,
+        sales_channel_ids=sales_channel_ids,
+    )
+    seed_product = get_translation_seed_product(product=product)
+    grouped_translations: dict[int | None, list[dict[str, Any]]] = defaultdict(list)
+
+    for translation in translations:
+        sales_channel_id = translation.get("sales_channel_id")
+        sales_channel = sales_channels_by_id.get(sales_channel_id) if sales_channel_id is not None else None
+        seed_data = get_existing_translation_seed(
+            product=seed_product,
+            language=translation["language"],
+            sales_channel=sales_channel,
+        )
+        translation_payload = {
+            "language": translation["language"],
+            "name": translation["name"] if "name" in translation else seed_data["name"],
+        }
+        for field_name in ["subtitle", "short_description", "description", "bullet_points"]:
+            if field_name in translation:
+                translation_payload[field_name] = translation[field_name]
+
+        grouped_translations[sales_channel_id].append(translation_payload)
+
+    return [
+        (
+            sales_channels_by_id.get(sales_channel_id),
+            grouped_payloads,
+        )
+        for sales_channel_id, grouped_payloads in grouped_translations.items()
+    ]
+
+
 def run_product_import_update(
     *,
     multi_tenant_company: MultiTenantCompany,
@@ -420,36 +609,23 @@ def build_product_confirmation_message(*, action: str) -> str:
     return "Updated successfully. Use get_product for details."
 
 
-def build_product_mutation_payload(
+def build_product_upsert_payload(
     *,
     product: Product,
+    applied_updates: ProductUpsertAppliedUpdatesPayload,
     action: str,
-) -> ProductMutationPayload:
-    payload: ProductMutationPayload = {
+) -> ProductUpsertPayload:
+    payload: ProductUpsertPayload = {
         "updated": True,
         "product_id": product.id,
         "sku": product.sku,
         "name": product.name,
         "message": build_product_confirmation_message(action=action),
+        "applied_updates": applied_updates,
     }
     if product.active is not None:
         payload["active"] = bool(product.active)
     return payload
-
-
-def build_product_batch_mutation_payload(
-    *,
-    product: Product,
-    updated_count: int,
-    action: str,
-) -> ProductBatchMutationPayload:
-    return {
-        "updated_count": updated_count,
-        "product_id": product.id,
-        "sku": product.sku,
-        "name": product.name,
-        "message": "Processed successfully. Use get_product for details.",
-    }
 
 
 def resolve_properties_for_updates(
@@ -538,3 +714,87 @@ def group_images_by_sales_channel_id(
             }
         )
     return grouped_images
+
+
+def run_upsert_product_updates(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    product: Product,
+    active: bool | None,
+    ean_code: str | None,
+    translations: list[ProductTranslationUpsertInputPayload] | None,
+    prices: list[ProductPriceUpsertInputPayload] | None,
+    properties: list[ProductPropertyValueUpdateInputPayload] | None,
+    images: list[ProductImageInputPayload] | None,
+) -> ProductUpsertPayload:
+    applied_updates: ProductUpsertAppliedUpdatesPayload = {}
+
+    with transaction.atomic():
+        core_product_data: dict[str, Any] = {}
+        if active is not None:
+            core_product_data["active"] = active
+            applied_updates["active"] = bool(active)
+        if ean_code is not None:
+            core_product_data["ean_code"] = ean_code
+            applied_updates["ean_code"] = True
+        if prices:
+            core_product_data["prices"] = resolve_price_updates(
+                multi_tenant_company=multi_tenant_company,
+                prices=prices,
+            )
+            applied_updates["prices"] = len(prices)
+        if properties:
+            core_product_data["properties"] = resolve_properties_for_updates(
+                multi_tenant_company=multi_tenant_company,
+                updates=properties,
+            )
+            applied_updates["properties"] = len(properties)
+        if core_product_data:
+            run_product_import_update(
+                multi_tenant_company=multi_tenant_company,
+                product=product,
+                product_data=core_product_data,
+            )
+
+        if translations:
+            translation_groups = build_translation_update_groups(
+                multi_tenant_company=multi_tenant_company,
+                product=product,
+                translations=translations,
+            )
+            for sales_channel, grouped_payload in translation_groups:
+                run_product_import_update(
+                    multi_tenant_company=multi_tenant_company,
+                    product=product,
+                    product_data={"translations": grouped_payload},
+                    sales_channel=sales_channel,
+                )
+            applied_updates["translations"] = len(translations)
+
+        if images:
+            sales_channels_by_id = resolve_sales_channels_map(
+                multi_tenant_company=multi_tenant_company,
+                sales_channel_ids={
+                    int(image["sales_channel_id"])
+                    for image in images
+                    if image.get("sales_channel_id") is not None
+                },
+            )
+            updated_images_count = 0
+            grouped_images = group_images_by_sales_channel_id(images=images)
+            for sales_channel_id, grouped_payload in grouped_images.items():
+                import_instance = run_product_import_update(
+                    multi_tenant_company=multi_tenant_company,
+                    product=product,
+                    product_data={"images": grouped_payload},
+                    sales_channel=sales_channels_by_id.get(sales_channel_id),
+                )
+                updated_images_count += import_instance.images_associations_instances.count()
+            applied_updates["images"] = updated_images_count
+
+    product.refresh_from_db()
+    return build_product_upsert_payload(
+        product=product,
+        applied_updates=applied_updates,
+        action="product upsert",
+    )

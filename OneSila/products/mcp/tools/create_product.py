@@ -35,19 +35,20 @@ class CreateProductMcpTool(BaseMcpTool):
         type: Annotated[ProductTypeValue, Field(description="Required structural product type, for example SIMPLE or CONFIGURABLE.")] = ...,
         name: Annotated[str, Field(description="Required default product name.")] = ...,
         sku: Annotated[str | None, Field(description="Optional custom SKU. If omitted, the system generates one automatically.")] = None,
-        product_type_id: Annotated[int | None, Field(ge=1, description="Recommended exact product-type select-value database ID from get_product_types.")] = None,
+        product_type_id: Annotated[int | None, Field(ge=1, description="Recommended exact product-type select-value database ID from get_company_details with show_product_types=true.")] = None,
         product_type_value: Annotated[str | None, Field(description="Fallback exact product-type value text when product_type_id is not available.")] = None,
         price: Annotated[str | float | int | None, Field(description="Recommended default price. If provided, it is stored in the company's default currency.")] = None,
         rrp: Annotated[str | float | int | None, Field(description="Optional recommended retail price. Ignored when not provided.")] = None,
-        vat_rate_id: Annotated[int | None, Field(ge=1, description="Recommended exact VAT rate database ID from get_vat_rates.")] = None,
+        vat_rate_id: Annotated[int | None, Field(ge=1, description="Recommended exact VAT rate database ID from get_company_details with show_vat_rates=true.")] = None,
         vat_rate: Annotated[int | None, Field(ge=0, description="Fallback exact VAT percentage when vat_rate_id is not available.")] = None,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
         Create a minimal product for the authenticated company.
-        Required fields are only `type` and `name`. When available, prefer using get_product_types first
-        and pass product_type_id, and use get_vat_rates first and pass vat_rate_id. If price or rrp is provided,
-        the tool stores it in the company's default currency.
+        Required fields are only `type` and `name`. When available, prefer using
+        `get_company_details(show_product_types=true)` first and pass `product_type_id`, and use
+        `get_company_details(show_vat_rates=true)` first and pass `vat_rate_id`. If price or rrp
+        is provided, the tool stores it in the company's default currency.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
