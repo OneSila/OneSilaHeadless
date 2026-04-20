@@ -571,6 +571,7 @@ PRODUCT_UPSERT_APPLIED_UPDATES_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
         "active": {"type": "boolean"},
+        "vat_rate": {"type": "boolean"},
         "ean_code": {"type": "boolean"},
         "translations": {"type": "integer"},
         "prices": {"type": "integer"},

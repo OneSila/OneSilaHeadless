@@ -10,6 +10,7 @@ from django.db.models import Prefetch, Q
 from currencies.models import Currency
 from imports_exports.factories.products import ImportProductInstance
 from llm.models import McpToolRun
+from products.mcp.catalog_helpers import get_vat_rate_match
 from products.mcp.types import (
     ProductImageInputPayload,
     ProductPriceUpsertInputPayload,
@@ -78,6 +79,30 @@ def normalize_property_update_value(
             ) from error
 
     return value
+
+
+def resolve_vat_rate_update_data(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    vat_rate_id: int | None,
+    vat_rate: int | None,
+) -> dict[str, Any]:
+    vat_rate_instance = get_vat_rate_match(
+        multi_tenant_company=multi_tenant_company,
+        vat_rate_id=vat_rate_id,
+        vat_rate=vat_rate,
+    )
+    if vat_rate_instance is None:
+        return {}
+
+    if vat_rate_instance.rate is not None:
+        return {"vat_rate": vat_rate_instance.rate}
+
+    return {
+        "vat_rate": vat_rate_instance.name,
+        "use_vat_rate_name": True,
+    }
+
 
 def get_product_match(
     *,
@@ -799,6 +824,8 @@ def run_upsert_product_updates(
     import_process: McpToolRun,
     multi_tenant_company: MultiTenantCompany,
     product: Product,
+    vat_rate_id: int | None,
+    vat_rate: int | None,
     active: bool | None,
     ean_code: str | None,
     translations: list[ProductTranslationUpsertInputPayload] | None,
@@ -811,6 +838,15 @@ def run_upsert_product_updates(
 
     with transaction.atomic():
         core_product_data: dict[str, Any] = {}
+        if vat_rate_id is not None or vat_rate is not None:
+            core_product_data.update(
+                resolve_vat_rate_update_data(
+                    multi_tenant_company=multi_tenant_company,
+                    vat_rate_id=vat_rate_id,
+                    vat_rate=vat_rate,
+                )
+            )
+            applied_updates["vat_rate"] = True
         if active is not None:
             core_product_data["active"] = active
             applied_updates["active"] = bool(active)

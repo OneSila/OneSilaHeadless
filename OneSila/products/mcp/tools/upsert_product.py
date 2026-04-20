@@ -49,16 +49,13 @@ class UpsertProductsMcpTool(BaseMcpTool):
             list[UpsertProductInputPayload] | UpsertProductInputPayload | str,
             Field(
                 description=(
-                    "One product update object or an array of product update objects. "
-                    "Supports up to 10 products per call. Use a single object for one product or an array for bulk updates. "
-                    "Each item requires product_id or sku and can include any of these sections: "
-                    "active: bool; ean_code: string; "
-                    "translations: [{language, sales_channel_id?, name?, subtitle?, short_description?, description?, bullet_points?}] with at least one content field per entry; "
-                    "prices: [{currency, price, rrp?}]; "
-                    "properties: [{property_id? or property_internal_name?, value, value_is_id?, translations?: [{language, value}]}]; "
-                    "images: [{image_url? or image_content?, title?, description?, type?, is_main_image?, sort_order?, sales_channel_id?}]; "
-                    "sales_channel_view_ids: [view_id, ...]. "
-                    "Use image_content for base64 chat-uploaded images."
+                    "Update 1 to 10 existing products. Each item must identify the product by `product_id` or `sku`, "
+                    "and must include at least one update section. Root update fields: `vat_rate_id`, `vat_rate`, `active`, `ean_code`. "
+                    "Nested update sections: `translations`, `prices`, `properties`, `images`, `sales_channel_view_ids`. "
+                    "Use `translations[].name` to update the product name in a language, usually the default language without `sales_channel_id` for the main product name. "
+                    "Use `properties` to update property values, including the Product Type property when needed. "
+                    "Use `vat_rate_id` from `get_company_details(show_vat_rates=true)` or `vat_rate` with the exact configured percentage. "
+                    "Use `image_content` for base64 uploaded images."
                 )
             ),
         ] = ...,
@@ -67,30 +64,41 @@ class UpsertProductsMcpTool(BaseMcpTool):
         """
         Update one or more existing products in a single call.
 
-        Pass `products` as either a single object or an array of objects. A single object is normalized
-        to a one-item batch, and the response always returns an array in `results`.
-
-        Limits:
-        - up to 10 products per call
-
-        This is the main product write tool. Use it when one or more existing products need coordinated
-        updates such as active status, EAN code, translations, prices, properties, images, or
-        website/storefront assignments.
+        This is the main write tool for existing products. A single object becomes a one-item batch,
+        and the response always returns an array in `results`.
 
         Per-product rules:
         - Requires `product_id` or `sku`.
         - Include only the sections you want to change.
         - Each product must include at least one update section.
         - One invalid item fails the whole call.
+        - Use `vat_rate_id` after calling `get_company_details(show_vat_rates=true)`, or use `vat_rate`
+          with the exact configured percentage.
+        - Use `translations[].name` to change the product name for a language.
+        - Use `properties` to change assigned property values, including Product Type.
 
         Section shapes:
+        - vat_rate by percentage: `{sku: "ABC-1", vat_rate: 21}`
+        - vat_rate by id: `{sku: "ABC-1", vat_rate_id: 4}`
         - translations: `{language: "fr", description: "...", bullet_points: ["a", "b"]}`
         - prices: `{currency: "GBP", price: "12.50", rrp: "15.00"}`
         - properties: `{property_id: 12, value: 44, value_is_id: true}`
         - images: `{image_url: "https://...", type: "PACK", is_main_image: true, sort_order: 1}`
 
-        `images` adds image assignments and does not require reading the current image list first.
-        `sales_channel_view_ids` adds storefront assignments and does not remove existing ones.
+        Examples:
+        - Set active and EAN: `{sku: "ABC-1", active: true, ean_code: "1234567890123"}`
+        - Change main product name in default language: `{sku: "ABC-1", translations: [{language: "en", name: "Red Mug"}]}`
+        - Update translated content: `{sku: "ABC-1", translations: [{language: "fr", description: "Tasse rouge", bullet_points: ["Ceramique", "325 ml"]}]}`
+        - Update price: `{sku: "ABC-1", prices: [{currency: "GBP", price: "12.50", rrp: "15.00"}]}`
+        - Update property by select value id: `{sku: "ABC-1", properties: [{property_id: 12, value: 44, value_is_id: true}]}`
+        - Update property by internal name: `{sku: "ABC-1", properties: [{property_internal_name: "material", value: "Ceramic"}]}`
+        - Add image from URL: `{sku: "ABC-1", images: [{image_url: "https://example.com/mug.jpg", type: "PACK", is_main_image: true, sort_order: 1}]}`
+        - Add uploaded image: `{sku: "ABC-1", images: [{image_content: "<base64>", title: "Front view", is_main_image: true}]}`
+        - Assign to storefront views: `{sku: "ABC-1", sales_channel_view_ids: [3, 5]}`
+
+        Notes:
+        - `images` adds image assignments; it does not remove existing ones.
+        - `sales_channel_view_ids` adds storefront assignments; it does not remove existing ones.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
@@ -198,6 +206,8 @@ class UpsertProductsMcpTool(BaseMcpTool):
     def _validate_has_updates(
         self,
         *,
+        vat_rate_id: int | None,
+        vat_rate: int | None,
         active: bool | None,
         ean_code: str | None,
         translations: list[ProductTranslationUpsertInputPayload] | None,
@@ -208,6 +218,8 @@ class UpsertProductsMcpTool(BaseMcpTool):
     ) -> None:
         if not any(
             [
+                vat_rate_id is not None,
+                vat_rate is not None,
                 active is not None,
                 ean_code is not None,
                 translations is not None,
@@ -218,7 +230,7 @@ class UpsertProductsMcpTool(BaseMcpTool):
             ]
         ):
             raise McpToolError(
-                "Each product update must include at least one section: active, ean_code, translations, prices, properties, images, or sales_channel_view_ids."
+                "Each product update must include at least one section: vat_rate_id, vat_rate, active, ean_code, translations, prices, properties, images, or sales_channel_view_ids."
             )
 
     def _sanitize_product_item(
@@ -238,6 +250,16 @@ class UpsertProductsMcpTool(BaseMcpTool):
         if sanitized_product_id is None and not sanitized_sku:
             raise McpToolError("Each product update must provide product_id or sku.")
 
+        sanitized_vat_rate_id = self.sanitize_optional_int(
+            value=product.get("vat_rate_id"),
+            field_name="vat_rate_id",
+            minimum=1,
+        )
+        sanitized_vat_rate = self.sanitize_optional_int(
+            value=product.get("vat_rate"),
+            field_name="vat_rate",
+            minimum=0,
+        )
         sanitized_active = self.sanitize_optional_bool(value=product.get("active"), field_name="active")
         sanitized_ean_code = self._sanitize_optional_string(value=product.get("ean_code"))
         sanitized_translations = self._sanitize_translations(
@@ -255,6 +277,8 @@ class UpsertProductsMcpTool(BaseMcpTool):
         )
 
         self._validate_has_updates(
+            vat_rate_id=sanitized_vat_rate_id,
+            vat_rate=sanitized_vat_rate,
             active=sanitized_active,
             ean_code=sanitized_ean_code,
             translations=sanitized_translations,
@@ -268,6 +292,10 @@ class UpsertProductsMcpTool(BaseMcpTool):
             sanitized_product["product_id"] = sanitized_product_id
         if sanitized_sku:
             sanitized_product["sku"] = sanitized_sku
+        if sanitized_vat_rate_id is not None:
+            sanitized_product["vat_rate_id"] = sanitized_vat_rate_id
+        if sanitized_vat_rate is not None:
+            sanitized_product["vat_rate"] = sanitized_vat_rate
         if sanitized_active is not None:
             sanitized_product["active"] = sanitized_active
         if sanitized_ean_code:
@@ -309,6 +337,8 @@ class UpsertProductsMcpTool(BaseMcpTool):
                     import_process=tool_run,
                     multi_tenant_company=multi_tenant_company,
                     product=product_instance,
+                    vat_rate_id=product.get("vat_rate_id"),
+                    vat_rate=product.get("vat_rate"),
                     active=product.get("active"),
                     ean_code=product.get("ean_code"),
                     translations=product.get("translations"),

@@ -52,17 +52,12 @@ class CreateProductsMcpTool(BaseMcpTool):
             list[CreateProductInputPayload] | CreateProductInputPayload | str,
             Field(
                 description=(
-                    "One product object or an array of product objects to create. "
-                    "Supports up to 10 products per call. Use a single object for one product or an array for bulk creation. "
-                    "Each product requires type and name. Optional create-time fields are sku, product_type_id, product_type_value, vat_rate_id, vat_rate, "
-                    "active, ean_code, translations, prices, properties, images, and sales_channel_view_ids. "
-                    "Nested section shapes match upsert_products: "
-                    "translations: [{language, sales_channel_id?, name?, subtitle?, short_description?, description?, bullet_points?}], "
-                    "prices: [{currency, price, rrp?}], "
-                    "properties: [{property_id? or property_internal_name?, value, value_is_id?, translations?: [{language, value}]}], "
-                    "images: [{image_url? or image_content?, title?, description?, type?, is_main_image?, sort_order?, sales_channel_id?}], "
-                    "sales_channel_view_ids: [view_id, ...]. "
-                    "Use image_content for base64 chat-uploaded images."
+                    "Create 1 to 10 products. Each item requires `type` and `name`. Optional root fields: "
+                    "`sku`, `product_type_id`, `product_type_value`, `vat_rate_id`, `vat_rate`, `active`, `ean_code`. "
+                    "Optional nested sections: `translations`, `prices`, `properties`, `images`, `sales_channel_view_ids`. "
+                    "Use `product_type_id` from `get_company_details(show_product_types=true)` or `product_type_value` when you know the exact product-type label. "
+                    "Use `vat_rate_id` from `get_company_details(show_vat_rates=true)` or `vat_rate` with the exact configured percentage. "
+                    "Use `image_content` for base64 uploaded images."
                 )
             ),
         ] = ...,
@@ -71,22 +66,32 @@ class CreateProductsMcpTool(BaseMcpTool):
         """
         Create one or more products for the authenticated company.
 
-        Pass `products` as either a single object or an array of objects. A single object is normalized
-        to a one-item batch, and the response always returns an array in `results`.
-
-        Limits:
-        - up to 10 products per call
-
-        Use this when the user wants new products created, optionally with full initial enrichment in the
-        same call: active status, EAN, translations, prices, properties, images, and storefront assignments.
+        Use this when the user wants brand-new products. A single object becomes a one-item batch,
+        and the response always returns an array in `results`.
 
         Required per product:
         - `type`: SIMPLE, BUNDLE, CONFIGURABLE, or ALIAS
         - `name`
 
+        Optional root fields:
+        - `sku`: provide one, otherwise one is generated
+        - `product_type_id` or `product_type_value`
+        - `vat_rate_id` or `vat_rate`
+        - `active`
+        - `ean_code`
+
+        Optional nested sections:
+        - `translations`
+        - `prices`
+        - `properties`
+        - `images`
+        - `sales_channel_view_ids`
+
         Examples:
         - Minimal create: `{type: "SIMPLE", name: "Red Mug"}`
         - Create with price: `{type: "SIMPLE", name: "Red Mug", prices: [{currency: "GBP", price: "9.99"}]}`
+        - Create with property select value: `{type: "SIMPLE", name: "Red Mug", properties: [{property_id: 12, value: 44, value_is_id: true}]}`
+        - Create with property by internal name: `{type: "SIMPLE", name: "Red Mug", properties: [{property_internal_name: "material", value: "Ceramic"}]}`
         - Create with uploaded image: `{type: "SIMPLE", name: "Red Mug", images: [{image_content: "<base64>", is_main_image: true}]}`
         """
         try:

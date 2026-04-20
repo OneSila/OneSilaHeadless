@@ -32,7 +32,7 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
         show_product_types: Annotated[bool, Field(description="Include product-type values available for this company. Returns {count, property, results:[{id,value,...}]}.")] = False,
         show_product_types_translations: Annotated[bool, Field(description="Include product-type translations inside each product-type result. Automatically enables show_product_types.")] = False,
         show_product_types_usage_counts: Annotated[bool, Field(description="Include product-type usage counts inside each product-type result. Automatically enables show_product_types.")] = False,
-        show_vat_rates: Annotated[bool, Field(description="Include configured VAT rates. Returns {count, results:[{id,name,rate}]}.")] = False,
+        show_vat_rates: Annotated[bool, Field(description="Include configured VAT rates. Returns {count, results:[{id,name,rate}]}. Use these ids with create_products/upsert_products via vat_rate_id, or pass the rate value directly via vat_rate.")] = False,
         show_currencies: Annotated[bool, Field(description="Include configured company currencies. Returns {count, default_currency_code, results:[{id,iso_code,name,symbol,is_default,inherits_from_iso_code}]}.")] = False,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
@@ -44,7 +44,9 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
         without paying for unrelated output.
 
         Use this tool before writes when you need valid reference data such as languages, product-type
-        ids, VAT rates, or currencies.
+        ids, VAT rates, or currencies. For product VAT updates, call
+        `get_company_details(show_vat_rates=true)` first if you want to pass `vat_rate_id` instead
+        of the raw VAT percentage.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

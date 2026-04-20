@@ -144,6 +144,8 @@ class CreateProductInputPayload(TypedDict, total=False):
 class UpsertProductInputPayload(TypedDict, total=False):
     product_id: int
     sku: str
+    vat_rate_id: int
+    vat_rate: int
     active: bool
     ean_code: str
     translations: list[ProductTranslationUpsertInputPayload]
@@ -324,6 +326,7 @@ class SearchSalesChannelsPayload(TypedDict):
 
 class ProductUpsertAppliedUpdatesPayload(TypedDict, total=False):
     active: bool
+    vat_rate: bool
     ean_code: bool
     translations: int
     prices: int

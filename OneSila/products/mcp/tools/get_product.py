@@ -31,13 +31,13 @@ class GetProductMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        sku: Annotated[str, Field(description="Exact SKU for the product within the authenticated company.")] ,
+        sku: Annotated[str, Field(description="Exact SKU of the product to load.")] ,
         show_inspector: Annotated[
             bool,
             Field(
                 description=(
-                    "Include product data-quality and readiness inspector status and issue blocks. "
-                    "Use this when checking what information is missing or why the product is not ready."
+                    "Include the product readiness check. This returns summary booleans plus a list of issues "
+                    "showing what information is missing or blocking the product."
                 )
             ),
         ] = False,
@@ -45,9 +45,8 @@ class GetProductMcpTool(BaseMcpTool):
             bool,
             Field(
                 description=(
-                    "Include website-view assignments for this product. "
-                    "Use this when checking which storefront views the product is assigned to "
-                    "and which remote product URLs already exist there."
+                    "Include website/storefront assignments and their remote URLs. "
+                    "Use this when checking where the product is already published."
                 )
             ),
         ] = False,
@@ -55,40 +54,42 @@ class GetProductMcpTool(BaseMcpTool):
             bool,
             Field(
                 description=(
-                    "Include the expected property map for the current product type. "
-                    "This can be large. Use it when inspector issues do not show which properties are missing, "
-                    "or when you need the full required and optional property list."
+                    "Include the full property requirement map for the current product type. "
+                    "Larger payload. Use this after show_inspector when you need the exact required and optional properties."
                 )
             ),
         ] = False,
         show_translations: Annotated[
             bool,
             Field(
-                description="Include product translations. Use this when editing or creating translations."
+                description=(
+                    "Include translations for the main product and any sales-channel-specific content. "
+                    "Use this before editing names, subtitles, descriptions, or bullet points."
+                )
             ),
         ] = False,
         show_vat_rate_data: Annotated[
             bool,
-            Field(description="Include detailed VAT rate data in addition to the top-level vat_rate percentage."),
+            Field(description="Include the full VAT object `{id, name, rate}` in addition to the top-level `vat_rate` percentage."),
         ] = False,
         show_images: Annotated[
             bool,
-            Field(description="Include assigned product images. Each image entry returns image_url, thumbnail_url, type, title, description, is_main_image, sort_order, and optional sales_channel."),
+            Field(description="Include assigned images with URLs, type, title, description, main-image flag, sort order, and optional sales channel."),
         ] = False,
         show_properties: Annotated[
             bool,
-            Field(description="Include assigned product properties and values."),
+            Field(description="Include assigned properties and their current values."),
         ] = False,
         show_prices: Annotated[
             bool,
-            Field(description="Include product prices."),
+            Field(description="Include prices for configured currencies."),
         ] = False,
         show_brand_voice: Annotated[
             bool,
             Field(
                 description=(
-                    "Include brand voice guidance resolved for this product's assigned brand. "
-                    "Use this when drafting or translating product content so the copy follows the brand style."
+                    "Include brand writing guidance for this product. "
+                    "Use this when generating or rewriting product copy in the brand's style."
                 )
             ),
         ] = False,
@@ -97,21 +98,19 @@ class GetProductMcpTool(BaseMcpTool):
         """
         Get one product by exact SKU for the authenticated company.
 
-        This is the main product-inspection and product-editing read tool. The default response is
-        intentionally small so the caller only pays for the fields needed for the current step.
+        This is the main read tool before editing a product. The default response is intentionally
+        small. Turn on only the sections needed for the current step.
 
-        Use the show_* flags carefully:
-        - show_inspector: when checking data quality, missing information, or why the product is not ready.
-        - show_website_views_assign: when checking which website/storefront views the product is assigned to and their remote URLs.
-        - show_property_requirements: when the inspector is not enough and you need the full required or optional property map.
-        - show_translations: when reviewing, creating, or updating translated product content.
-        - show_vat_rate_data: when the VAT configuration details are needed, not just the top-level rate.
-        - show_images: when reviewing or updating assigned product images. This is the exact runtime image shape used by create_products and upsert_products.
-        - show_properties: when reviewing or updating assigned property values.
-        - show_prices: when reviewing or updating product prices.
-        - show_brand_voice: when writing or translating content and the copy should follow the product brand style.
+        Terminology:
+        - inspector: internal readiness check for the product. It tells you whether required or optional
+          information is missing and returns issue items with explanations.
+        - property requirements: the full expected property schema for the current product type.
 
-        Prefer enabling only the sections needed for the current task.
+        Common usage:
+        - Use `show_inspector=true` to learn what is missing.
+        - Add `show_property_requirements=true` when the inspector alone is not specific enough.
+        - Use `show_translations=true`, `show_properties=true`, `show_prices=true`, or `show_images=true`
+          before calling `upsert_products` if you need the current data first.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

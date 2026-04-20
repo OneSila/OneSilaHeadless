@@ -894,6 +894,70 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
+    def test_upsert_product_updates_vat_rate_by_rate(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        reduced_vat_rate = VatRate.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Reduced",
+            rate=9,
+        )
+        ctx = DummyContext()
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
+
+        result = async_to_sync(tool.execute)(
+            products={
+                "sku": "BOOK-001",
+                "vat_rate": reduced_vat_rate.rate,
+            },
+            ctx=ctx,
+        )
+
+        self.product.refresh_from_db()
+        payload = self._get_payload(result=result)
+        self.assertEqual(self.product.vat_rate_id, reduced_vat_rate.id)
+        self.assertEqual(
+            payload["results"][0]["applied_updates"],
+            {
+                "vat_rate": True,
+            },
+        )
+        ctx.error.assert_not_awaited()
+
+    @patch("llm.mcp.auth.get_access_token")
+    def test_upsert_product_updates_vat_rate_by_id(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        reduced_vat_rate = VatRate.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Reduced",
+            rate=9,
+        )
+        ctx = DummyContext()
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
+
+        result = async_to_sync(tool.execute)(
+            products={
+                "sku": "BOOK-001",
+                "vat_rate_id": reduced_vat_rate.id,
+            },
+            ctx=ctx,
+        )
+
+        self.product.refresh_from_db()
+        payload = self._get_payload(result=result)
+        self.assertEqual(self.product.vat_rate_id, reduced_vat_rate.id)
+        self.assertEqual(
+            payload["results"][0]["applied_updates"],
+            {
+                "vat_rate": True,
+            },
+        )
+        ctx.error.assert_not_awaited()
+
+    @patch("llm.mcp.auth.get_access_token")
     def test_upsert_product_rejects_when_no_sections_are_provided(self, mock_get_access_token):
         mock_get_access_token.return_value = self._build_access_token(
             company_id=self.multi_tenant_company.id,
@@ -903,7 +967,7 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
 
         with self.assertRaisesMessage(
             Exception,
-            "Each product update must include at least one section: active, ean_code, translations, prices, properties, images, or sales_channel_view_ids.",
+            "Each product update must include at least one section: vat_rate_id, vat_rate, active, ean_code, translations, prices, properties, images, or sales_channel_view_ids.",
         ):
             async_to_sync(tool.execute)(
                 products={"sku": "BOOK-001"},
