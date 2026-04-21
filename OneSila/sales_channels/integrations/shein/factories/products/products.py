@@ -931,8 +931,14 @@ class SheinProductBaseFactory(
             )
             varying_ids = [pid for pid, values in varying_map.items() if len(values) > 1]
             if len(varying_ids) > 3:
+                varying_items = [item for item in configurator_items if item.property_id in varying_ids]
+                varying_details = self._format_configurator_item_details(
+                    configurator_items=varying_items,
+                    varying_map=varying_map,
+                )
                 raise SheinConfiguratorAttributesLimitError(
-                    "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level)."
+                    "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level). "
+                    f"Found {len(varying_ids)} varying configurator attributes: {varying_details}."
                 )
 
         rule_properties_qs = self.local_instance.get_required_and_optional_properties(
@@ -1031,6 +1037,24 @@ class SheinProductBaseFactory(
                     continue
                 values.setdefault(property_id, set()).add(serialized)
         return values
+
+    def _format_configurator_item_details(
+        self,
+        *,
+        configurator_items: list[ProductPropertiesRuleItem],
+        varying_map: Optional[dict[int, set]] = None,
+    ) -> str:
+        details: list[str] = []
+        for item in sorted(configurator_items, key=lambda item: getattr(item, "sort_order", 0)):
+            prop = getattr(item, "property", None)
+            prop_name = getattr(prop, "name", None)
+            label = prop_name if prop_name else f"property_id={item.property_id}"
+            if prop_name:
+                label = f"{label} (property_id={item.property_id})"
+            if varying_map is not None:
+                label = f"{label}, {len(varying_map.get(item.property_id, set()))} values"
+            details.append(label)
+        return ", ".join(details)
 
     def _resolve_type_items_for_property(
         self,
@@ -1714,8 +1738,18 @@ class SheinProductBaseFactory(
             item for item in items if item.property_id != primary.property_id and is_varying(item)
         ]
         if len(sku_level_items) > 2:
+            primary_details = self._format_configurator_item_details(
+                configurator_items=[primary],
+                varying_map=varying_map,
+            )
+            sku_level_details = self._format_configurator_item_details(
+                configurator_items=sku_level_items,
+                varying_map=varying_map,
+            )
             raise SheinConfiguratorAttributesLimitError(
-                "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level)."
+                "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level). "
+                f"Primary attribute: {primary_details}. "
+                f"SKU-level attributes ({len(sku_level_items)}): {sku_level_details}."
             )
         return primary, sku_level_items
 
