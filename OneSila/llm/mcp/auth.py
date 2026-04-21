@@ -1,22 +1,30 @@
 from __future__ import annotations
 
+from django.contrib.auth import get_user_model
 from asgiref.sync import sync_to_async
 
 from llm.mcp.runtime import AccessToken, TokenVerifier, get_access_token
 
 
-def get_authenticated_company():
+def get_authenticated_user():
     token = get_access_token()
-    if token is None or not token.client_id or not str(token.client_id).startswith("company:"):
+    if token is None or not token.client_id or not str(token.client_id).startswith("user:"):
         return None
 
-    from core.models import MultiTenantCompany
-
-    company_id = int(str(token.client_id).split(":", 1)[1])
+    user_model = get_user_model()
+    user_id = int(str(token.client_id).split(":", 1)[1])
     try:
-        return MultiTenantCompany.objects.get(pk=company_id)
-    except MultiTenantCompany.DoesNotExist:
+        return user_model.objects.select_related("multi_tenant_company").get(pk=user_id)
+    except user_model.DoesNotExist:
         return None
+
+
+def get_authenticated_company():
+    user = get_authenticated_user()
+    if user is None:
+        return None
+
+    return user.multi_tenant_company
 
 
 class McpApiKeyAuth(TokenVerifier):
@@ -27,7 +35,7 @@ class McpApiKeyAuth(TokenVerifier):
 
         return AccessToken(
             token=token,
-            client_id=f"company:{mcp_api_key.multi_tenant_company_id}",
+            client_id=f"user:{mcp_api_key.user_id}",
             scopes=[],
         )
 
@@ -36,7 +44,7 @@ class McpApiKeyAuth(TokenVerifier):
         from llm.models import McpApiKey
 
         try:
-            return McpApiKey.objects.select_related("multi_tenant_company").get(
+            return McpApiKey.objects.select_related("user").get(
                 key=token,
                 is_active=True,
             )

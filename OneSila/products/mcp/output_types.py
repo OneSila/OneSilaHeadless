@@ -119,6 +119,18 @@ SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA = {
     "required": ["id", "hostname", "active", "type", "subtype", "views"],
 }
 
+SALES_CHANNEL_REFERENCE_LIGHT_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "hostname": {"type": "string"},
+        "active": {"type": "boolean"},
+        "type": {"type": "string"},
+        "subtype": {"type": ["string", "null"]},
+    },
+    "required": ["id", "hostname", "active", "type", "subtype"],
+}
+
 
 PRODUCT_IMAGE_OUTPUT_SCHEMA = {
     "type": "object",
@@ -135,7 +147,7 @@ PRODUCT_IMAGE_OUTPUT_SCHEMA = {
         "sort_order": {"type": "integer"},
         "sales_channel": {
             "oneOf": [
-                SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA,
+                SALES_CHANNEL_REFERENCE_LIGHT_OUTPUT_SCHEMA,
                 {"type": "null"},
             ],
         },
@@ -171,7 +183,7 @@ PRODUCT_TRANSLATION_OUTPUT_SCHEMA = {
         "name": {"type": "string"},
         "sales_channel": {
             "oneOf": [
-                SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA,
+                SALES_CHANNEL_REFERENCE_LIGHT_OUTPUT_SCHEMA,
                 {"type": "null"},
             ],
         },
@@ -328,6 +340,7 @@ PRODUCT_BASE_DETAIL_OUTPUT_SCHEMA = {
         "type": {"type": "string", "enum": PRODUCT_TYPE_ENUM},
         "type_label": {"type": "string"},
         "active": {"type": "boolean"},
+        "ean_code": {"type": ["string", "null"]},
         "vat_rate": {"type": ["integer", "null"]},
         "thumbnail_url": {"type": ["string", "null"]},
         "has_images": {"type": "boolean"},
@@ -341,6 +354,7 @@ PRODUCT_BASE_DETAIL_OUTPUT_SCHEMA = {
         "type",
         "type_label",
         "active",
+        "ean_code",
         "vat_rate",
         "thumbnail_url",
         "has_images",

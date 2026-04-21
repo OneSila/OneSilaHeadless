@@ -3,6 +3,7 @@ import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from core.tests import TestCase
 from django.core.files.base import ContentFile
 from model_bakery import baker
@@ -392,7 +393,7 @@ class DirectExportFeedViewTest(TestCase):
         )
         export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
         api_key = McpApiKey.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
+            user=self.user,
         )
 
         response = self.client.get(
@@ -414,8 +415,12 @@ class DirectExportFeedViewTest(TestCase):
         )
         export_process.file.save("feed.json", ContentFile(b'{"hello": "world"}'), save=True)
         other_company = baker.make("core.MultiTenantCompany")
-        api_key = McpApiKey.objects.create(
+        other_user = baker.make(
+            get_user_model(),
             multi_tenant_company=other_company,
+        )
+        api_key = McpApiKey.objects.create(
+            user=other_user,
         )
 
         response = self.client.get(

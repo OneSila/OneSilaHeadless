@@ -10,7 +10,7 @@ from channels.db import database_sync_to_async
 from fastmcp.exceptions import ToolError
 from fastmcp.tools.tool import ToolResult
 from imports_exports.models import Import
-from llm.mcp.auth import get_authenticated_company
+from llm.mcp.auth import get_authenticated_company, get_authenticated_user as get_authenticated_user_from_auth
 from llm.models import McpToolRun
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,12 @@ class BaseMcpTool:
         if self.title and "title" not in annotations:
             annotations["title"] = self.title
         return annotations
+
+    async def get_authenticated_user(self, *, required: bool = True):
+        user = await database_sync_to_async(get_authenticated_user_from_auth)()
+        if user is None and required:
+            raise McpToolError("Could not determine the authenticated user.")
+        return user
 
     async def get_multi_tenant_company(self, *, required: bool = True):
         multi_tenant_company = await database_sync_to_async(get_authenticated_company)()
@@ -153,12 +159,18 @@ class BaseMcpTool:
     async def create_mcp_tool_run(
         self,
         *,
-        multi_tenant_company,
+        user=None,
+        multi_tenant_company=None,
         payload_content: dict[str, Any],
         total_records: int,
         skip_broken_records: bool = True,
     ) -> McpToolRun:
+        if user is None:
+            user = await self.get_authenticated_user(required=True)
+        if multi_tenant_company is None and user is not None:
+            multi_tenant_company = user.multi_tenant_company
         return await database_sync_to_async(self._create_mcp_tool_run)(
+            user=user,
             multi_tenant_company=multi_tenant_company,
             payload_content=payload_content,
             total_records=total_records,
@@ -168,12 +180,14 @@ class BaseMcpTool:
     def _create_mcp_tool_run(
         self,
         *,
-        multi_tenant_company,
+        user,
+        multi_tenant_company=None,
         payload_content: dict[str, Any],
         total_records: int,
         skip_broken_records: bool,
     ) -> McpToolRun:
         return McpToolRun.objects.create(
+            user=user,
             multi_tenant_company=multi_tenant_company,
             tool_name=self.name or self.execute.__name__,
             payload_content=payload_content,

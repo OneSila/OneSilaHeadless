@@ -580,6 +580,7 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
 
         payload = self._get_payload(result=result)
         self.assertEqual(payload["sku"], "BOOK-001")
+        self.assertIsNone(payload["ean_code"])
         self.assertEqual(payload["vat_rate"], 21)
         self.assertIn("/products/product/", payload["onesila_url"])
         self.assertNotIn("inspector", payload)
@@ -606,6 +607,11 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             name="Main website",
             url="https://amazon-nice-prints.example.com",
         )
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
         website_view_assign = SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -630,6 +636,7 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
 
         payload = self._get_payload(result=result)
         self.assertEqual(payload["inspector"]["status_label"], "red")
+        self.assertEqual(payload["ean_code"], "1234567890123")
         self.assertEqual(len(payload["inspector"]["issues"]), 1)
         self.assertEqual(payload["inspector"]["issues"][0]["code"], 101)
         self.assertEqual(

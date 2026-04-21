@@ -1,4 +1,4 @@
-from llm.mcp.auth import McpApiKeyAuth, get_authenticated_company
+from llm.mcp.auth import McpApiKeyAuth, get_authenticated_company, get_authenticated_user
 from llm.mcp.mcp_tool import BaseMcpTool, McpToolError
 from llm.mcp.runtime import FastMCP
 
@@ -8,4 +8,5 @@ __all__ = [
     "McpApiKeyAuth",
     "McpToolError",
     "get_authenticated_company",
+    "get_authenticated_user",
 ]

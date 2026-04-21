@@ -27,15 +27,15 @@ def regenerate_mcp_api_keys(modeladmin, request, queryset):
 
 @admin.register(McpApiKey)
 class McpApiKeyAdmin(ModelAdmin):
-    list_display = ("multi_tenant_company", "key", "is_active", "created_at", "updated_at")
+    list_display = ("user", "key", "is_active", "created_at", "updated_at")
     list_filter = ("is_active",)
-    search_fields = ("multi_tenant_company__name", "key")
-    list_select_related = ("multi_tenant_company",)
-    raw_id_fields = ("multi_tenant_company",)
-    ordering = ("multi_tenant_company__name",)
+    search_fields = ("user__username", "user__email", "key")
+    list_select_related = ("user",)
+    raw_id_fields = ("user",)
+    ordering = ("user__username",)
     actions = (regenerate_mcp_api_keys,)
     readonly_fields = ("key", "created_at", "updated_at")
-    fields = ("multi_tenant_company", "key", "is_active", "created_at", "updated_at")
+    fields = ("user", "key", "is_active", "created_at", "updated_at")
 
 
 @admin.register(AiGenerateProcess)
@@ -61,14 +61,14 @@ class AiImportProcessAdmin(ModelAdmin):
 
 @admin.register(McpToolRun)
 class McpToolRunAdmin(ModelAdmin):
-    list_display = ("tool_name", "multi_tenant_company", "status", "percentage", "created_at")
+    list_display = ("tool_name", "user", "status", "percentage", "created_at")
     list_filter = ("tool_name", "status")
-    search_fields = ("tool_name", "name", "multi_tenant_company__name")
-    list_select_related = ("multi_tenant_company",)
-    raw_id_fields = ("multi_tenant_company",)
+    search_fields = ("tool_name", "name", "user__username", "user__email")
+    list_select_related = ("user",)
+    raw_id_fields = ("user",)
     readonly_fields = ("created_at", "updated_at")
     fields = (
-        "multi_tenant_company",
+        "user",
         "tool_name",
         "name",
         "status",

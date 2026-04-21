@@ -1,9 +1,10 @@
+from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
 from core.tests import TestCase
-from llm.models import ChatGptProductFeedConfig, McpToolRun
+from llm.models import ChatGptProductFeedConfig, McpApiKey, McpToolRun
 from properties.models import Property, PropertySelectValue
 
 
@@ -121,3 +122,31 @@ class McpToolRunModelTestCase(SimpleTestCase):
             McpToolRun.OMITTED_IMAGE_CONTENT_TEMPLATE.format(length=len(image_content)),
         )
         self.assertEqual(result["images"][0]["title"], "Chat upload")
+
+    def test_has_user_field(self):
+        user_field = McpToolRun._meta.get_field("user")
+
+        self.assertEqual(user_field.related_model, get_user_model())
+
+    def test_user_full_name_uses_linked_user(self):
+        user = get_user_model()(
+            username="tool-runner@example.com",
+            first_name="Tool",
+            last_name="Runner",
+        )
+        tool_run = McpToolRun(user=user)
+
+        self.assertEqual(tool_run.user_full_name(None), "Tool Runner")
+
+
+class McpApiKeyModelTestCase(TestCase):
+    def test_save_generates_key_and_links_user(self):
+        user = get_user_model().objects.create(
+            username="mcp-owner@example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        mcp_api_key = McpApiKey.objects.create(user=user)
+
+        self.assertEqual(mcp_api_key.user, user)
+        self.assertTrue(mcp_api_key.key)

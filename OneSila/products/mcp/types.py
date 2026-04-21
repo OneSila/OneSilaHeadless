@@ -224,6 +224,7 @@ class ProductBaseDetailPayload(TypedDict):
     type: ProductTypeValue
     type_label: str
     active: bool
+    ean_code: str | None
     vat_rate: int | None
     thumbnail_url: str | None
     has_images: bool

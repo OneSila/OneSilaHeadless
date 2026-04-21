@@ -47,6 +47,7 @@ class MultiTenantUserType(relay.Node):
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
     timezone_detail: TimezoneType
     multi_tenant_company: Annotated['MultiTenantCompanyType', lazy("core.schema.multi_tenant.types.types")] | None
+    mcp_api_key: Annotated['McpApiKeyType', lazy("llm.schema.types.types")] | None
 
     @field()
     def full_name(self, info) -> str | None:
@@ -66,7 +67,6 @@ class MultiTenantUserType(relay.Node):
 class MultiTenantCompanyType(relay.Node):
     multitenantuser_set: List[MultiTenantUserType]
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
-    mcp_api_key: Annotated['McpApiKeyType', lazy("llm.schema.types.types")] | None
 
     @field()
     def full_address(self, info) -> str:

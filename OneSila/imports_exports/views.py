@@ -25,8 +25,8 @@ class DirectExportFeedView(View):
         api_key = McpApiKey.objects.filter(
             key=token,
             is_active=True,
-            multi_tenant_company=export.multi_tenant_company,
-        ).first()
+            user__multi_tenant_company=export.multi_tenant_company,
+        ).select_related("user").first()
         if api_key is None:
             return HttpResponseForbidden("Invalid bearer token.")
 

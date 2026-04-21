@@ -12,11 +12,7 @@ from imports_exports.models import Import
 
 
 class McpApiKey(models.SharedModel):
-    multi_tenant_company = models.OneToOneField(
-        "core.MultiTenantCompany",
-        on_delete=models.CASCADE,
-        related_name="mcp_api_key",
-    )
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mcp_api_key")
     key = models.CharField(max_length=64, unique=True, db_index=True, editable=False)
     is_active = models.BooleanField(default=True)
 
@@ -26,7 +22,7 @@ class McpApiKey(models.SharedModel):
         verbose_name_plural = "MCP API Keys"
 
     def __str__(self):
-        return f"MCP API Key ({self.multi_tenant_company})"
+        return f"MCP API Key ({self.user})"
 
     @staticmethod
     def generate_key() -> str:
@@ -65,6 +61,7 @@ class McpToolRun(Import, models.Model):
     TRUNCATED_SUFFIX = "...[truncated]"
     OMITTED_IMAGE_CONTENT_TEMPLATE = "<image_content omitted, length={length}>"
 
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mcp_tool_runs")
     tool_name = models.CharField(
         max_length=128,
         db_index=True,
@@ -95,7 +92,8 @@ class McpToolRun(Import, models.Model):
 
     def __str__(self):
         display_name = self.name or self.tool_name or "MCP Tool Run"
-        return f"{display_name} - {self.get_status_display()} ({self.percentage}%)"
+        owner = self.user if self.user_id else "unassigned"
+        return f"{display_name} - {owner} - {self.get_status_display()} ({self.percentage}%)"
 
     @classmethod
     def sanitize_json_content(cls, *, value):

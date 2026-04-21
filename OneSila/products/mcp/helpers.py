@@ -636,6 +636,7 @@ def serialize_product_base_detail(*, product: Product) -> ProductBaseDetailPaylo
         "type": product.type,
         "type_label": get_product_type_label(type_value=product.type),
         "active": product.active,
+        "ean_code": product.ean_code,
         "vat_rate": product.vat_rate.rate if product.vat_rate_id else None,
         "thumbnail_url": get_product_thumbnail_url(product=product),
         "has_images": bool(getattr(product, "has_images", False) or _get_image_assignments(product=product)),

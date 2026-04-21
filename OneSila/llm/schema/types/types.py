@@ -56,8 +56,8 @@ class BrandCustomPromptType(relay.Node, GetQuerysetMultiTenantMixin):
     McpApiKey,
     fields="__all__",
 )
-class McpApiKeyType(relay.Node, GetQuerysetMultiTenantMixin):
-    multi_tenant_company: Annotated["MultiTenantCompanyType", lazy("core.schema.multi_tenant.types.types")]
+class McpApiKeyType(relay.Node):
+    user: Annotated["MultiTenantUserType", lazy("core.schema.multi_tenant.types.types")]
 
     @field()
     def masked_key(self, info) -> str:
@@ -72,6 +72,7 @@ class McpApiKeyType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class McpToolRunType(relay.Node, GetQuerysetMultiTenantMixin):
+    user: Annotated["MultiTenantUserType", lazy("core.schema.multi_tenant.types.types")]
     multi_tenant_company: Annotated["MultiTenantCompanyType", lazy("core.schema.multi_tenant.types.types")]
     assigned_views: List[Annotated["SalesChannelViewType", lazy("sales_channels.schema.types.types")]]
 
@@ -82,6 +83,12 @@ class McpToolRunType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def percentage_color(self) -> PercentageColorEnum:
         return _resolve_percentage_color(status=self.status, percentage=self.percentage)
+
+    @field()
+    def user_full_name(self, info) -> Optional[str]:
+        if not self.user_id:
+            return None
+        return self.user.full_name()
 
     @field()
     def tool(self, info) -> Optional[McpToolRunToolEnum]:

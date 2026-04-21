@@ -28,25 +28,28 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        show_languages: Annotated[bool, Field(description="Include enabled company languages and the default language. Returns {default_language_code, enabled_languages:[{code,name,name_local,name_translated,bidi,is_default}]}.")] = False,
-        show_product_types: Annotated[bool, Field(description="Include product-type values available for this company. Returns {count, property, results:[{id,value,...}]}.")] = False,
-        show_product_types_translations: Annotated[bool, Field(description="Include product-type translations inside each product-type result. Automatically enables show_product_types.")] = False,
-        show_product_types_usage_counts: Annotated[bool, Field(description="Include product-type usage counts inside each product-type result. Automatically enables show_product_types.")] = False,
-        show_vat_rates: Annotated[bool, Field(description="Include configured VAT rates. Returns {count, results:[{id,name,rate}]}. Use these ids with create_products/upsert_products via vat_rate_id, or pass the rate value directly via vat_rate.")] = False,
-        show_currencies: Annotated[bool, Field(description="Include configured company currencies. Returns {count, default_currency_code, results:[{id,iso_code,name,symbol,is_default,inherits_from_iso_code}]}.")] = False,
+        show_languages: Annotated[bool, Field(description="Opt in to company languages when you need language codes for translation writes or validation.")] = False,
+        show_product_types: Annotated[bool, Field(description="Opt in to product-type values when you need `product_type_id` or `product_type_value` for create or property writes.")] = False,
+        show_product_types_translations: Annotated[bool, Field(description="Also include product-type translations. This automatically enables `show_product_types`.")] = False,
+        show_product_types_usage_counts: Annotated[bool, Field(description="Also include product-type usage counts. This automatically enables `show_product_types`.")] = False,
+        show_vat_rates: Annotated[bool, Field(description="Opt in to configured VAT rates when you need `vat_rate_id` for create or upsert, or when you want to confirm the exact percentage.")] = False,
+        show_currencies: Annotated[bool, Field(description="Opt in to company currencies when you need valid currency codes for price writes.")] = False,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
         Get company reference data with opt-in sections.
 
-        Set only the show_* flags you need. This tool is intentionally sparse so the client can
-        request just languages, product types, VAT rates, or currencies
-        without paying for unrelated output.
+        Use this only when you need reference data for a write or validation step:
+        - languages for translation writes
+        - product types for create-time product type assignment
+        - VAT rates for create/upsert VAT assignment
+        - currencies for price writes
 
-        Use this tool before writes when you need valid reference data such as languages, product-type
-        ids, VAT rates, or currencies. For product VAT updates, call
-        `get_company_details(show_vat_rates=true)` first if you want to pass `vat_rate_id` instead
-        of the raw VAT percentage.
+        Do not use this as a general fallback after `search_products`. It is not a product-count or
+        product-inspection tool. If you need a product count, use `search_products`. If you need the
+        state of a specific product, use `get_product`.
+
+        Set only the `show_*` flags you need. Each flag opts in to one section of reference data.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)

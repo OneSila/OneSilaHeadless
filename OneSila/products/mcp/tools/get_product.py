@@ -64,6 +64,7 @@ class GetProductMcpTool(BaseMcpTool):
             Field(
                 description=(
                     "Include translations for the main product and any sales-channel-specific content. "
+                    "If a translation has `sales_channel: null`, that is the default translation for that language. "
                     "Use this before editing names, subtitles, descriptions, or bullet points."
                 )
             ),
@@ -105,12 +106,16 @@ class GetProductMcpTool(BaseMcpTool):
         - inspector: internal readiness check for the product. It tells you whether required or optional
           information is missing and returns issue items with explanations.
         - property requirements: the full expected property schema for the current product type.
+        - ean_code: the current product EAN stored on the product, if one is assigned.
 
         Common usage:
         - Use `show_inspector=true` to learn what is missing.
         - Add `show_property_requirements=true` when the inspector alone is not specific enough.
         - Use `show_translations=true`, `show_properties=true`, `show_prices=true`, or `show_images=true`
           before calling `upsert_products` if you need the current data first.
+        - Use the top-level `ean_code` field to see the product's current EAN before deciding whether to
+          update it with `upsert_products`.
+        - For translations, treat `sales_channel: null` as the default translation for that language.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
