@@ -634,10 +634,23 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
         from properties.models import ProductProperty
         product_type_ids = list(self.values_list('product_type_id', flat=True))
 
-        if ProductProperty.objects.filter(value_select_id__in=product_type_ids).exists():
+        used_skus = list(
+            ProductProperty.objects.filter(value_select_id__in=product_type_ids)
+            .exclude(product__sku__isnull=True)
+            .values_list("product__sku", flat=True)
+            .distinct()
+            .order_by("product__sku")
+        )
+        if used_skus:
+            display_skus = used_skus[:20]
+            remaining = len(used_skus) - len(display_skus)
+            if remaining > 0:
+                display_skus.append(_("+%(count)s others") % {"count": remaining})
             raise ValidationError(
-                _("One or more product type rules are currently in use by some products. "
-                  "Please unassign all products from these rules before attempting deletion.")
+                _(
+                    "This object cannot be deleted because it is still used in products:\n%(skus)s"
+                )
+                % {"skus": ", ".join(display_skus)}
             )
 
         return super().delete(*args, **kwargs)

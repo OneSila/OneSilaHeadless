@@ -1,5 +1,6 @@
 from django.db import models, transaction
 from django.core.exceptions import PermissionDenied
+from django.db.models import ProtectedError
 
 import strawberry_django
 from strawberry_django.mutations import resolvers
@@ -15,6 +16,7 @@ from typing import List
 from .decorators import multi_tenant_owner_protection
 from .mixins import GetMultiTenantCompanyMixin, GetCurrentUserMixin
 from .extensions import default_extensions
+from .delete_errors import raise_protected_delete_validation_error
 from ...signals import mutation_update, mutation_create
 from strawberry_django.permissions import get_with_perms
 
@@ -126,7 +128,10 @@ class DeleteMutation(GetMultiTenantCompanyMixin, BulkDjangoDeleteMutation):
             get_real_instance = getattr(instance, "get_real_instance", None)
             if callable(get_real_instance):
                 instance = get_real_instance()
-        return super().delete(info=info, instance=instance)
+        try:
+            return super().delete(info=info, instance=instance)
+        except ProtectedError as exc:
+            raise_protected_delete_validation_error(protected_error=exc)
 
 
 def create(input_type, validators=None):
