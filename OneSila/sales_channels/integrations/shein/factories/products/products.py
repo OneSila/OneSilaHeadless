@@ -2226,6 +2226,13 @@ class SheinProductBaseFactory(
                         else:
                             lines.append(text)
 
+                for record in info.get("mcc_valid_result") or []:
+                    if not isinstance(record, dict):
+                        continue
+                    text = str(record.get("message") or "").strip()
+                    if text:
+                        lines.append(text)
+
                 combined = "\n".join(dict.fromkeys(lines)) if lines else "Shein pre-validation failed."
                 raise SheinPreValidationError(combined)
 
