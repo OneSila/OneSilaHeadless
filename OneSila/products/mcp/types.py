@@ -4,7 +4,12 @@ from typing import Literal
 
 from typing_extensions import TypedDict
 
-from properties.mcp.types import PropertyReferencePayload, PropertySelectValueSummaryPayload
+from properties.mcp.types import (
+    CompanyLanguagesPayload,
+    PropertyReferencePayload,
+    PropertySelectValueSummaryPayload,
+    PropertySelectValueTranslationPayload,
+)
 
 
 ProductTypeValue = Literal["SIMPLE", "BUNDLE", "CONFIGURABLE", "ALIAS"]
@@ -47,6 +52,19 @@ class SalesChannelReferencePayload(TypedDict, total=False):
     active: bool
     type: str
     subtype: str | None
+    views: list["SalesChannelViewSummaryPayload"]
+
+
+class SalesChannelViewSummaryPayload(TypedDict):
+    id: int
+    name: str | None
+    is_default: bool | None
+
+
+class ProductWebsiteViewAssignPayload(TypedDict):
+    id: int
+    view_name: str | None
+    remote_url: str | None
 
 
 class ProductImagePayload(TypedDict):
@@ -81,12 +99,60 @@ class ProductPropertyValueUpdateInputPayload(TypedDict, total=False):
 
 class ProductImageInputPayload(TypedDict, total=False):
     image_url: str
+    image_content: str
     title: str
     description: str
     type: str
     is_main_image: bool
     sort_order: int
     sales_channel_id: int
+
+
+class ProductTranslationUpsertInputPayload(TypedDict, total=False):
+    language: str
+    sales_channel_id: int
+    name: str
+    subtitle: str
+    short_description: str
+    description: str
+    bullet_points: list[str]
+
+
+class ProductPriceUpsertInputPayload(TypedDict, total=False):
+    currency: str
+    price: str | float | int
+    rrp: str | float | int | None
+
+
+class CreateProductInputPayload(TypedDict, total=False):
+    type: ProductTypeValue
+    name: str
+    sku: str
+    product_type_id: int
+    product_type_value: str
+    vat_rate_id: int
+    vat_rate: int
+    active: bool
+    ean_code: str
+    translations: list[ProductTranslationUpsertInputPayload]
+    prices: list[ProductPriceUpsertInputPayload]
+    properties: list[ProductPropertyValueUpdateInputPayload]
+    images: list[ProductImageInputPayload]
+    sales_channel_view_ids: list[int]
+
+
+class UpsertProductInputPayload(TypedDict, total=False):
+    product_id: int
+    sku: str
+    vat_rate_id: int
+    vat_rate: int
+    active: bool
+    ean_code: str
+    translations: list[ProductTranslationUpsertInputPayload]
+    prices: list[ProductPriceUpsertInputPayload]
+    properties: list[ProductPropertyValueUpdateInputPayload]
+    images: list[ProductImageInputPayload]
+    sales_channel_view_ids: list[int]
 
 
 class ProductTranslationPayload(TypedDict, total=False):
@@ -136,7 +202,7 @@ class ProductPropertyRequirementsPayload(TypedDict):
     requirements: dict[str, ProductPropertyRequirementPayload]
 
 
-class ProductSummaryPayload(TypedDict):
+class ProductSearchSummaryPayload(TypedDict):
     id: int
     sku: str | None
     name: str
@@ -151,15 +217,43 @@ class ProductSummaryPayload(TypedDict):
     has_missing_information: bool
 
 
-class ProductDetailPayload(ProductSummaryPayload):
+class ProductBaseDetailPayload(TypedDict):
+    id: int
+    sku: str | None
+    name: str
+    type: ProductTypeValue
+    type_label: str
+    active: bool
+    ean_code: str | None
+    vat_rate: int | None
+    thumbnail_url: str | None
+    has_images: bool
+    onesila_url: str
     allow_backorder: bool
+
+
+class ProductBrandVoiceLanguagePromptPayload(TypedDict):
+    language: str
+    prompt: str
+
+
+class ProductBrandVoicePayload(TypedDict, total=False):
+    brand_value_id: int
+    brand_value: str
+    default_prompt: str
+    language_prompts: list[ProductBrandVoiceLanguagePromptPayload]
+
+
+class ProductDetailPayload(ProductBaseDetailPayload, total=False):
     vat_rate_data: ProductVatRatePayload | None
     inspector: ProductInspectorPayload
+    website_views_assign: list[ProductWebsiteViewAssignPayload]
     property_requirements: ProductPropertyRequirementsPayload
     translations: list[ProductTranslationPayload]
     images: list[ProductImagePayload]
     properties: list[ProductAssignedPropertyPayload]
     prices: list[ProductPricePayload]
+    brand_voice: ProductBrandVoicePayload | None
 
 
 class SearchProductsPayload(TypedDict):
@@ -167,15 +261,7 @@ class SearchProductsPayload(TypedDict):
     has_more: bool
     offset: int
     limit: int
-    results: list[ProductSummaryPayload]
-
-
-class ProductOnesilaUrlPayload(TypedDict):
-    id: int
-    sku: str | None
-    global_id: str
-    onesila_path: str
-    onesila_url: str
+    results: list[ProductSearchSummaryPayload]
 
 
 class VatRateOptionPayload(TypedDict):
@@ -195,6 +281,42 @@ class GetVatRatesPayload(TypedDict):
     results: list[VatRateOptionPayload]
 
 
+class CompanyProductTypePayload(TypedDict, total=False):
+    id: int
+    value: str
+    translations: list[PropertySelectValueTranslationPayload]
+    usage_count: int
+
+
+class CompanyProductTypesPayload(TypedDict):
+    count: int
+    property: PropertyReferencePayload
+    results: list[CompanyProductTypePayload]
+
+
+class CompanyCurrencyPayload(TypedDict):
+    id: int
+    iso_code: str
+    name: str
+    symbol: str
+    is_default: bool
+    inherits_from_iso_code: str | None
+
+
+class CompanyCurrenciesPayload(TypedDict):
+    count: int
+    default_currency_code: str | None
+    results: list[CompanyCurrencyPayload]
+
+
+class CompanyDetailsPayload(TypedDict, total=False):
+    message: str
+    languages: CompanyLanguagesPayload
+    product_types: CompanyProductTypesPayload
+    vat_rates: GetVatRatesPayload
+    currencies: CompanyCurrenciesPayload
+
+
 class SearchSalesChannelsPayload(TypedDict):
     total_count: int
     has_more: bool
@@ -203,17 +325,45 @@ class SearchSalesChannelsPayload(TypedDict):
     results: list[SalesChannelReferencePayload]
 
 
-class ProductMutationPayload(TypedDict):
+class ProductUpsertAppliedUpdatesPayload(TypedDict, total=False):
+    active: bool
+    vat_rate: bool
+    ean_code: bool
+    translations: int
+    prices: int
+    properties: int
+    images: int
+    website_views_assignments: int
+
+
+class ProductUpsertPayload(TypedDict, total=False):
     updated: bool
-    product: ProductDetailPayload
+    product_id: int
+    sku: str | None
+    name: str
+    active: bool
+    message: str
+    applied_updates: ProductUpsertAppliedUpdatesPayload
 
 
-class ProductBatchMutationPayload(TypedDict):
-    updated_count: int
-    product: ProductDetailPayload
-
-
-class CreateProductPayload(TypedDict):
+class CreateProductPayload(TypedDict, total=False):
     created: bool
     sku_was_generated: bool
-    product: ProductDetailPayload
+    product_id: int
+    sku: str | None
+    name: str
+    message: str
+
+
+class CreateProductsPayload(TypedDict):
+    requested_count: int
+    processed_count: int
+    created_count: int
+    results: list[CreateProductPayload]
+
+
+class UpsertProductsPayload(TypedDict):
+    requested_count: int
+    processed_count: int
+    updated_count: int
+    results: list[ProductUpsertPayload]

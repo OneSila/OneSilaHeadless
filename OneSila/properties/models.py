@@ -307,10 +307,21 @@ class ProductPropertiesRule(models.Model):
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-
-        if ProductProperty.objects.filter(value_select=self.product_type).exists():
+        used_skus = list(
+            ProductProperty.objects.filter(value_select=self.product_type)
+            .exclude(product__sku__isnull=True)
+            .values_list("product__sku", flat=True)
+            .order_by("product__sku")
+            .distinct()
+        )
+        if used_skus:
+            display_skus = used_skus[:20]
+            remaining = len(used_skus) - len(display_skus)
+            if remaining > 0:
+                display_skus.append(_("+%(count)s others") % {"count": remaining})
             raise ValidationError(
-                _("Cannot delete product type rule because there are products assigned to this rule.")
+                _("This object cannot be deleted because it is still used in products:\n%(skus)s")
+                % {"skus": ", ".join(display_skus)}
             )
         super().delete(*args, **kwargs)
 

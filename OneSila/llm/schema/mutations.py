@@ -28,9 +28,9 @@ from django.core.exceptions import ValidationError
 from llm.models import McpApiKey
 
 
-def _get_or_create_mcp_api_key(*, multi_tenant_company):
+def _get_or_create_mcp_api_key(*, user):
     mcp_api_key, _ = McpApiKey.objects.get_or_create(
-        multi_tenant_company=multi_tenant_company,
+        user=user,
     )
     return mcp_api_key
 
@@ -46,8 +46,11 @@ class LlmMutation:
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=[*default_extensions, IsMultiTenantCompanyOwner()])
     def create_mcp_api_key(self, info: Info) -> McpApiKeyType:
-        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        mcp_api_key = _get_or_create_mcp_api_key(multi_tenant_company=multi_tenant_company)
+        current_user = get_current_user(info)
+        if current_user is None:
+            raise ValidationError("Could not determine the authenticated user.")
+
+        mcp_api_key = _get_or_create_mcp_api_key(user=current_user)
 
         if not mcp_api_key.key:
             mcp_api_key.regenerate_key(save=True)
@@ -56,23 +59,32 @@ class LlmMutation:
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=[*default_extensions, IsMultiTenantCompanyOwner()])
     def regenerate_mcp_api_key(self, info: Info) -> McpApiKeyType:
-        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        mcp_api_key = _get_or_create_mcp_api_key(multi_tenant_company=multi_tenant_company)
+        current_user = get_current_user(info)
+        if current_user is None:
+            raise ValidationError("Could not determine the authenticated user.")
+
+        mcp_api_key = _get_or_create_mcp_api_key(user=current_user)
         mcp_api_key.regenerate_key(save=True)
 
         return mcp_api_key
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=[*default_extensions, IsMultiTenantCompanyOwner()])
     def activate_mcp_api_key(self, info: Info) -> McpApiKeyType:
-        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        mcp_api_key = _get_or_create_mcp_api_key(multi_tenant_company=multi_tenant_company)
+        current_user = get_current_user(info)
+        if current_user is None:
+            raise ValidationError("Could not determine the authenticated user.")
+
+        mcp_api_key = _get_or_create_mcp_api_key(user=current_user)
         mcp_api_key.activate(save=True)
         return mcp_api_key
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=[*default_extensions, IsMultiTenantCompanyOwner()])
     def deactivate_mcp_api_key(self, info: Info) -> McpApiKeyType:
-        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        mcp_api_key = _get_or_create_mcp_api_key(multi_tenant_company=multi_tenant_company)
+        current_user = get_current_user(info)
+        if current_user is None:
+            raise ValidationError("Could not determine the authenticated user.")
+
+        mcp_api_key = _get_or_create_mcp_api_key(user=current_user)
         mcp_api_key.deactivate(save=True)
         return mcp_api_key
 

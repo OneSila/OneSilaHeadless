@@ -2,19 +2,17 @@ import secrets
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core import models
-from core.helpers import get_languages
+from core.helpers import ensure_serializable, get_languages
 from core.locales import LANGUAGE_MAX_LENGTH
+from imports_exports.models import Import
 
 
 class McpApiKey(models.SharedModel):
-    multi_tenant_company = models.OneToOneField(
-        "core.MultiTenantCompany",
-        on_delete=models.CASCADE,
-        related_name="mcp_api_key",
-    )
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mcp_api_key")
     key = models.CharField(max_length=64, unique=True, db_index=True, editable=False)
     is_active = models.BooleanField(default=True)
 
@@ -24,7 +22,7 @@ class McpApiKey(models.SharedModel):
         verbose_name_plural = "MCP API Keys"
 
     def __str__(self):
-        return f"MCP API Key ({self.multi_tenant_company})"
+        return f"MCP API Key ({self.user})"
 
     @staticmethod
     def generate_key() -> str:
@@ -55,6 +53,86 @@ class McpApiKey(models.SharedModel):
     def save(self, *args, **kwargs):
         if not self.key:
             self.key = self.generate_key()
+        super().save(*args, **kwargs)
+
+
+class McpToolRun(Import, models.Model):
+    MAX_JSON_VALUE_LENGTH = 20_000
+    TRUNCATED_SUFFIX = "...[truncated]"
+    OMITTED_IMAGE_CONTENT_TEMPLATE = "<image_content omitted, length={length}>"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mcp_tool_runs")
+    tool_name = models.CharField(
+        max_length=128,
+        db_index=True,
+        help_text="MCP tool name that created this run, for example create_products or upsert_products.",
+    )
+    payload_content = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Normalized MCP tool payload stored for traceability. Long values are truncated before saving.",
+    )
+    response_content = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Lean MCP tool response payload stored for traceability. Long values are truncated before saving.",
+    )
+    assigned_views = models.ManyToManyField(
+        "sales_channels.SalesChannelView",
+        blank=True,
+        related_name="mcp_tool_runs",
+        help_text="Website/storefront views explicitly referenced by this MCP tool run, when applicable.",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "MCP Tool Run"
+        verbose_name_plural = "MCP Tool Runs"
+        search_terms = ["name", "tool_name"]
+
+    def __str__(self):
+        display_name = self.name or self.tool_name or "MCP Tool Run"
+        owner = self.user if self.user_id else "unassigned"
+        return f"{display_name} - {owner} - {self.get_status_display()} ({self.percentage}%)"
+
+    def user_full_name(self, info=None):
+        user = getattr(self, "user", None)
+        if user is None:
+            return None
+        return user.full_name()
+
+    @classmethod
+    def sanitize_json_content(cls, *, value):
+        return cls._truncate_json_values(value=ensure_serializable(value))
+
+    @classmethod
+    def _truncate_json_values(cls, *, value, parent_key: str | None = None):
+        if isinstance(value, dict):
+            return {
+                key: cls._truncate_json_values(value=item_value, parent_key=str(key))
+                for key, item_value in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._truncate_json_values(value=item, parent_key=parent_key) for item in value]
+        if isinstance(value, tuple):
+            return [cls._truncate_json_values(value=item, parent_key=parent_key) for item in value]
+        if parent_key == "image_content" and isinstance(value, str):
+            return cls.OMITTED_IMAGE_CONTENT_TEMPLATE.format(length=len(value))
+        if isinstance(value, str) and len(value) > cls.MAX_JSON_VALUE_LENGTH:
+            trimmed_length = max(
+                0,
+                cls.MAX_JSON_VALUE_LENGTH - len(cls.TRUNCATED_SUFFIX),
+            )
+            return f"{value[:trimmed_length]}{cls.TRUNCATED_SUFFIX}"
+        return value
+
+    def save(self, *args, **kwargs):
+        if not self.name:
+            timestamp = timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M:%S")
+            self.name = f"{self.tool_name} - {timestamp}"
+
+        self.payload_content = self.sanitize_json_content(value=self.payload_content)
+        self.response_content = self.sanitize_json_content(value=self.response_content)
         super().save(*args, **kwargs)
 
 

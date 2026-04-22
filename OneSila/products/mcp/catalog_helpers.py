@@ -6,6 +6,7 @@ from imports_exports.factories.exports.helpers import serialize_sales_channel_pa
 from products.mcp.types import (
     GetProductTypesPayload,
     SearchSalesChannelsPayload,
+    SalesChannelViewSummaryPayload,
     GetVatRatesPayload,
     SalesChannelReferencePayload,
     VatRateOptionPayload,
@@ -13,7 +14,7 @@ from products.mcp.types import (
 from properties.mcp.helpers import (
     get_property_select_value_detail_queryset,
     serialize_property_reference,
-    serialize_property_select_value_detail,
+    serialize_property_select_value_summary,
 )
 from properties.models import Property, PropertySelectValue
 from sales_channels.models import SalesChannel
@@ -45,7 +46,7 @@ def get_product_types_payload(*, multi_tenant_company: MultiTenantCompany) -> Ge
         "count": len(select_values),
         "property": serialize_property_reference(property_instance=product_type_property),
         "results": [
-            serialize_property_select_value_detail(select_value=select_value)
+            serialize_property_select_value_summary(select_value=select_value)
             for select_value in select_values
         ],
     }
@@ -59,9 +60,22 @@ def serialize_vat_rate_option(*, vat_rate: VatRate) -> VatRateOptionPayload:
     }
 
 
+def serialize_sales_channel_view_option(*, view) -> SalesChannelViewSummaryPayload:
+    real_view = view.get_real_instance()
+    return {
+        "id": view.id,
+        "name": view.name,
+        "is_default": getattr(real_view, "is_default", None),
+    }
+
+
 def serialize_sales_channel_option(*, sales_channel: SalesChannel) -> SalesChannelReferencePayload:
     payload = serialize_sales_channel_payload(sales_channel=sales_channel)
     payload["active"] = bool(sales_channel.active)
+    payload["views"] = [
+        serialize_sales_channel_view_option(view=view)
+        for view in sorted(sales_channel.saleschannelview_set.all(), key=lambda item: item.id)
+    ]
     return payload
 
 
@@ -76,7 +90,7 @@ def search_sales_channels_payload(
 ) -> SearchSalesChannelsPayload:
     queryset = SalesChannel.objects.filter(
         multi_tenant_company=multi_tenant_company,
-    )
+    ).prefetch_related("saleschannelview_set")
     if search:
         queryset = queryset.filter(hostname__icontains=search)
     if active is not None:
@@ -153,11 +167,11 @@ def get_product_type_match(
     )
     if not matching_ids:
         raise ValueError(
-            f"Product type {product_type_value!r} not found. Use get_product_types first."
+            f"Product type {product_type_value!r} not found. Use get_company_details with show_product_types=true first."
         )
     if len(matching_ids) > 1:
         raise ValueError(
-            f"Multiple product types matched {product_type_value!r}. Use get_product_types and pass product_type_id."
+            f"Multiple product types matched {product_type_value!r}. Use get_company_details with show_product_types=true and pass product_type_id."
         )
     return queryset.get(id=matching_ids[0])
 
@@ -182,6 +196,6 @@ def get_vat_rate_match(
     vat_rate_instance = queryset.filter(rate=vat_rate).first()
     if vat_rate_instance is None:
         raise ValueError(
-            f"VAT rate {vat_rate!r} not found. Use get_vat_rates first."
+            f"VAT rate {vat_rate!r} not found. Use get_company_details with show_vat_rates=true first."
         )
     return vat_rate_instance

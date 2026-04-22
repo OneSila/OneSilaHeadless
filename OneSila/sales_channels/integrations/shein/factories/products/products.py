@@ -1047,10 +1047,11 @@ class SheinProductBaseFactory(
         details: list[str] = []
         for item in sorted(configurator_items, key=lambda item: getattr(item, "sort_order", 0)):
             prop = getattr(item, "property", None)
+            prop_internal_name = getattr(prop, "internal_name", None)
             prop_name = getattr(prop, "name", None)
-            label = prop_name if prop_name else f"property_id={item.property_id}"
-            if prop_name:
-                label = f"{label} (property_id={item.property_id})"
+            label = prop_internal_name or prop_name or f"property_id={item.property_id}"
+            if prop_internal_name and prop_name and prop_name != prop_internal_name:
+                label = f"{label} ({prop_name})"
             if varying_map is not None:
                 label = f"{label}, {len(varying_map.get(item.property_id, set()))} values"
             details.append(label)
@@ -2224,6 +2225,13 @@ class SheinProductBaseFactory(
                             lines.append(f"{form_name}: {text}")
                         else:
                             lines.append(text)
+
+                for record in info.get("mcc_valid_result") or []:
+                    if not isinstance(record, dict):
+                        continue
+                    text = str(record.get("message") or "").strip()
+                    if text:
+                        lines.append(text)
 
                 combined = "\n".join(dict.fromkeys(lines)) if lines else "Shein pre-validation failed."
                 raise SheinPreValidationError(combined)

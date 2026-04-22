@@ -40,6 +40,17 @@ class SearchSalesChannelsMcpTool(BaseMcpTool):
         Search or list the sales channels configured for the authenticated company.
         Use this when you need to resolve a hostname or marketplace name to the
         exact sales_channel_id before calling channel-specific product tools.
+        Each result also includes channel views. Use sales_channel_view_id when assigning
+        a product to a storefront or website view. Use sales_channel_id for channel-specific
+        content, images, prices, or other sales-channel-scoped product data.
+        Each result has this shape:
+        - id, hostname, active, type, subtype
+        - views: [{id, name, is_default}]
+
+        Important distinction:
+        - sales_channel_view_id assigns a product to a storefront or website view
+        - sales_channel_id scopes channel-specific translations, images, and other channel content
+
         When called without filters, it returns the company sales channels as a paginated list.
         """
         try:
@@ -72,12 +83,6 @@ class SearchSalesChannelsMcpTool(BaseMcpTool):
             await ctx.error(f"Search sales channels failed: {error}")
             self.handle_error(error=error, action=self.name)
             raise
-
-    def _sanitize_optional_string(self, *, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
 
     @database_sync_to_async
     def _search_sales_channels(

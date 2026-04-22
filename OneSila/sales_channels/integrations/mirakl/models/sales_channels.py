@@ -78,6 +78,10 @@ class MiraklSalesChannel(SalesChannel):
         choices=CSV_DELIMITER_CHOICES,
         help_text="Delimiter expected in operator CSV files.",
     )
+    product_data_validation_by_channel = models.BooleanField(
+        default=False,
+        help_text="Indicates whether Mirakl validates product attributes per sales channel view.",
+    )
     last_differential_issues_fetch = models.DateTimeField(
         null=True,
         blank=True,

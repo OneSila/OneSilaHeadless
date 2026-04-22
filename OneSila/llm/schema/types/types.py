@@ -2,11 +2,13 @@ from typing import Annotated, List, Optional
 
 from core.schema.core.types.types import relay, type, strawberry_type, GetQuerysetMultiTenantMixin, field
 from strawberry import lazy
+from strawberry.relay import to_base64
+from imports_exports.schema.types.types import ImportType, PercentageColorEnum, _resolve_percentage_color
 
-from .filters import BrandCustomPromptFilter
-from .ordering import BrandCustomPromptOrder
+from .filters import BrandCustomPromptFilter, McpToolRunFilter, McpToolRunToolEnum
+from .ordering import BrandCustomPromptOrder, McpToolRunOrder
 from properties.schema.types.types import PropertySelectValueType
-from llm.models import BrandCustomPrompt, ChatGptProductFeedConfig, McpApiKey
+from llm.models import BrandCustomPrompt, ChatGptProductFeedConfig, McpApiKey, McpToolRun
 
 
 @strawberry_type
@@ -54,12 +56,46 @@ class BrandCustomPromptType(relay.Node, GetQuerysetMultiTenantMixin):
     McpApiKey,
     fields="__all__",
 )
-class McpApiKeyType(relay.Node, GetQuerysetMultiTenantMixin):
-    multi_tenant_company: Annotated["MultiTenantCompanyType", lazy("core.schema.multi_tenant.types.types")]
+class McpApiKeyType(relay.Node):
+    user: Annotated["MultiTenantUserType", lazy("core.schema.multi_tenant.types.types")]
 
     @field()
     def masked_key(self, info) -> str:
         return McpApiKey.masked_key.fget(self)
+
+
+@type(
+    McpToolRun,
+    filters=McpToolRunFilter,
+    order=McpToolRunOrder,
+    pagination=True,
+    fields="__all__",
+)
+class McpToolRunType(relay.Node, GetQuerysetMultiTenantMixin):
+    user: Annotated["MultiTenantUserType", lazy("core.schema.multi_tenant.types.types")]
+    multi_tenant_company: Annotated["MultiTenantCompanyType", lazy("core.schema.multi_tenant.types.types")]
+    assigned_views: List[Annotated["SalesChannelViewType", lazy("sales_channels.schema.types.types")]]
+
+    @field()
+    def proxy_id(self, info) -> str:
+        return to_base64(ImportType, self.pk)
+
+    @field()
+    def percentage_color(self) -> PercentageColorEnum:
+        return _resolve_percentage_color(status=self.status, percentage=self.percentage)
+
+    @field()
+    def user_full_name(self, info) -> Optional[str]:
+        if not self.user_id:
+            return None
+        return self.user.full_name()
+
+    @field()
+    def tool(self, info) -> Optional[McpToolRunToolEnum]:
+        try:
+            return McpToolRunToolEnum(self.tool_name)
+        except ValueError:
+            return None
 
 
 @type(

@@ -49,6 +49,7 @@ class MiraklSalesChannelMetadataFactoriesTests(DisableMiraklConnectionMixin, Tes
                 "catalog": {
                     "product_import_only_on_leaf": True,
                     "list_of_multiple_values_separator": "|",
+                    "product_data_validation_by_channel": True,
                 },
                 "offer_prices_decimals": "2",
                 "operator_csv_delimiter": "SEMICOLON",
@@ -66,6 +67,7 @@ class MiraklSalesChannelMetadataFactoriesTests(DisableMiraklConnectionMixin, Tes
             self.sales_channel.operator_csv_delimiter,
             MiraklSalesChannel.CSV_DELIMITER_SEMICOLON,
         )
+        self.assertTrue(self.sales_channel.product_data_validation_by_channel)
         validate_credentials_mock.assert_called_once_with()
         get_platform_configuration_mock.assert_called_once_with()
 

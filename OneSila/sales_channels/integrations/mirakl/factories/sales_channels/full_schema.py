@@ -661,6 +661,8 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self.summary_data["product_type_items"] += 1
 
     def _sync_property_applicabilities(self, *, remote_property: MiraklProperty, item: dict[str, Any]) -> None:
+        if not getattr(self.sales_channel, "product_data_validation_by_channel", False):
+            return
         for channel_item in self._normalize_records(item.get("channels")):
             channel_code = self._clean_string(channel_item.get("code"))
             if not channel_code:

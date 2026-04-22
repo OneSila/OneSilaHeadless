@@ -22,6 +22,7 @@ class ValidateMiraklCredentialsFactory(GetMiraklAPIMixin):
                 "list_of_multiple_values_separator",
                 "offer_prices_decimals",
                 "operator_csv_delimiter",
+                "product_data_validation_by_channel",
             ]
         )
         return account_info
@@ -32,6 +33,7 @@ class ValidateMiraklCredentialsFactory(GetMiraklAPIMixin):
 
         instance.product_import_only_on_leaf = bool(catalog_features.get("product_import_only_on_leaf", False))
         instance.list_of_multiple_values_separator = str(catalog_features.get("list_of_multiple_values_separator") or "").strip()
+        instance.product_data_validation_by_channel = bool(catalog_features.get("product_data_validation_by_channel", False))
 
         offer_prices_decimals = str(features.get("offer_prices_decimals") or "").strip()
         try:

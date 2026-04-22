@@ -18,11 +18,12 @@ from llm.mcp.tags import (
 )
 from properties.mcp.helpers import (
     get_property_select_value_detail_queryset,
+    resolve_property_ids,
     serialize_property_select_value_detail,
 )
 from properties.mcp.output_types import GET_PROPERTY_SELECT_VALUE_OUTPUT_SCHEMA
 from properties.mcp.types import PropertySelectValueDetailPayload
-from properties.models import Property, PropertySelectValue
+from properties.models import PropertySelectValue
 
 
 class GetPropertySelectValueMcpTool(BaseMcpTool):
@@ -39,11 +40,11 @@ class GetPropertySelectValueMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        select_value_id: Annotated[int | None, Field(ge=1, description="Exact property select-value database ID.")] = None,
+        select_value_id: Annotated[int | None, Field(ge=1, description="Exact property select-value database ID. Prefer this when you already know it.")] = None,
         value: Annotated[str | None, Field(description="Exact translated select-value text for natural-key lookup.")] = None,
-        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID for natural-key lookup.")] = None,
-        property_internal_name: Annotated[str | None, Field(description="Exact property internal name for natural-key lookup.")] = None,
-        property_name: Annotated[str | None, Field(description="Exact translated property name for natural-key lookup.")] = None,
+        property_id: Annotated[int | None, Field(ge=1, description="Exact property database ID for natural-key lookup when select_value_id is unknown.")] = None,
+        property_internal_name: Annotated[str | None, Field(description="Exact property internal name for natural-key lookup when select_value_id is unknown.")] = None,
+        property_name: Annotated[str | None, Field(description="Exact translated property name for natural-key lookup when select_value_id is unknown.")] = None,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
@@ -55,6 +56,12 @@ class GetPropertySelectValueMcpTool(BaseMcpTool):
 
         When you are not sure which value is the correct one, call `search_property_select_values`
         first and then use the returned `select_value_id` here.
+
+        Returned detail includes:
+        - id, value, full_value_name
+        - usage_count, thumbnail_url
+        - parent property summary
+        - translations: `[{language, value}]`
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
@@ -128,10 +135,6 @@ class GetPropertySelectValueMcpTool(BaseMcpTool):
         )
 
         if select_value_id is not None:
-            if not isinstance(select_value_id, int):
-                raise McpToolError(
-                    f"select_value_id must be an integer, got: {type(select_value_id).__name__}"
-                )
             select_value = queryset.filter(id=select_value_id).first()
             if select_value is None:
                 raise McpToolError(
@@ -188,34 +191,13 @@ class GetPropertySelectValueMcpTool(BaseMcpTool):
         property_internal_name: str | None,
         property_name: str | None,
     ) -> list[int] | None:
-        if not any(
-            [
-                property_id is not None,
-                property_internal_name,
-                property_name,
-            ]
-        ):
-            return None
-
-        queryset = Property.objects.filter(multi_tenant_company=multi_tenant_company)
-
-        if property_id is not None:
-            if not isinstance(property_id, int):
-                raise McpToolError(
-                    f"property_id must be an integer, got: {type(property_id).__name__}"
-                )
-            queryset = queryset.filter(id=property_id)
-
-        if property_internal_name:
-            queryset = queryset.filter(internal_name__iexact=property_internal_name)
-
-        if property_name:
-            queryset = queryset.filter(propertytranslation__name__iexact=property_name)
-
-        property_ids = list(
-            queryset.order_by("id").values_list("id", flat=True).distinct()[:2]
+        property_ids = resolve_property_ids(
+            multi_tenant_company=multi_tenant_company,
+            property_id=property_id,
+            property_internal_name=property_internal_name,
+            property_name=property_name,
         )
-        if len(property_ids) > 1:
+        if property_ids is not None and len(property_ids) > 1:
             raise McpToolError(
                 "Multiple properties matched the provided property identifiers."
             )

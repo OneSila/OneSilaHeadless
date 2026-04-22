@@ -1,49 +1,31 @@
+from products.mcp.resources import register_product_mcp_resources
 from products.mcp.tools import (
-    ActivateProductMcpTool,
-    AddProductImagesMcpTool,
-    CreateProductMcpTool,
-    DeactivateProductMcpTool,
-    GetProductOnesilaUrlMcpTool,
+    CreateProductsMcpTool,
+    GetCompanyDetailsMcpTool,
     GetProductMcpTool,
-    GetProductTypesMcpTool,
-    GetVatRatesMcpTool,
     SearchSalesChannelsMcpTool,
     SearchProductsMcpTool,
-    UpdateProductContentMcpTool,
-    UpsertProductPriceMcpTool,
-    UpsertProductPropertyValuesMcpTool,
+    UpsertProductsMcpTool,
 )
 
 
 def register_product_mcp_tools(*, mcp):
+    register_product_mcp_resources(mcp=mcp)
+    GetCompanyDetailsMcpTool(mcp=mcp)
     SearchProductsMcpTool(mcp=mcp)
     GetProductMcpTool(mcp=mcp)
-    GetProductOnesilaUrlMcpTool(mcp=mcp)
     SearchSalesChannelsMcpTool(mcp=mcp)
-    GetProductTypesMcpTool(mcp=mcp)
-    GetVatRatesMcpTool(mcp=mcp)
-    CreateProductMcpTool(mcp=mcp)
-    ActivateProductMcpTool(mcp=mcp)
-    DeactivateProductMcpTool(mcp=mcp)
-    UpsertProductPriceMcpTool(mcp=mcp)
-    AddProductImagesMcpTool(mcp=mcp)
-    UpsertProductPropertyValuesMcpTool(mcp=mcp)
-    UpdateProductContentMcpTool(mcp=mcp)
+    CreateProductsMcpTool(mcp=mcp)
+    UpsertProductsMcpTool(mcp=mcp)
 
 
 __all__ = [
-    "ActivateProductMcpTool",
-    "AddProductImagesMcpTool",
-    "CreateProductMcpTool",
-    "DeactivateProductMcpTool",
-    "GetProductOnesilaUrlMcpTool",
+    "CreateProductsMcpTool",
+    "GetCompanyDetailsMcpTool",
     "GetProductMcpTool",
-    "GetProductTypesMcpTool",
-    "GetVatRatesMcpTool",
     "SearchSalesChannelsMcpTool",
     "SearchProductsMcpTool",
-    "UpdateProductContentMcpTool",
-    "UpsertProductPriceMcpTool",
-    "UpsertProductPropertyValuesMcpTool",
+    "UpsertProductsMcpTool",
+    "register_product_mcp_resources",
     "register_product_mcp_tools",
 ]

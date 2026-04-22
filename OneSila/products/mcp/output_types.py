@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from properties.mcp.output_types import (
+    COMPANY_LANGUAGE_OUTPUT_SCHEMA,
     PROPERTY_REFERENCE_OUTPUT_SCHEMA,
     PROPERTY_SELECT_VALUE_SUMMARY_OUTPUT_SCHEMA,
+    PROPERTY_SELECT_VALUE_TRANSLATION_OUTPUT_SCHEMA,
 )
 
 
@@ -79,7 +81,45 @@ PRODUCT_INSPECTOR_OUTPUT_SCHEMA = {
 }
 
 
+SALES_CHANNEL_VIEW_SUMMARY_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": ["string", "null"]},
+        "is_default": {"type": ["boolean", "null"]},
+    },
+    "required": ["id", "name", "is_default"],
+}
+
+
+PRODUCT_WEBSITE_VIEW_ASSIGN_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "view_name": {"type": ["string", "null"]},
+        "remote_url": {"type": ["string", "null"]},
+    },
+    "required": ["id", "view_name", "remote_url"],
+}
+
+
 SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "hostname": {"type": "string"},
+        "active": {"type": "boolean"},
+        "type": {"type": "string"},
+        "subtype": {"type": ["string", "null"]},
+        "views": {
+            "type": "array",
+            "items": SALES_CHANNEL_VIEW_SUMMARY_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["id", "hostname", "active", "type", "subtype", "views"],
+}
+
+SALES_CHANNEL_REFERENCE_LIGHT_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
         "id": {"type": "integer"},
@@ -107,7 +147,7 @@ PRODUCT_IMAGE_OUTPUT_SCHEMA = {
         "sort_order": {"type": "integer"},
         "sales_channel": {
             "oneOf": [
-                SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA,
+                SALES_CHANNEL_REFERENCE_LIGHT_OUTPUT_SCHEMA,
                 {"type": "null"},
             ],
         },
@@ -143,7 +183,7 @@ PRODUCT_TRANSLATION_OUTPUT_SCHEMA = {
         "name": {"type": "string"},
         "sales_channel": {
             "oneOf": [
-                SALES_CHANNEL_REFERENCE_OUTPUT_SCHEMA,
+                SALES_CHANNEL_REFERENCE_LIGHT_OUTPUT_SCHEMA,
                 {"type": "null"},
             ],
         },
@@ -258,7 +298,7 @@ PRODUCT_PROPERTY_REQUIREMENTS_OUTPUT_SCHEMA = {
 }
 
 
-PRODUCT_SUMMARY_OUTPUT_SCHEMA = {
+PRODUCT_SEARCH_SUMMARY_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
         "id": {"type": "integer"},
@@ -291,11 +331,68 @@ PRODUCT_SUMMARY_OUTPUT_SCHEMA = {
 }
 
 
+PRODUCT_BASE_DETAIL_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "sku": {"type": ["string", "null"]},
+        "name": {"type": "string"},
+        "type": {"type": "string", "enum": PRODUCT_TYPE_ENUM},
+        "type_label": {"type": "string"},
+        "active": {"type": "boolean"},
+        "ean_code": {"type": ["string", "null"]},
+        "vat_rate": {"type": ["integer", "null"]},
+        "thumbnail_url": {"type": ["string", "null"]},
+        "has_images": {"type": "boolean"},
+        "onesila_url": {"type": "string"},
+        "allow_backorder": {"type": "boolean"},
+    },
+    "required": [
+        "id",
+        "sku",
+        "name",
+        "type",
+        "type_label",
+        "active",
+        "ean_code",
+        "vat_rate",
+        "thumbnail_url",
+        "has_images",
+        "onesila_url",
+        "allow_backorder",
+    ],
+}
+
+
+PRODUCT_BRAND_VOICE_LANGUAGE_PROMPT_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "language": {"type": "string"},
+        "prompt": {"type": "string"},
+    },
+    "required": ["language", "prompt"],
+}
+
+
+PRODUCT_BRAND_VOICE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "brand_value_id": {"type": "integer"},
+        "brand_value": {"type": "string"},
+        "default_prompt": {"type": "string"},
+        "language_prompts": {
+            "type": "array",
+            "items": PRODUCT_BRAND_VOICE_LANGUAGE_PROMPT_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["brand_value_id", "brand_value"],
+}
+
+
 GET_PRODUCT_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
-        **PRODUCT_SUMMARY_OUTPUT_SCHEMA["properties"],
-        "allow_backorder": {"type": "boolean"},
+        **PRODUCT_BASE_DETAIL_OUTPUT_SCHEMA["properties"],
         "vat_rate_data": {
             "oneOf": [
                 PRODUCT_VAT_RATE_OUTPUT_SCHEMA,
@@ -303,6 +400,10 @@ GET_PRODUCT_OUTPUT_SCHEMA = {
             ],
         },
         "inspector": PRODUCT_INSPECTOR_OUTPUT_SCHEMA,
+        "website_views_assign": {
+            "type": "array",
+            "items": PRODUCT_WEBSITE_VIEW_ASSIGN_OUTPUT_SCHEMA,
+        },
         "property_requirements": PRODUCT_PROPERTY_REQUIREMENTS_OUTPUT_SCHEMA,
         "translations": {
             "type": "array",
@@ -320,18 +421,14 @@ GET_PRODUCT_OUTPUT_SCHEMA = {
             "type": "array",
             "items": PRODUCT_PRICE_OUTPUT_SCHEMA,
         },
+        "brand_voice": {
+            "oneOf": [
+                PRODUCT_BRAND_VOICE_OUTPUT_SCHEMA,
+                {"type": "null"},
+            ],
+        },
     },
-    "required": PRODUCT_SUMMARY_OUTPUT_SCHEMA["required"]
-    + [
-        "allow_backorder",
-        "vat_rate_data",
-        "inspector",
-        "property_requirements",
-        "translations",
-        "images",
-        "properties",
-        "prices",
-    ],
+    "required": PRODUCT_BASE_DETAIL_OUTPUT_SCHEMA["required"],
 }
 
 
@@ -344,24 +441,12 @@ SEARCH_PRODUCTS_OUTPUT_SCHEMA = {
         "limit": {"type": "integer"},
         "results": {
             "type": "array",
-            "items": PRODUCT_SUMMARY_OUTPUT_SCHEMA,
+            "items": PRODUCT_SEARCH_SUMMARY_OUTPUT_SCHEMA,
         },
     },
     "required": ["total_count", "has_more", "offset", "limit", "results"],
 }
 
-
-GET_PRODUCT_ONESILA_URL_OUTPUT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "integer"},
-        "sku": {"type": ["string", "null"]},
-        "global_id": {"type": "string"},
-        "onesila_path": {"type": "string"},
-        "onesila_url": {"type": "string"},
-    },
-    "required": ["id", "sku", "global_id", "onesila_path", "onesila_url"],
-}
 
 VAT_RATE_OPTION_OUTPUT_SCHEMA = {
     "type": "object",
@@ -371,6 +456,35 @@ VAT_RATE_OPTION_OUTPUT_SCHEMA = {
         "rate": {"type": ["integer", "null"]},
     },
     "required": ["id", "name", "rate"],
+}
+
+
+COMPANY_PRODUCT_TYPE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "value": {"type": "string"},
+        "translations": {
+            "type": "array",
+            "items": PROPERTY_SELECT_VALUE_TRANSLATION_OUTPUT_SCHEMA,
+        },
+        "usage_count": {"type": "integer"},
+    },
+    "required": ["id", "value"],
+}
+
+
+COMPANY_PRODUCT_TYPES_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "count": {"type": "integer"},
+        "property": PROPERTY_REFERENCE_OUTPUT_SCHEMA,
+        "results": {
+            "type": "array",
+            "items": COMPANY_PRODUCT_TYPE_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["count", "property", "results"],
 }
 
 
@@ -401,6 +515,56 @@ GET_VAT_RATES_OUTPUT_SCHEMA = {
 }
 
 
+COMPANY_CURRENCY_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "iso_code": {"type": "string"},
+        "name": {"type": "string"},
+        "symbol": {"type": "string"},
+        "is_default": {"type": "boolean"},
+        "inherits_from_iso_code": {"type": ["string", "null"]},
+    },
+    "required": ["id", "iso_code", "name", "symbol", "is_default", "inherits_from_iso_code"],
+}
+
+
+COMPANY_CURRENCIES_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "count": {"type": "integer"},
+        "default_currency_code": {"type": ["string", "null"]},
+        "results": {
+            "type": "array",
+            "items": COMPANY_CURRENCY_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["count", "default_currency_code", "results"],
+}
+
+
+GET_COMPANY_DETAILS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "message": {"type": "string"},
+        "languages": {
+            "type": "object",
+            "properties": {
+                "default_language_code": {"type": "string"},
+                "enabled_languages": {
+                    "type": "array",
+                    "items": COMPANY_LANGUAGE_OUTPUT_SCHEMA,
+                },
+            },
+            "required": ["default_language_code", "enabled_languages"],
+        },
+        "product_types": COMPANY_PRODUCT_TYPES_OUTPUT_SCHEMA,
+        "vat_rates": GET_VAT_RATES_OUTPUT_SCHEMA,
+        "currencies": COMPANY_CURRENCIES_OUTPUT_SCHEMA,
+    },
+}
+
+
 SEARCH_SALES_CHANNELS_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -417,23 +581,48 @@ SEARCH_SALES_CHANNELS_OUTPUT_SCHEMA = {
 }
 
 
-PRODUCT_MUTATION_OUTPUT_SCHEMA = {
+PRODUCT_UPSERT_APPLIED_UPDATES_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
-        "updated": {"type": "boolean"},
-        "product": GET_PRODUCT_OUTPUT_SCHEMA,
+        "active": {"type": "boolean"},
+        "vat_rate": {"type": "boolean"},
+        "ean_code": {"type": "boolean"},
+        "translations": {"type": "integer"},
+        "prices": {"type": "integer"},
+        "properties": {"type": "integer"},
+        "images": {"type": "integer"},
+        "website_views_assignments": {"type": "integer"},
     },
-    "required": ["updated", "product"],
 }
 
 
-PRODUCT_BATCH_MUTATION_OUTPUT_SCHEMA = {
+PRODUCT_UPSERT_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
-        "updated_count": {"type": "integer"},
-        "product": GET_PRODUCT_OUTPUT_SCHEMA,
+        "updated": {"type": "boolean"},
+        "product_id": {"type": "integer"},
+        "sku": {"type": ["string", "null"]},
+        "name": {"type": "string"},
+        "active": {"type": "boolean"},
+        "message": {"type": "string"},
+        "applied_updates": PRODUCT_UPSERT_APPLIED_UPDATES_OUTPUT_SCHEMA,
     },
-    "required": ["updated_count", "product"],
+    "required": ["updated", "product_id", "sku", "name", "message", "applied_updates"],
+}
+
+
+UPSERT_PRODUCTS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requested_count": {"type": "integer"},
+        "processed_count": {"type": "integer"},
+        "updated_count": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": PRODUCT_UPSERT_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["requested_count", "processed_count", "updated_count", "results"],
 }
 
 
@@ -442,7 +631,25 @@ CREATE_PRODUCT_OUTPUT_SCHEMA = {
     "properties": {
         "created": {"type": "boolean"},
         "sku_was_generated": {"type": "boolean"},
-        "product": GET_PRODUCT_OUTPUT_SCHEMA,
+        "product_id": {"type": "integer"},
+        "sku": {"type": ["string", "null"]},
+        "name": {"type": "string"},
+        "message": {"type": "string"},
     },
-    "required": ["created", "sku_was_generated", "product"],
+    "required": ["created", "sku_was_generated", "product_id", "sku", "name", "message"],
+}
+
+
+CREATE_PRODUCTS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requested_count": {"type": "integer"},
+        "processed_count": {"type": "integer"},
+        "created_count": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": CREATE_PRODUCT_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["requested_count", "processed_count", "created_count", "results"],
 }

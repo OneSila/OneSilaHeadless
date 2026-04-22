@@ -31,22 +31,91 @@ class GetProductMcpTool(BaseMcpTool):
 
     async def execute(
         self,
-        sku: Annotated[str, Field(description="Exact SKU for the product within the authenticated company.")] ,
+        sku: Annotated[str, Field(description="Exact SKU of the product to load.")] ,
+        show_inspector: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include the product readiness check. This returns summary booleans plus a list of issues "
+                    "showing what information is missing or blocking the product."
+                )
+            ),
+        ] = False,
+        show_website_views_assign: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include website/storefront assignments and their remote URLs. "
+                    "Use this when checking where the product is already published."
+                )
+            ),
+        ] = False,
+        show_property_requirements: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include the full property requirement map for the current product type. "
+                    "Larger payload. Use this after show_inspector when you need the exact required and optional properties."
+                )
+            ),
+        ] = False,
+        show_translations: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include translations for the main product and any sales-channel-specific content. "
+                    "If a translation has `sales_channel: null`, that is the default translation for that language. "
+                    "Use this before editing names, subtitles, descriptions, or bullet points."
+                )
+            ),
+        ] = False,
+        show_vat_rate_data: Annotated[
+            bool,
+            Field(description="Include the full VAT object `{id, name, rate}` in addition to the top-level `vat_rate` percentage."),
+        ] = False,
+        show_images: Annotated[
+            bool,
+            Field(description="Include assigned images with URLs, type, title, description, main-image flag, sort order, and optional sales channel."),
+        ] = False,
+        show_properties: Annotated[
+            bool,
+            Field(description="Include assigned properties and their current values."),
+        ] = False,
+        show_prices: Annotated[
+            bool,
+            Field(description="Include prices for configured currencies."),
+        ] = False,
+        show_brand_voice: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Include brand writing guidance for this product. "
+                    "Use this when generating or rewriting product copy in the brand's style."
+                )
+            ),
+        ] = False,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
-        Get a single company-scoped product by exact SKU.
-        Use this when you already know the SKU and need the product detail, pricing,
-        assigned property values, images, VAT data, inspector status, and
-        property_requirements guidance for the current product type.
+        Get one product by exact SKU for the authenticated company.
 
-        `property_requirements` explains which properties the product is expected
-        to have for its current product type. Only `OPTIONAL` is truly optional.
-        Any other `requirement_type` should be treated as effectively required,
-        especially when `has_value` is `false`.
+        This is the main read tool before editing a product. The default response is intentionally
+        small. Turn on only the sections needed for the current step.
 
-        Args:
-            sku: Exact product SKU.
+        Terminology:
+        - inspector: internal readiness check for the product. It tells you whether required or optional
+          information is missing and returns issue items with explanations.
+        - property requirements: the full expected property schema for the current product type.
+        - ean_code: the current product EAN stored on the product, if one is assigned.
+
+        Common usage:
+        - Use `show_inspector=true` to learn what is missing.
+        - Add `show_property_requirements=true` when the inspector alone is not specific enough.
+        - Use `show_translations=true`, `show_properties=true`, `show_prices=true`, or `show_images=true`
+          before calling `upsert_products` if you need the current data first.
+        - Use the top-level `ean_code` field to see the product's current EAN before deciding whether to
+          update it with `upsert_products`.
+        - For translations, treat `sales_channel: null` as the default translation for that language.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
@@ -57,6 +126,39 @@ class GetProductMcpTool(BaseMcpTool):
             response_data = await self._get_product_detail(
                 multi_tenant_company=multi_tenant_company,
                 sku=sku,
+                show_inspector=self.sanitize_optional_bool(value=show_inspector, field_name="show_inspector") or False,
+                show_website_views_assign=self.sanitize_optional_bool(
+                    value=show_website_views_assign,
+                    field_name="show_website_views_assign",
+                ) or False,
+                show_property_requirements=self.sanitize_optional_bool(
+                    value=show_property_requirements,
+                    field_name="show_property_requirements",
+                ) or False,
+                show_translations=self.sanitize_optional_bool(
+                    value=show_translations,
+                    field_name="show_translations",
+                ) or False,
+                show_vat_rate_data=self.sanitize_optional_bool(
+                    value=show_vat_rate_data,
+                    field_name="show_vat_rate_data",
+                ) or False,
+                show_images=self.sanitize_optional_bool(
+                    value=show_images,
+                    field_name="show_images",
+                ) or False,
+                show_properties=self.sanitize_optional_bool(
+                    value=show_properties,
+                    field_name="show_properties",
+                ) or False,
+                show_prices=self.sanitize_optional_bool(
+                    value=show_prices,
+                    field_name="show_prices",
+                ) or False,
+                show_brand_voice=self.sanitize_optional_bool(
+                    value=show_brand_voice,
+                    field_name="show_brand_voice",
+                ) or False,
             )
             await ctx.info(
                 f"Loaded product_id={response_data['id']} sku={response_data['sku']!r}."
@@ -79,6 +181,15 @@ class GetProductMcpTool(BaseMcpTool):
         *,
         multi_tenant_company: MultiTenantCompany,
         sku: str,
+        show_inspector: bool,
+        show_website_views_assign: bool,
+        show_property_requirements: bool,
+        show_translations: bool,
+        show_vat_rate_data: bool,
+        show_images: bool,
+        show_properties: bool,
+        show_prices: bool,
+        show_brand_voice: bool,
     ) -> ProductDetailPayload:
         try:
             product = get_product_detail_queryset(
@@ -87,4 +198,15 @@ class GetProductMcpTool(BaseMcpTool):
         except Product.DoesNotExist as error:
             raise McpToolError("Product not found.") from error
 
-        return serialize_product_detail(product=product)
+        return serialize_product_detail(
+            product=product,
+            show_inspector=show_inspector,
+            show_website_views_assign=show_website_views_assign,
+            show_property_requirements=show_property_requirements,
+            show_translations=show_translations,
+            show_vat_rate_data=show_vat_rate_data,
+            show_images=show_images,
+            show_properties=show_properties,
+            show_prices=show_prices,
+            show_brand_voice=show_brand_voice,
+        )

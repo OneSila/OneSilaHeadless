@@ -1,8 +1,10 @@
+from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
 from core.tests import TestCase
-from llm.models import ChatGptProductFeedConfig
+from llm.models import ChatGptProductFeedConfig, McpApiKey, McpToolRun
 from properties.models import Property, PropertySelectValue
 
 
@@ -77,3 +79,74 @@ class ChatGptProductFeedConfigModelTestCase(TestCase):
 
         with self.assertRaises(IntegrityError):
             duplicate.save(force_save=True)
+
+
+class McpToolRunModelTestCase(SimpleTestCase):
+    def test_sanitize_json_content_truncates_nested_string_values(self):
+        long_value = "x" * (McpToolRun.MAX_JSON_VALUE_LENGTH + 25)
+
+        result = McpToolRun.sanitize_json_content(
+            value={
+                "payload": long_value,
+                "nested": [
+                    {"message": long_value},
+                ],
+            }
+        )
+
+        self.assertTrue(result["payload"].endswith(McpToolRun.TRUNCATED_SUFFIX))
+        self.assertEqual(
+            len(result["payload"]),
+            McpToolRun.MAX_JSON_VALUE_LENGTH,
+        )
+        self.assertTrue(
+            result["nested"][0]["message"].endswith(McpToolRun.TRUNCATED_SUFFIX)
+        )
+
+    def test_sanitize_json_content_omits_image_content_base64(self):
+        image_content = "a" * 5000
+
+        result = McpToolRun.sanitize_json_content(
+            value={
+                "images": [
+                    {
+                        "image_content": image_content,
+                        "title": "Chat upload",
+                    }
+                ]
+            }
+        )
+
+        self.assertEqual(
+            result["images"][0]["image_content"],
+            McpToolRun.OMITTED_IMAGE_CONTENT_TEMPLATE.format(length=len(image_content)),
+        )
+        self.assertEqual(result["images"][0]["title"], "Chat upload")
+
+    def test_has_user_field(self):
+        user_field = McpToolRun._meta.get_field("user")
+
+        self.assertEqual(user_field.related_model, get_user_model())
+
+    def test_user_full_name_uses_linked_user(self):
+        user = get_user_model()(
+            username="tool-runner@example.com",
+            first_name="Tool",
+            last_name="Runner",
+        )
+        tool_run = McpToolRun(user=user)
+
+        self.assertEqual(tool_run.user_full_name(None), "Tool Runner")
+
+
+class McpApiKeyModelTestCase(TestCase):
+    def test_save_generates_key_and_links_user(self):
+        user = get_user_model().objects.create(
+            username="mcp-owner@example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        mcp_api_key = McpApiKey.objects.create(user=user)
+
+        self.assertEqual(mcp_api_key.user, user)
+        self.assertTrue(mcp_api_key.key)

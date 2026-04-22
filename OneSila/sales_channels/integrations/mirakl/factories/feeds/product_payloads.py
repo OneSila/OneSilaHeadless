@@ -711,6 +711,9 @@ class MiraklProductPayloadBuilder:
             if str(item.requirement_level or "").upper() == "DISABLED":
                 continue
             applicability_view_ids = [applicability.view_id for applicability in item.remote_property.applicabilities.all()]
+            if not applicability_view_ids and not getattr(self.sales_channel, "product_data_validation_by_channel", False):
+                filtered.append(item)
+                continue
             if view_id not in applicability_view_ids:
                 continue
             filtered.append(item)

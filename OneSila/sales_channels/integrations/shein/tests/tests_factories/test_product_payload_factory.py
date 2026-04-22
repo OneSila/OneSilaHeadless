@@ -33,7 +33,10 @@ from sales_channels.integrations.shein.models import (
     SheinSalesChannelView,
 )
 from sales_channels.integrations.shein.models.sales_channels import SheinRemoteCurrency
-from sales_channels.integrations.shein.exceptions import SheinConfiguratorAttributesLimitError
+from sales_channels.integrations.shein.exceptions import (
+    SheinConfiguratorAttributesLimitError,
+    SheinPreValidationError,
+)
 from sales_channels.exceptions import PreFlightCheckError
 from sales_channels.models import SalesChannelViewAssign
 from sales_prices.models import SalesPrice
@@ -2342,3 +2345,38 @@ class SheinProductPayloadFactoryTests(TestCase):
                     variation_properties={},
                     varying_map=varying_map,
                 )
+
+    def test_perform_remote_action_treats_mcc_valid_result_as_prevalidation_error(self) -> None:
+        factory = SheinProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            skip_checks=True,
+        )
+        factory.payload = {"supplier_code": "SUP-1"}
+
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "success": False,
+                "pre_valid_result": [],
+                "mcc_valid_result": [
+                    {
+                        "rule_id": 19285,
+                        "type": 2,
+                        "message": "19285: Does not meet the category definition, please re-select the appropriate category",
+                    }
+                ],
+            },
+        }
+
+        with patch.object(factory, "shein_post", return_value=response):
+            with self.assertRaises(SheinPreValidationError) as raised:
+                factory.perform_remote_action()
+
+        self.assertEqual(
+            str(raised.exception),
+            "19285: Does not meet the category definition, please re-select the appropriate category",
+        )
