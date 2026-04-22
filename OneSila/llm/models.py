@@ -95,6 +95,12 @@ class McpToolRun(Import, models.Model):
         owner = self.user if self.user_id else "unassigned"
         return f"{display_name} - {owner} - {self.get_status_display()} ({self.percentage}%)"
 
+    def user_full_name(self, info=None):
+        user = getattr(self, "user", None)
+        if user is None:
+            return None
+        return user.full_name()
+
     @classmethod
     def sanitize_json_content(cls, *, value):
         return cls._truncate_json_values(value=ensure_serializable(value))
