@@ -354,6 +354,9 @@ class UpsertProductsMcpTool(BaseMcpTool):
                     processed_records=index,
                     total_records=len(products),
                 )
+        except ValueError as error:
+            self.fail_mcp_tool_run(tool_run=tool_run, error=error)
+            raise McpToolError(str(error)) from error
         except Exception as error:
             self.fail_mcp_tool_run(tool_run=tool_run, error=error)
             raise

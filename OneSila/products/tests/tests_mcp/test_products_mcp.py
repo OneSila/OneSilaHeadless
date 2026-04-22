@@ -57,6 +57,18 @@ class DummyContext:
 class ProductMcpToolAsyncTestCase(TransactionTestCase):
     def setUp(self):
         super().setUp()
+        self.get_authenticated_company_patcher = patch(
+            "llm.mcp.mcp_tool.get_authenticated_company",
+            return_value=self.multi_tenant_company,
+        )
+        self.get_authenticated_company_patcher.start()
+        self.addCleanup(self.get_authenticated_company_patcher.stop)
+        self.get_authenticated_user_patcher = patch(
+            "llm.mcp.mcp_tool.get_authenticated_user_from_auth",
+            return_value=self.user,
+        )
+        self.get_authenticated_user_patcher.start()
+        self.addCleanup(self.get_authenticated_user_patcher.stop)
         self.sales_channel_connect_patcher = patch.object(SalesChannel, "connect", return_value=None)
         self.sales_channel_connect_patcher.start()
         self.addCleanup(self.sales_channel_connect_patcher.stop)
@@ -241,16 +253,23 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             name="Subtitle Hint",
             multi_tenant_company=self.multi_tenant_company,
         )
-        self.brand_property = Property.objects.create(
+        self.brand_property, _ = Property.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            type=Property.TYPES.SELECT,
             internal_name="brand",
+            defaults={
+                "type": Property.TYPES.SELECT,
+                "is_public_information": True,
+                "non_deletable": True,
+            },
         )
-        PropertyTranslation.objects.create(
+        PropertyTranslation.objects.get_or_create(
             property=self.brand_property,
             language="en",
-            name="Brand",
             multi_tenant_company=self.multi_tenant_company,
+            defaults={
+                "name": "Brand",
+                "multi_tenant_company": self.multi_tenant_company,
+            },
         )
         self.brand_value = PropertySelectValue.objects.create(
             property=self.brand_property,
@@ -328,13 +347,16 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         image_block.save(update_fields=["successfully_checked", "fixing_message"])
 
     def _build_access_token(self, *, company_id: int) -> AccessToken:
+        self.assertEqual(company_id, self.multi_tenant_company.id)
         return AccessToken(
             token="test-token",
-            client_id=f"company:{company_id}",
+            client_id=f"user:{self.user.id}",
             scopes=[],
         )
 
     def _get_payload(self, *, result):
+        if result.structured_content is not None:
+            return result.structured_content
         self.assertEqual(len(result.content), 1)
         return json.loads(result.content[0].text)
 
@@ -619,6 +641,10 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             sales_channel_view=website_view,
             link="https://amazon-nice-prints.example.com/products/book-page",
         )
+        image_block = self.product.inspector.blocks.get(error_code=HAS_IMAGES_ERROR)
+        image_block.successfully_checked = False
+        image_block.fixing_message = "Upload a main product image."
+        image_block.save(update_fields=["successfully_checked", "fixing_message"])
 
         result = async_to_sync(tool.execute)(
             sku="BOOK-001",
@@ -1035,13 +1061,7 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         mock_get_access_token.return_value = self._build_access_token(
             company_id=self.multi_tenant_company.id,
         )
-        inherited_currency = Currency.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            iso_code="EUR",
-            name="Euro",
-            symbol="€",
-            inherits_from=self.currency,
-        )
+        inherited_currency = self.secondary_currency
         ctx = DummyContext()
         tool = UpsertProductsMcpTool(mcp=DummyMcp())
 

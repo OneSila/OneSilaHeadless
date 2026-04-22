@@ -806,10 +806,10 @@ def assign_product_to_sales_channel_views(
     for view_id in sales_channel_view_ids:
         sales_channel_view = views_by_id[view_id]
         _, created = SalesChannelViewAssign.objects.get_or_create(
+            multi_tenant_company=multi_tenant_company,
             product=product,
             sales_channel_view=sales_channel_view,
             defaults={
-                "multi_tenant_company": multi_tenant_company,
                 "sales_channel": sales_channel_view.sales_channel,
             },
         )

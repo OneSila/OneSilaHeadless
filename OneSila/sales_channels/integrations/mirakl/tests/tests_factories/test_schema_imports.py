@@ -474,6 +474,8 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         }
 
     def test_run_imports_schema_records(self):
+        self.sales_channel.product_data_validation_by_channel = True
+        self.sales_channel.save(update_fields=["product_data_validation_by_channel"])
         payloads = self._payloads_by_path()
 
         def mirakl_get_side_effect(*, path, params=None, timeout=None):

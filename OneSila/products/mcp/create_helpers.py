@@ -125,6 +125,8 @@ def run_create_product_with_sections(
                 import_process=import_process,
                 multi_tenant_company=multi_tenant_company,
                 product=import_instance.instance,
+                vat_rate_id=None,
+                vat_rate=None,
                 active=active,
                 ean_code=ean_code,
                 translations=translations,
