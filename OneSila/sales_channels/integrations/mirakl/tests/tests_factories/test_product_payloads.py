@@ -173,6 +173,78 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["collection"], "")
 
+    def test_field_without_applicability_is_included_when_channel_validation_is_disabled(self):
+        self.sales_channel.product_data_validation_by_channel = False
+        self.sales_channel.save(update_fields=["product_data_validation_by_channel"])
+        product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+            sku="SKU-1",
+        )
+        remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product,
+        )
+        category = baker.make(
+            MiraklCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="cat-1",
+            name="Category 1",
+            is_leaf=True,
+        )
+        product_type = baker.make(
+            MiraklProductType,
+            category=category,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            remote_id="cat-1",
+        )
+        baker.make(
+            MiraklProductCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=product,
+            remote_id="cat-1",
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="title",
+            type="TEXT",
+            local_instance=None,
+            representation_type=MiraklProperty.REPRESENTATION_PRODUCT_TITLE,
+        )
+        baker.make(
+            MiraklProductTypeItem,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=product_type,
+            remote_property=remote_property,
+            required=True,
+        )
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="English Name",
+        )
+
+        builder = MiraklProductPayloadBuilder(
+            remote_product=remote_product,
+            sales_channel_view=self.view,
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["title"], "English Name")
+
     def test_required_mapped_field_without_product_value_raises_missing_value_error(self):
         local_property = baker.make(
             Property,
