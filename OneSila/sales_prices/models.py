@@ -31,15 +31,15 @@ class SalesPrice(models.Model):
         unique_together = ('product', 'currency', 'multi_tenant_company')
         constraints = [
             models.CheckConstraint(
-                check=models.Q(rrp__gte=models.F("price")),
+                condition=models.Q(rrp__gte=models.F("price")),
                 name=_("RRP cannot be less then the price"),
             ),
             models.CheckConstraint(
-                check=models.Q(rrp__gte='0.01'),
+                condition=models.Q(rrp__gte='0.01'),
                 name=_("RRP cannot be 0"),
             ),
             models.CheckConstraint(
-                check=models.Q(price__gte='0.01'),
+                condition=models.Q(price__gte='0.01'),
                 name=_("Price cannot be 0"),
             ),
         ]

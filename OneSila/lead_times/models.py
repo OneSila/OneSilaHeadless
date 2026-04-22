@@ -42,15 +42,15 @@ class LeadTime(models.Model):
         unique_together = ['multi_tenant_company', 'min_time', 'max_time', 'unit']
         constraints = [
             models.CheckConstraint(
-                check=models.Q(max_time__gte=models.F("min_time")),
+                condition=models.Q(max_time__gte=models.F("min_time")),
                 name=_("Maximum Time cannot be less then Minimum Time"),
             ),
             models.CheckConstraint(
-                check=models.Q(max_time__gte=0),
+                condition=models.Q(max_time__gte=0),
                 name=_("Maximum time cannot be 0"),
             ),
             models.CheckConstraint(
-                check=models.Q(min_time__gte=0),
+                condition=models.Q(min_time__gte=0),
                 name=_("Minimum Time cannot be 0"),
             ),
         ]

@@ -56,7 +56,7 @@ class EanCode(models.Model):
             ),
 
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(ean_code__isnull=False) |
                     models.Q(product__isnull=False)
                 ),

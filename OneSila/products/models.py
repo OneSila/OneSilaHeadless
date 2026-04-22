@@ -499,7 +499,7 @@ class Product(TranslatedModelMixin, models.Model):
         unique_together = ('sku', 'multi_tenant_company')
         constraints = [
             CheckConstraint(
-                check=Q(type='ALIAS', alias_parent_product__isnull=False) | ~Q(type='ALIAS'),
+                condition=Q(type='ALIAS', alias_parent_product__isnull=False) | ~Q(type='ALIAS'),
                 name='alias_requires_alias_parent_product'
             )
         ]
