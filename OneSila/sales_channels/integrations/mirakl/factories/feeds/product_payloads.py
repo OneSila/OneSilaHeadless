@@ -1372,7 +1372,9 @@ class MiraklProductPayloadBuilder:
             except (TypeError, ValueError):
                 return value
             if len(value) > limit:
-                return value[:limit]
+                raise MiraklPayloadValidationError(
+                    f"Mirakl field '{remote_property.code}' is longer than max length {limit} for product {product_context['sku']}."
+                )
             return value
 
         if validator_type == "MIN_LENGTH":

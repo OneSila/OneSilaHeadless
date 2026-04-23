@@ -1,11 +1,12 @@
 from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
+from django.urls import reverse
 from django.test import RequestFactory, TransactionTestCase
 
-from integrations.admin import PublicIntegrationTypeAdmin
-from integrations.models import PublicIntegrationType
-from integrations.tests.helpers import PublicIntegrationTypeSchemaMixin
+from integrations.admin import PublicIntegrationTypeAdmin, PublicIssueRequestAdmin
+from integrations.models import PublicIntegrationType, PublicIssueRequest
+from integrations.tests.helpers import PublicIntegrationTypeSchemaMixin, PublicIssueSchemaMixin
 
 
 class PublicIntegrationTypeAdminTests(PublicIntegrationTypeSchemaMixin, TransactionTestCase):
@@ -61,3 +62,27 @@ class PublicIntegrationTypeAdminTests(PublicIntegrationTypeSchemaMixin, Transact
 
         self.assertFalse(queryset.filter(active=True).exists())
         message_user_mock.assert_called_once()
+
+
+class PublicIssueRequestAdminTests(PublicIssueSchemaMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.admin = PublicIssueRequestAdmin(PublicIssueRequest, AdminSite())
+
+    def test_create_public_issue_button_links_to_prefilled_add_page(self):
+        integration_type = PublicIntegrationType.objects.create(
+            key="admin-public-issue-request-button",
+            type="ebay",
+            category=PublicIntegrationType.CATEGORY_MARKETPLACE,
+        )
+        public_issue_request = PublicIssueRequest.objects.create(
+            integration_type=integration_type,
+            issue="The integration log says SKU TEST-1 failed validation.",
+        )
+
+        button = self.admin.create_public_issue_button(public_issue_request)
+
+        self.assertIn(reverse("admin:integrations_publicissue_add"), button)
+        self.assertIn(f"integration_type={integration_type.id}", button)
+        self.assertIn(f"request_reference={public_issue_request.id}", button)
+        self.assertIn("issue=The+integration+log+says+SKU+TEST-1+failed+validation.", button)

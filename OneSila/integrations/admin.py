@@ -8,6 +8,10 @@ from integrations.models import (
     IntegrationLog,
     PublicIntegrationType,
     PublicIntegrationTypeTranslation,
+    PublicIssue,
+    PublicIssueCategory,
+    PublicIssueImage,
+    PublicIssueRequest,
 )
 from django.urls import path, reverse
 from django.utils.html import format_html
@@ -16,6 +20,8 @@ from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.db.models import Q
 import json
+from urllib.parse import urlencode
+
 from pygments import highlight
 from pygments.lexers import JsonLexer
 from pygments.formatters import HtmlFormatter
@@ -28,6 +34,16 @@ from sales_channels.models import SalesChannel, RemoteLog
 
 class PublicIntegrationTypeTranslationInline(admin.TabularInline):
     model = PublicIntegrationTypeTranslation
+    extra = 1
+
+
+class PublicIssueCategoryInline(admin.TabularInline):
+    model = PublicIssueCategory
+    extra = 1
+
+
+class PublicIssueImageInline(admin.TabularInline):
+    model = PublicIssueImage
     extra = 1
 
 
@@ -249,3 +265,81 @@ class PublicIntegrationTypeTranslationAdmin(SharedModelAdmin):
     search_fields = ("name", "description", "public_integration_type__key")
     raw_id_fields = ("public_integration_type",)
     list_select_related = ("public_integration_type",)
+
+
+@admin.register(PublicIssue)
+class PublicIssueAdmin(SharedModelAdmin):
+    list_display = ("code", "integration_type", "short_issue", "request_reference", "created_at")
+    list_filter = ("integration_type__category", "integration_type")
+    search_fields = (
+        "code",
+        "issue",
+        "cause",
+        "recommended_fix",
+        "=request_reference",
+        "integration_type__key",
+        "integration_type__type",
+        "integration_type__subtype",
+        "categories__name",
+        "categories__code",
+    )
+    raw_id_fields = ("integration_type",)
+    list_select_related = ("integration_type",)
+    inlines = (PublicIssueCategoryInline, PublicIssueImageInline)
+
+    @admin.display(description="Issue")
+    def short_issue(self, obj):
+        return obj.issue[:120]
+
+
+@admin.register(PublicIssueRequest)
+class PublicIssueRequestAdmin(ModelAdmin):
+    list_display = (
+        "short_issue",
+        "integration_type",
+        "submission_id",
+        "product_sku",
+        "status",
+        "multi_tenant_company",
+        "created_at",
+    )
+    list_filter = ("status", "integration_type", "multi_tenant_company")
+    search_fields = (
+        "issue",
+        "description",
+        "submission_id",
+        "product_sku",
+        "status",
+        "integration_type__key",
+        "integration_type__type",
+        "integration_type__subtype",
+    )
+    raw_id_fields = ("integration_type",)
+    list_select_related = ("integration_type", "multi_tenant_company")
+    readonly_fields = (
+        "multi_tenant_company",
+        "created_by_multi_tenant_user",
+        "last_update_by_multi_tenant_user",
+        "created_at",
+        "updated_at",
+        "create_public_issue_button",
+    )
+
+    @admin.display(description="Issue")
+    def short_issue(self, obj):
+        return obj.issue[:120]
+
+    @admin.display(description="Create Public Issue")
+    def create_public_issue_button(self, obj):
+        if not obj or not obj.pk:
+            return "-"
+
+        add_url = reverse("admin:integrations_publicissue_add")
+        query = urlencode(
+            {
+                "integration_type": obj.integration_type_id,
+                "request_reference": obj.pk,
+                "issue": obj.issue,
+            }
+        )
+        return format_html('<a class="button" href="{}?{}">Create Public Issue</a>', add_url, query)

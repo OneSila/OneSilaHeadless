@@ -1,11 +1,25 @@
 from typing import Annotated, Optional, List
 
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, lazy
-from integrations.models import Integration, PublicIntegrationType, PublicIntegrationTypeTranslation
-from integrations.schema.types.filters import IntegrationFilter, PublicIntegrationTypeFilter
-from integrations.schema.types.ordering import IntegrationOrder, PublicIntegrationTypeOrder
+from integrations.models import (
+    Integration,
+    PublicIntegrationType,
+    PublicIntegrationTypeTranslation,
+    PublicIssue,
+    PublicIssueCategory,
+    PublicIssueImage,
+    PublicIssueRequest,
+)
+from integrations.schema.types.filters import (
+    IntegrationFilter,
+    PublicIntegrationTypeFilter,
+    PublicIssueCategoryFilter,
+    PublicIssueFilter,
+)
+from integrations.schema.types.ordering import IntegrationOrder, PublicIntegrationTypeOrder, PublicIssueOrder
 from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION, MIRAKL_INTEGRATION
 from integrations.helpers import get_public_integration_asset_url
+from strawberry_django.fields.types import DjangoImageType
 from strawberry.relay.utils import to_base64
 
 
@@ -160,3 +174,70 @@ class PublicIntegrationTypeType(relay.Node):
             integration=self,
             field_name="logo_png",
         )
+
+@type(PublicIssueRequest, fields=("issue", "description", "submission_id", "product_sku", "status", "created_at", "updated_at"))
+class PublicIssueRequestType(relay.Node, GetQuerysetMultiTenantMixin):
+    integration_type: Annotated[
+        "PublicIntegrationTypeType",
+        lazy("integrations.schema.types.types"),
+    ]
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return queryset.select_related("integration_type")
+
+
+@type(
+    PublicIssueCategory,
+    filters=PublicIssueCategoryFilter,
+    pagination=True,
+    fields=("name", "code", "created_at", "updated_at"),
+)
+class PublicIssueCategoryType(relay.Node):
+    public_issue: Annotated[
+        "PublicIssueType",
+        lazy("integrations.schema.types.types"),
+    ]
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return queryset.select_related("public_issue").order_by("code")
+
+
+@type(PublicIssueImage,fields=("image", "created_at", "updated_at"))
+class PublicIssueImageType(relay.Node):
+    public_issue: Annotated[
+        "PublicIssueType",
+        lazy("integrations.schema.types.types"),
+    ]
+    image: DjangoImageType
+
+    @field()
+    def image_url(self, info) -> Optional[str]:
+        return self.image_url
+
+
+@type(
+    PublicIssue,
+    filters=PublicIssueFilter,
+    order=PublicIssueOrder,
+    pagination=True,
+    fields=("code", "issue", "cause", "recommended_fix", "request_reference", "created_at", "updated_at"),
+)
+class PublicIssueType(relay.Node):
+    integration_type: Optional[Annotated[
+        "PublicIntegrationTypeType",
+        lazy("integrations.schema.types.types"),
+    ]]
+    categories: List[Annotated[
+        "PublicIssueCategoryType",
+        lazy("integrations.schema.types.types"),
+    ]]
+    images: List[Annotated[
+        "PublicIssueImageType",
+        lazy("integrations.schema.types.types"),
+    ]]
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return queryset.select_related("integration_type").prefetch_related("categories", "images")

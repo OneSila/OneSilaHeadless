@@ -5,8 +5,14 @@ from strawberry.relay import to_base64
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from integrations.helpers import _get_public_integration_type_cached
-from integrations.models import PublicIntegrationType, PublicIntegrationTypeTranslation
-from integrations.tests.helpers import PublicIntegrationTypeSchemaMixin
+from integrations.models import (
+    PublicIntegrationType,
+    PublicIntegrationTypeTranslation,
+    PublicIssue,
+    PublicIssueCategory,
+    PublicIssueImage,
+)
+from integrations.tests.helpers import PublicIntegrationTypeSchemaMixin, PublicIssueSchemaMixin
 from media.tests.helpers import CreateImageMixin
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel, MiraklSalesChannelImport
 from sales_channels.integrations.mirakl.schema.types.types import MiraklSalesChannelType
@@ -70,6 +76,63 @@ query PublicIntegrationTypes($search: String!) {
           key
         }
       }
+    }
+  }
+}
+"""
+
+PUBLIC_ISSUES_QUERY = """
+query PublicIssues($search: String!, $categoryCode: String!, $integrationType: String!) {
+  publicIssues(filters: {
+    search: $search,
+    categoryCode: $categoryCode,
+    integrationTypeType: $integrationType
+  }) {
+    edges {
+      node {
+        code
+        issue
+        cause
+        recommendedFix
+        integrationType {
+          key
+          type
+        }
+        categories {
+          name
+          code
+        }
+      }
+    }
+  }
+}
+"""
+
+PUBLIC_ISSUE_CATEGORIES_QUERY = """
+query PublicIssueCategories {
+  publicIssueCategories {
+    edges {
+      node {
+        name
+        code
+      }
+    }
+  }
+}
+"""
+
+PUBLIC_ISSUE_QUERY = """
+query PublicIssue($id: GlobalID!) {
+  publicIssue(id: $id) {
+    id
+    code
+    issue
+    recommendedFix
+    categories {
+      code
+    }
+    images {
+      imageUrl
     }
   }
 }
@@ -246,3 +309,88 @@ class PublicIntegrationTypeQueryTests(
         self.assertEqual(node["basedTo"]["key"], self.base_type.key)
         self.assertTrue(node["isBeta"])
         self.assertFalse(node["supportsOpenAiProductFeed"])
+
+
+class PublicIssueQueryTests(
+    PublicIssueSchemaMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
+    def setUp(self):
+        super().setUp()
+        self.ebay_type = PublicIntegrationType.objects.create(
+            key="ebay_public_issue_query_test",
+            type="ebay",
+            category=PublicIntegrationType.CATEGORY_MARKETPLACE,
+        )
+        self.amazon_type = PublicIntegrationType.objects.create(
+            key="amazon_public_issue_query_test",
+            type="amazon",
+            category=PublicIntegrationType.CATEGORY_MARKETPLACE,
+        )
+        self.matching_issue = PublicIssue.objects.create(
+            integration_type=self.ebay_type,
+            code="1234",
+            issue="Ebay rejected the listing because a required aspect is missing.",
+            cause="The color aspect is required for this category.",
+            recommended_fix="Fill the color attribute and retry the listing sync.",
+        )
+        PublicIssueCategory.objects.create(
+            public_issue=self.matching_issue,
+            name="Product Data",
+            code="PRODUCT_DATA",
+        )
+        PublicIssueImage.objects.create(
+            public_issue=self.matching_issue,
+            image=ContentFile(b"image", name="issue-image.jpg"),
+        )
+        other_issue = PublicIssue.objects.create(
+            integration_type=self.amazon_type,
+            code="5678",
+            issue="Amazon rejected the feed because a browse node is missing.",
+            cause="The product type requires a browse node.",
+            recommended_fix="Map a valid browse node.",
+        )
+        PublicIssueCategory.objects.create(
+            public_issue=other_issue,
+            name="Catalog",
+            code="CATALOG",
+        )
+
+    def test_public_issues_query_filters_by_search_category_and_integration_type(self):
+        response = self.strawberry_test_client(
+            query=PUBLIC_ISSUES_QUERY,
+            variables={
+                "search": "color",
+                "categoryCode": "PRODUCT_DATA",
+                "integrationType": "ebay",
+            },
+        )
+
+        self.assertIsNone(response.errors)
+        edges = response.data["publicIssues"]["edges"]
+        self.assertEqual(len(edges), 1)
+        node = edges[0]["node"]
+        self.assertEqual(node["code"], "1234")
+        self.assertEqual(node["integrationType"]["key"], self.ebay_type.key)
+        self.assertEqual(node["categories"][0]["code"], "PRODUCT_DATA")
+
+    def test_public_issue_categories_query_orders_by_code(self):
+        response = self.strawberry_test_client(query=PUBLIC_ISSUE_CATEGORIES_QUERY)
+
+        self.assertIsNone(response.errors)
+        edges = response.data["publicIssueCategories"]["edges"]
+        self.assertEqual([edge["node"]["code"] for edge in edges], ["CATALOG", "PRODUCT_DATA"])
+
+    def test_public_issue_query_gets_single_issue_by_id(self):
+        response = self.strawberry_test_client(
+            query=PUBLIC_ISSUE_QUERY,
+            variables={"id": self.to_global_id(self.matching_issue)},
+        )
+
+        self.assertIsNone(response.errors)
+        node = response.data["publicIssue"]
+        self.assertEqual(node["id"], self.to_global_id(self.matching_issue))
+        self.assertEqual(node["code"], "1234")
+        self.assertEqual(node["recommendedFix"], "Fill the color attribute and retry the listing sync.")
+        self.assertTrue(node["images"][0]["imageUrl"].endswith("/issue-image.jpg"))
