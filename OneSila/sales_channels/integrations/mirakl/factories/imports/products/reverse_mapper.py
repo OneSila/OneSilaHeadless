@@ -574,8 +574,6 @@ class MiraklReverseProductMapper:
             return True
         if remote_type in {Property.TYPES.SELECT, Property.TYPES.MULTISELECT}:
             return True
-        if getattr(remote_property, "value_list_code", ""):
-            return True
         return MiraklPropertySelectValue.objects.filter(
             sales_channel=self.sales_channel,
             remote_property=remote_property,

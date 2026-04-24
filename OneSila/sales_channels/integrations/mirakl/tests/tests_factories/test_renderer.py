@@ -85,3 +85,93 @@ class MiraklProductFeedFileFactoryTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(lines[0], "description,sku,description")
         self.assertEqual(lines[1], "Product title,SKU-1,Offer description")
+
+    def test_run_uses_product_description_for_first_duplicate_and_offer_description_for_last(self):
+        self.product_type.template.save(
+            "mirakl-template-duplicate-description.csv",
+            ContentFile("barcode,description,sku,description\n"),
+            save=True,
+        )
+        item = self.feed.items.get()
+        item.payload_data = [
+            {
+                "barcode": "5056863156519",
+                "description": "Product title stored on description",
+                "sku": "PRODUCT-SKU-1",
+                "offer__sku": "OFFER-SKU-1",
+                "offer__description": "Offer description HTML",
+            }
+        ]
+        item.save(update_fields=["payload_data"])
+
+        MiraklProductFeedFileFactory(feed=self.feed).run()
+
+        with self.feed.file.open("r") as file_handle:
+            lines = file_handle.read().splitlines()
+
+        self.assertEqual(lines[0], "barcode,description,sku,description")
+        self.assertEqual(lines[1], "5056863156519,Product title stored on description,OFFER-SKU-1,Offer description HTML")
+
+    def test_run_uses_explicit_offer_headers_when_template_prefixes_them(self):
+        self.product_type.template.save(
+            "mirakl-template-offer-prefixed.csv",
+            ContentFile("barcode,sku,description,offer-sku,product-id,product-id-type,offer-description\n"),
+            save=True,
+        )
+        item = self.feed.items.get()
+        item.payload_data = [
+            {
+                "barcode": "5056863156502",
+                "description": "Product title stored on description",
+                "sku": "PRODUCT-SKU-1",
+                "offer__sku": "OFFER-SKU-1",
+                "offer__product-id": "SHOP-SKU-1",
+                "offer__product-id-type": "SHOP_SKU",
+                "offer__description": "Offer description HTML",
+            }
+        ]
+        item.save(update_fields=["payload_data"])
+
+        MiraklProductFeedFileFactory(feed=self.feed).run()
+
+        with self.feed.file.open("r") as file_handle:
+            lines = file_handle.read().splitlines()
+
+        self.assertEqual(lines[0], "barcode,sku,description,offer-sku,product-id,product-id-type,offer-description")
+        self.assertEqual(
+            lines[1],
+            "5056863156502,PRODUCT-SKU-1,Product title stored on description,OFFER-SKU-1,SHOP-SKU-1,SHOP_SKU,Offer description HTML",
+        )
+
+    def test_run_supports_explicit_offer_prefix_for_other_offer_fields(self):
+        self.product_type.template.save(
+            "mirakl-template-offer-prefixed-extra.csv",
+            ContentFile("sku,offer-sku,description,offer-description,offer-internal-description,offer-price\n"),
+            save=True,
+        )
+        item = self.feed.items.get()
+        item.payload_data = [
+            {
+                "sku": "PRODUCT-SKU-1",
+                "description": "Product title stored on description",
+                "offer__sku": "OFFER-SKU-1",
+                "offer__description": "Offer description HTML",
+                "offer__internal-description": "Private internal note",
+                "offer__price": "19.99",
+            }
+        ]
+        item.save(update_fields=["payload_data"])
+
+        MiraklProductFeedFileFactory(feed=self.feed).run()
+
+        with self.feed.file.open("r") as file_handle:
+            lines = file_handle.read().splitlines()
+
+        self.assertEqual(
+            lines[0],
+            "sku,offer-sku,description,offer-description,offer-internal-description,offer-price",
+        )
+        self.assertEqual(
+            lines[1],
+            "PRODUCT-SKU-1,OFFER-SKU-1,Product title stored on description,Offer description HTML,Private internal note,19.99",
+        )

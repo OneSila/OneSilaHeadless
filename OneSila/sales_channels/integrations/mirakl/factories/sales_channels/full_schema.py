@@ -43,6 +43,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self._inline_property_values: dict[str, list[dict[str, Any]]] = {}
         self._value_list_labels: dict[str, str] = {}
         self._value_list_single_defaults: dict[str, str] = {}
+        self._default_value_candidates_by_property_code: dict[str, set[str]] = {}
         self._offer_states_value_list_code = "offer_states"
         self._offer_states_value_list_label = "Offer states"
         self._offer_state_property_code = "offer_state"
@@ -544,6 +545,16 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             values_list_code=values_list_code,
             inline_values=inline_values,
         )
+        default_value_candidate = self._detect_default_value(
+            item=item,
+            values_list_code=values_list_code,
+            inline_values=inline_values,
+            representation_type=detected_representation_type,
+        )
+        self._register_default_value_candidate(
+            property_code=code,
+            raw_default=default_value_candidate,
+        )
         if self._should_replace_property_definition(remote_property=remote_property, item=item):
             remote_property.code = code
             remote_property.name = self._build_property_name(item=item, code=code)
@@ -556,14 +567,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 Property.TYPES.MULTISELECT,
             }
             remote_property.representation_type = detected_representation_type
-            remote_property.default_value = self._detect_default_value(
-                item=item,
-                values_list_code=values_list_code,
-                inline_values=inline_values,
-                representation_type=remote_property.representation_type,
-            )
-            remote_property.value_list_code = values_list_code
-            remote_property.value_list_label = self._value_list_labels.get(values_list_code, remote_property.value_list_label)
+            remote_property.default_value = ""
             remote_property.description_translations = self._ensure_json_value(item.get("description_translations"), default=[])
             remote_property.label_translations = self._ensure_json_value(item.get("label_translations"), default=[])
             remote_property.type_parameters = self._ensure_json_value(item.get("type_parameters"), default=[])
@@ -632,6 +636,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         return f"{base_name}{suffix}"
 
     def _upsert_product_type_item(self, *, product_type: MiraklProductType, remote_property: MiraklProperty, item: dict[str, Any]) -> None:
+        value_list_code = self._resolve_value_list_code(item=item)
         product_type_item, _ = MiraklProductTypeItem.objects.get_or_create(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.sales_channel.multi_tenant_company,
@@ -655,6 +660,8 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         product_type_item.required = bool(item.get("required"))
         product_type_item.variant = bool(item.get("variant"))
         product_type_item.requirement_level = self._clean_string(item.get("requirement_level"))
+        product_type_item.value_list_code = value_list_code
+        product_type_item.value_list_label = self._value_list_labels.get(value_list_code, "")
         product_type_item.role_data = self._ensure_json_value(item.get("roles"), default=[])
         product_type_item.raw_data = item
         product_type_item.save()
@@ -694,10 +701,18 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
 
             self._value_list_labels[value_list_code] = value_list_label
             value_payloads = self._parse_value_entries(value_list.get("values"))
+            property_ids = list(
+                MiraklProductTypeItem.objects.filter(
+                    sales_channel=self.sales_channel,
+                    value_list_code=value_list_code,
+                )
+                .values_list("remote_property_id", flat=True)
+                .distinct()
+            )
             matching_properties = list(
                 MiraklProperty.objects.filter(
                     sales_channel=self.sales_channel,
-                    value_list_code=value_list_code,
+                    id__in=property_ids,
                 )
             )
             self._log_phase_item(
@@ -707,10 +722,10 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 matching_properties=len(matching_properties),
                 force=(len(value_payloads) * max(1, len(matching_properties))) >= 100,
             )
-            if matching_properties:
-                MiraklProperty.objects.filter(
-                    id__in=[item.id for item in matching_properties],
-                ).update(value_list_label=value_list_label)
+            MiraklProductTypeItem.objects.filter(
+                sales_channel=self.sales_channel,
+                value_list_code=value_list_code,
+            ).update(value_list_label=value_list_label)
 
             for value_payload in value_payloads:
                 for remote_property in matching_properties:
@@ -785,8 +800,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         remote_property.type = Property.TYPES.SELECT
         remote_property.allows_unmapped_values = False
         remote_property.representation_type = representation_type
-        remote_property.value_list_code = value_list_code
-        remote_property.value_list_label = value_list_label
         remote_property.save()
         self.summary_data["properties"] += 1
 
@@ -820,7 +833,6 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
     def sync_default_value_labels(self) -> None:
         queryset = MiraklProperty.objects.filter(
             sales_channel=self.sales_channel,
-            representation_type=MiraklProperty.REPRESENTATION_DEFAULT_VALUE,
         ).order_by("id")
 
         for remote_property in queryset.iterator():
@@ -831,7 +843,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 )
                 .order_by("id")[:2]
             )
-            resolved_default = self._resolve_default_value_label(
+            resolved_default = self._resolve_final_default_value(
                 remote_property=remote_property,
                 select_values=select_values,
             )
@@ -1005,6 +1017,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self,
         *,
         remote_property: MiraklProperty,
+        raw_default: str = "",
         select_values: list[MiraklPropertySelectValue] | None = None,
     ) -> str:
         if select_values is None:
@@ -1015,7 +1028,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 ).order_by("id")
             )
 
-        raw_default = self._clean_string(remote_property.default_value)
+        raw_default = self._clean_string(raw_default or remote_property.default_value)
         if len(select_values) == 1:
             select_value = select_values[0]
             return self._clean_string(select_value.code) or self._clean_string(select_value.remote_id) or self._clean_string(select_value.value) or raw_default
@@ -1032,6 +1045,50 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                 return self._clean_string(select_value.code) or self._clean_string(select_value.remote_id) or self._clean_string(select_value.value) or raw_default
 
         return raw_default
+
+    def _register_default_value_candidate(self, *, property_code: str, raw_default: str) -> None:
+        normalized_property_code = self._clean_string(property_code)
+        normalized_default = self._clean_string(raw_default)
+        if not normalized_property_code or not normalized_default:
+            return
+        self._default_value_candidates_by_property_code.setdefault(normalized_property_code, set()).add(normalized_default)
+
+    def _resolve_final_default_value(
+        self,
+        *,
+        remote_property: MiraklProperty,
+        select_values: list[MiraklPropertySelectValue],
+    ) -> str:
+        property_code = self._clean_string(remote_property.code)
+        raw_defaults = sorted(
+            self._default_value_candidates_by_property_code.get(property_code, set())
+        )
+        resolved_defaults: set[str] = set()
+        for raw_default in raw_defaults:
+            resolved_default = self._resolve_default_value_label(
+                remote_property=remote_property,
+                raw_default=raw_default,
+                select_values=select_values,
+            )
+            if resolved_default:
+                resolved_defaults.add(resolved_default)
+        if len(resolved_defaults) == 1:
+            return next(iter(resolved_defaults))
+        if len(resolved_defaults) > 1:
+            return ""
+        if remote_property.default_value:
+            return self._resolve_default_value_label(
+                remote_property=remote_property,
+                raw_default=remote_property.default_value,
+                select_values=select_values,
+            )
+        if remote_property.representation_type == MiraklProperty.REPRESENTATION_DEFAULT_VALUE and len(select_values) == 1:
+            return self._resolve_default_value_label(
+                remote_property=remote_property,
+                raw_default="",
+                select_values=select_values,
+            )
+        return ""
 
     def _map_remote_type(
         self,

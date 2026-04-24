@@ -94,8 +94,6 @@ class MiraklProperty(RemoteProperty):
     language = models.CharField(max_length=64, null=True, blank=True, default=None)
     representation_type_decided = models.BooleanField(default=False)
     default_value = models.CharField(max_length=255, blank=True, default="")
-    value_list_code = models.CharField(max_length=255, blank=True, default="")
-    value_list_label = models.CharField(max_length=255, blank=True, default="")
     description_translations = models.JSONField(default=list, blank=True)
     label_translations = models.JSONField(default=list, blank=True)
     type_parameters = models.JSONField(default=list, blank=True)
@@ -215,6 +213,8 @@ class MiraklProductTypeItem(RemoteObjectMixin, models.Model):
     required = models.BooleanField(default=False)
     variant = models.BooleanField(default=False)
     requirement_level = models.CharField(max_length=64, blank=True, default="")
+    value_list_code = models.CharField(max_length=255, blank=True, default="")
+    value_list_label = models.CharField(max_length=255, blank=True, default="")
     role_data = models.JSONField(default=list, blank=True)
     raw_data = models.JSONField(default=dict, blank=True)
 

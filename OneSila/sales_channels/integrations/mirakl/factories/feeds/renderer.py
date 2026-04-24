@@ -12,8 +12,12 @@ from django.utils.text import slugify
 from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeedItem
 from sales_channels.integrations.mirakl.utils.offer_fields import (
     build_offer_field_key,
+    is_explicit_offer_field_header,
     is_offer_field_header,
+    normalize_offer_external_key,
 )
+
+PLAIN_PRODUCT_PREFERRED_OFFER_HEADERS = {"description"}
 
 
 class MiraklProductFeedFileFactory:
@@ -115,6 +119,11 @@ class MiraklProductFeedFileFactory:
 
     def _build_output_values(self, *, row: dict[str, str], headers: list[str]) -> list[str]:
         header_counts = Counter(headers)
+        explicit_offer_headers = {
+            normalize_offer_external_key(external_key=header)
+            for header in headers
+            if is_explicit_offer_field_header(header=header)
+        }
         seen_headers: dict[str, int] = defaultdict(int)
         output_values: list[str] = []
         for header in headers:
@@ -125,6 +134,7 @@ class MiraklProductFeedFileFactory:
                     header=header,
                     occurrence_index=seen_headers[header],
                     total_occurrences=header_counts[header],
+                    explicit_offer_headers=explicit_offer_headers,
                 )
             )
         return output_values
@@ -136,19 +146,36 @@ class MiraklProductFeedFileFactory:
         header: str,
         occurrence_index: int,
         total_occurrences: int,
+        explicit_offer_headers: set[str],
     ) -> str:
+        if is_explicit_offer_field_header(header=header):
+            offer_key = build_offer_field_key(external_key=header)
+            return row.get(offer_key, row.get(header, ""))
+
         if not is_offer_field_header(header=header):
             return row.get(header, "")
 
+        normalized_header = normalize_offer_external_key(external_key=header)
         offer_key = build_offer_field_key(external_key=header)
         has_plain_value = header in row
         has_offer_value = offer_key in row
-        if has_plain_value and has_offer_value and total_occurrences > 1:
-            if occurrence_index < total_occurrences:
+        has_explicit_offer_counterpart = normalized_header in explicit_offer_headers
+
+        if normalized_header in PLAIN_PRODUCT_PREFERRED_OFFER_HEADERS:
+            if total_occurrences > 1 and has_offer_value and occurrence_index == total_occurrences:
+                return row.get(offer_key, "")
+            if has_plain_value:
                 return row.get(header, "")
-            return row.get(offer_key, "")
+            if has_offer_value:
+                return row.get(offer_key, "")
+            return row.get(header, "")
+
+        if has_explicit_offer_counterpart and has_plain_value:
+            return row.get(header, "")
+
         if has_offer_value:
             return row.get(offer_key, "")
+
         return row.get(header, "")
 
     def _build_filename(self) -> str:

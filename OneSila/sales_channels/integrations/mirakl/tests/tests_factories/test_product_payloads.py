@@ -770,6 +770,14 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             property=local_property,
             value_select=local_select_value,
         )
+        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        product_type_item = MiraklProductTypeItem.objects.get(
+            product_type=product_type,
+            remote_property=remote_property,
+        )
+        product_type_item.value_list_code = "COLOUR_LIST"
+        product_type_item.value_list_label = "Colours"
+        product_type_item.save(update_fields=["value_list_code", "value_list_label"])
         baker.make(
             MiraklPropertySelectValue,
             multi_tenant_company=self.multi_tenant_company,
@@ -778,11 +786,63 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             local_instance=local_select_value,
             code="PURPLE_CODE",
             value="Purple Label",
+            value_list_code="COLOUR_LIST",
+            value_list_label="Colours",
         )
 
         _, rows = builder.build()
 
         self.assertEqual(rows[0]["colour"], "PURPLE_CODE")
+
+    def test_select_field_raises_when_mapped_value_comes_from_other_item_list(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="colour",
+            local_property=local_property,
+            required=True,
+            remote_type="SELECT",
+        )
+        local_select_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        baker.make(
+            ProductProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_property,
+            value_select=local_select_value,
+        )
+        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        product_type_item = MiraklProductTypeItem.objects.get(
+            product_type=product_type,
+            remote_property=remote_property,
+        )
+        product_type_item.value_list_code = "COLOUR_LIST_A"
+        product_type_item.value_list_label = "Colours A"
+        product_type_item.save(update_fields=["value_list_code", "value_list_label"])
+        baker.make(
+            MiraklPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
+            local_instance=local_select_value,
+            code="PURPLE_CODE",
+            value="Purple Label",
+            value_list_code="COLOUR_LIST_B",
+            value_list_label="Colours B",
+        )
+
+        with self.assertRaisesMessage(
+            PreFlightCheckError,
+            "Mirakl field 'colour' uses remote value 'PURPLE_CODE' from list 'COLOUR_LIST_B' but product type item requires list 'COLOUR_LIST_A' for product SKU-1.",
+        ):
+            builder.build()
 
     def test_logistic_class_offer_field_uses_mapped_remote_code_in_payload(self):
         local_property = baker.make(
