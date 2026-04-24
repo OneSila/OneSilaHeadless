@@ -219,6 +219,44 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(remote_property.language, "fr")
         self.assertTrue(remote_property.representation_type_decided)
 
+    def test_upsert_property_preserves_existing_runtime_type_mapping(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="measurement_value",
+            local_instance=local_property,
+            original_type=Property.TYPES.FLOAT,
+            type=Property.TYPES.FLOAT,
+            raw_data={"code": "measurement_value", "hierarchy_code": ""},
+        )
+
+        synced_property = factory._upsert_property(
+            item={
+                "code": "measurement_value",
+                "label": "Measurement Value",
+                "description": "",
+                "example": "",
+                "hierarchy_code": "",
+                "type": "TEXT",
+                "type_parameters": [],
+                "roles": [],
+            }
+        )
+
+        self.assertEqual(synced_property.pk, remote_property.pk)
+        self.assertEqual(synced_property.original_type, Property.TYPES.TEXT)
+        self.assertEqual(synced_property.type, Property.TYPES.FLOAT)
+
     def test_public_definition_sync_persists_language(self):
         remote_property = baker.make(
             MiraklProperty,

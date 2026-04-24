@@ -556,12 +556,20 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             raw_default=default_value_candidate,
         )
         if self._should_replace_property_definition(remote_property=remote_property, item=item):
+            existing_original_type = str(getattr(remote_property, "original_type", "") or "")
+            existing_runtime_type = str(getattr(remote_property, "type", "") or "")
             remote_property.code = code
             remote_property.name = self._build_property_name(item=item, code=code)
             remote_property.description = self._clean_string(item.get("description"))
             remote_property.example = self._clean_string(item.get("example"))
             remote_property.is_common = not bool(self._clean_string(item.get("hierarchy_code")))
-            remote_property.type = property_type
+            remote_property.original_type = property_type
+            if self._should_refresh_runtime_property_type(
+                remote_property=remote_property,
+                existing_original_type=existing_original_type,
+                existing_runtime_type=existing_runtime_type,
+            ):
+                remote_property.type = property_type
             remote_property.allows_unmapped_values = property_type not in {
                 Property.TYPES.SELECT,
                 Property.TYPES.MULTISELECT,
@@ -592,6 +600,21 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             self._inline_property_values[remote_property.code] = inline_values
 
         return remote_property
+
+    def _should_refresh_runtime_property_type(
+        self,
+        *,
+        remote_property: MiraklProperty,
+        existing_original_type: str,
+        existing_runtime_type: str,
+    ) -> bool:
+        if remote_property.pk is None:
+            return True
+        if not existing_runtime_type:
+            return True
+        if not existing_original_type:
+            return True
+        return existing_runtime_type == existing_original_type
 
     def _apply_brand_role_local_mapping(self, *, remote_property: MiraklProperty, item: dict[str, Any]) -> None:
         if getattr(remote_property, "local_instance_id", None):
