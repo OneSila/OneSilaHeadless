@@ -46,6 +46,10 @@ from sales_channels.integrations.mirakl.utils.helpers import (
     build_remote_property_mapping_label,
     get_local_instance_label,
 )
+from sales_channels.integrations.mirakl.utils.offer_fields import (
+    OFFER_FIELD_KEYS as MIRAKL_OFFER_FIELD_KEYS,
+    build_offer_field_key,
+)
 from sales_channels.integrations.mirakl.utils.type_parameters import get_mirakl_type_parameter_value
 from sales_channels.models import SalesChannelFeedItem, SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPriceListItem
@@ -160,26 +164,7 @@ class MiraklProductPayloadBuilder:
         "SCRIPT",
     )
 
-    OFFER_FIELD_KEYS = [
-        "sku",
-        "product-id",
-        "product-id-type",
-        "description",
-        "internal-description",
-        "price",
-        "price-additional-info",
-        "quantity",
-        "min-quantity-alert",
-        "state",
-        "available-start-date",
-        "available-end-date",
-        "logistic-class",
-        "discount-price",
-        "discount-start-date",
-        "discount-end-date",
-        "leadtime-to-ship",
-        "update-delete",
-    ]
+    OFFER_FIELD_KEYS = list(MIRAKL_OFFER_FIELD_KEYS)
     _QUANTITY_CACHE_MISSING = object()
 
     def __init__(
@@ -529,7 +514,7 @@ class MiraklProductPayloadBuilder:
                 price = "0"
             if not quantity:
                 quantity = "0"
-        return {
+        offer_fields = {
             "sku": product_context["sku"],
             "product-id": product_context["sku"],
             "product-id-type": "SHOP_SKU",
@@ -548,6 +533,10 @@ class MiraklProductPayloadBuilder:
             "discount-end-date": self._format_date(price_data.get("end_date")),
             "leadtime-to-ship": "",
             "update-delete": self._resolve_update_delete_value(),
+        }
+        return {
+            build_offer_field_key(external_key=key): value
+            for key, value in offer_fields.items()
         }
 
     def _resolve_update_delete_value(self) -> str:

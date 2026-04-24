@@ -490,7 +490,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         _, rows = builder.build()
 
-        self.assertEqual(rows[0]["update-delete"], "UPDATE")
+        self.assertEqual(rows[0]["offer__update-delete"], "UPDATE")
 
     def test_delete_action_uses_delete_marker_in_offer_row(self):
         local_property = baker.make(
@@ -507,7 +507,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         _, rows = builder.build()
 
-        self.assertEqual(rows[0]["update-delete"], "DELETE")
+        self.assertEqual(rows[0]["offer__update-delete"], "DELETE")
 
     def test_configurable_build_creates_variation_mirror_without_remote_sku(self):
         parent_product = baker.make(
@@ -833,7 +833,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         _, rows = builder.build()
 
-        self.assertEqual(rows[0]["logistic-class"], "L")
+        self.assertEqual(rows[0]["offer__logistic-class"], "L")
 
     def test_multiselect_field_uses_mapped_remote_codes_in_payload(self):
         local_property = baker.make(
@@ -990,8 +990,53 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         _, rows = builder.build()
 
-        self.assertEqual(rows[0]["internal-description"], "")
-        self.assertEqual(rows[0]["description"], "")
+        self.assertEqual(rows[0]["offer__internal-description"], "")
+        self.assertEqual(rows[0]["offer__description"], "")
+
+    def test_offer_description_is_namespaced_when_product_field_uses_description_code(self):
+        MiraklRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.multi_tenant_company.language,
+            remote_code=self.multi_tenant_company.language,
+            label="Default",
+            is_default=True,
+        )
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, product = self._build_builder(
+            remote_code="description",
+            local_property=local_property,
+            required=False,
+        )
+        pp = baker.make(
+            ProductProperty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=local_property,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=pp,
+            value_text="Product title from property"
+
+        )
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language=self.multi_tenant_company.language,
+            sales_channel=None,
+            name="Test product",
+            description="Offer description from translation",
+        )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["description"], "Product title from property")
+        self.assertEqual(rows[0]["offer__description"], "Offer description from translation")
 
     def test_bullet_point_representation_uses_shared_content_bullet_points(self):
         local_property = baker.make(

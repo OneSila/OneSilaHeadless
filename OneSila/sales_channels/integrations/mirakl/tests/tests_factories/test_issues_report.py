@@ -188,6 +188,39 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
         self.remote_product.refresh_from_db()
         self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
 
+    def test_run_matches_payload_rows_with_namespaced_offer_keys(self):
+        item = self.feed.items.get()
+        item.payload_data = [
+            {
+                "offer__product_id": "ILFD4043XS+5029+1479-58",
+                "ean": "5056863153211",
+                "product_category": "Toys/Dress Up & Role Play",
+            }
+        ]
+        item.save(update_fields=["payload_data"])
+        self.feed.error_report_file.save(
+            "mirakl-product-errors-namespaced.csv",
+            ContentFile(
+                "\n".join(
+                    [
+                        '"product_category","product_id","ean","line_number","errors"',
+                        '"Toys/Dress Up & Role Play","ILFD4043XS+5029+1479-58","5056863153211","3","1000|The attribute main_image is required"',
+                    ]
+                )
+            ),
+            save=True,
+        )
+
+        synced_issues = MiraklTransformationErrorReportIssueSyncFactory(feed=self.feed).run()
+
+        self.assertEqual(synced_issues, 1)
+        self.assertTrue(
+            MiraklProductIssue.objects.filter(
+                remote_product=self.remote_product,
+                code="1000",
+            ).exists()
+        )
+
     def test_run_recovers_tail_columns_from_csv_overflow_and_upserts_issues(self):
         self.feed.error_report_file.save(
             "mirakl-product-errors-overflow.csv",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+from collections import Counter, defaultdict
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -9,6 +10,10 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from sales_channels.integrations.mirakl.models import MiraklSalesChannelFeedItem
+from sales_channels.integrations.mirakl.utils.offer_fields import (
+    build_offer_field_key,
+    is_offer_field_header,
+)
 
 
 class MiraklProductFeedFileFactory:
@@ -33,16 +38,15 @@ class MiraklProductFeedFileFactory:
         delimiter = self._template_delimiter or self.sales_channel.csv_delimiter
 
         buffer = io.StringIO()
-        writer = csv.DictWriter(
+        writer = csv.writer(
             buffer,
-            fieldnames=headers,
             delimiter=delimiter,
             quoting=csv.QUOTE_MINIMAL,
             lineterminator="\n",
         )
-        writer.writeheader()
+        writer.writerow(headers)
         for row in rows:
-            writer.writerow({header: row.get(header, "") for header in headers})
+            writer.writerow(self._build_output_values(row=row, headers=headers))
 
         filename = self._build_filename()
         if self.feed.file:
@@ -108,6 +112,44 @@ class MiraklProductFeedFileFactory:
             for row in item.payload_data or []:
                 rows.append({str(key): self._stringify(value) for key, value in (row or {}).items()})
         return rows
+
+    def _build_output_values(self, *, row: dict[str, str], headers: list[str]) -> list[str]:
+        header_counts = Counter(headers)
+        seen_headers: dict[str, int] = defaultdict(int)
+        output_values: list[str] = []
+        for header in headers:
+            seen_headers[header] += 1
+            output_values.append(
+                self._resolve_output_value(
+                    row=row,
+                    header=header,
+                    occurrence_index=seen_headers[header],
+                    total_occurrences=header_counts[header],
+                )
+            )
+        return output_values
+
+    def _resolve_output_value(
+        self,
+        *,
+        row: dict[str, str],
+        header: str,
+        occurrence_index: int,
+        total_occurrences: int,
+    ) -> str:
+        if not is_offer_field_header(header=header):
+            return row.get(header, "")
+
+        offer_key = build_offer_field_key(external_key=header)
+        has_plain_value = header in row
+        has_offer_value = offer_key in row
+        if has_plain_value and has_offer_value and total_occurrences > 1:
+            if occurrence_index < total_occurrences:
+                return row.get(header, "")
+            return row.get(offer_key, "")
+        if has_offer_value:
+            return row.get(offer_key, "")
+        return row.get(header, "")
 
     def _build_filename(self) -> str:
         product_type_part = slugify(getattr(self.product_type, "remote_id", "") or getattr(self.product_type, "name", "") or "product-type")
