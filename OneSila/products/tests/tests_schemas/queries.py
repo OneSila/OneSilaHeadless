@@ -370,6 +370,46 @@ query Products($view: String!) {
 }
 """
 
+PRODUCTS_REJECTED_FOR_VIEW_QUERY = """
+query Products($view: String!) {
+  products(filters: {rejectedForSalesChannelViewId: $view}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_TODO_FOR_VIEW_QUERY = """
+query Products($view: String!) {
+  products(filters: {todoForSalesChannelViewId: $view}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_HAS_TODO_VIEW_QUERY = """
+query Products($hasTodo: Boolean!) {
+  products(filters: {hasTodoSalesChannelView: $hasTodo}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_REJECTED_VIEW_ASSIGN_SET_QUERY = """
+query Products($sku: String!) {
+  products(filters: {sku: {exact: $sku}}) {
+    edges {
+      node {
+        id
+        rejectedSaleschannelviewassignSet {
+          id
+          salesChannelView { id }
+        }
+      }
+    }
+  }
+}
+"""
+
 PRODUCTS_WITH_VALUE_SELECT_IDS_QUERY = """
 query Products($ids: [String!]!) {
   products(filters: {valueSelectIds: $ids}) {

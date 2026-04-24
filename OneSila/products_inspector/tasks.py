@@ -84,3 +84,20 @@ def products_inspector__tasks__refresh_document_type_blocks_for_products(
     )
     for product in queryset.iterator():
         _send_document_type_block_refresh(product=product)
+
+
+@run_task_after_commit
+@db_task(priority=VERY_LOW_PRIORITY)
+def products_inspector__tasks__refresh_undecided_sales_channel_views_for_company(
+    *,
+    multi_tenant_company_id: int,
+) -> None:
+    from core.models import MultiTenantCompany
+    from products_inspector.flows.undecided_sales_channel_views import (
+        refresh_undecided_sales_channel_views_blocks_for_company_flow,
+    )
+
+    multi_tenant_company = MultiTenantCompany.objects.get(id=multi_tenant_company_id)
+    refresh_undecided_sales_channel_views_blocks_for_company_flow(
+        multi_tenant_company=multi_tenant_company,
+    )

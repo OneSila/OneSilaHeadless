@@ -40,6 +40,7 @@ from sales_channels.models import (
     SalesChannelContentTemplate,
     SalesChannelView,
     SalesChannelViewAssign,
+    RejectedSalesChannelViewAssign,
     SalesChannelGptFeed,
     RemoteOrder,
 )
@@ -72,6 +73,7 @@ from .filters import (
     SalesChannelIntegrationPricelistFilter,
     SalesChannelViewFilter,
     SalesChannelViewAssignFilter,
+    RejectedSalesChannelViewAssignFilter,
     SalesChannelContentTemplateFilter,
     RemoteLanguageFilter,
 )
@@ -104,6 +106,7 @@ from .ordering import (
     SalesChannelIntegrationPricelistOrder,
     SalesChannelViewOrder,
     SalesChannelViewAssignOrder,
+    RejectedSalesChannelViewAssignOrder,
     SalesChannelContentTemplateOrder,
     RemoteLanguageOrder,
 )
@@ -546,6 +549,18 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.remote_product.syncing_current_percentage
 
         return 0
+
+
+@type(
+    RejectedSalesChannelViewAssign,
+    filters=RejectedSalesChannelViewAssignFilter,
+    order=RejectedSalesChannelViewAssignOrder,
+    pagination=True,
+    fields='__all__',
+)
+class RejectedSalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel_view: SalesChannelViewType
+    product: Annotated['ProductType', lazy("products.schema.types.types")]
 
 
 @type(SalesChannelContentTemplate, filters=SalesChannelContentTemplateFilter, order=SalesChannelContentTemplateOrder, pagination=True, fields='__all__')

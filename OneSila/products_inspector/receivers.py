@@ -15,6 +15,8 @@ from products_inspector.helpers import _refresh_document_type_blocks_for_product
 from products_inspector.models import InspectorBlock, Inspector
 from products_inspector.signals import inspector_block_refresh, inspector_missing_info_detected, inspector_missing_info_resolved
 from properties.signals import product_properties_rule_created, product_properties_rule_updated
+from sales_channels.models import SalesChannelView
+from sales_channels.signals import product_view_status_changed
 
 
 # BASIC RECEIVERS FOR FUNCTIONALITY ---------------------------------------------
@@ -243,6 +245,37 @@ def products_inspector__inspector__trigger_block_sales_pricelist_delete(sender, 
     for item in instance.salespricelistitem_set.all().iterator():
         inspector_block_refresh.send(sender=item.product.inspector.__class__, instance=item.product.inspector,
                                      error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=False)
+
+
+# UNDECIDED_SALES_CHANNEL_VIEWS_ERROR -----------------------------------------
+
+@receiver(product_view_status_changed, sender='products.Product')
+@receiver(product_view_status_changed, sender='products.SimpleProduct')
+@receiver(product_view_status_changed, sender='products.ConfigurableProduct')
+@receiver(product_view_status_changed, sender='products.BundleProduct')
+@receiver(product_view_status_changed, sender='products.AliasProduct')
+def products_inspector__inspector__trigger_undecided_sales_channel_views(sender, instance, **kwargs):
+    """
+    Frontend-only status flow hook.
+    We intentionally do not listen to assign/reject model create/delete so one UI change triggers one recheck.
+    """
+    from products_inspector.flows.undecided_sales_channel_views import (
+        refresh_undecided_sales_channel_views_block_for_product_flow,
+    )
+
+    refresh_undecided_sales_channel_views_block_for_product_flow(product=instance)
+
+
+@receiver(post_update, sender=SalesChannelView)
+@trigger_signal_for_dirty_fields('include_in_todo')
+def products_inspector__inspector__trigger_undecided_sales_channel_views_for_view_todo_toggle(sender, instance, **kwargs):
+    from products_inspector.tasks import (
+        products_inspector__tasks__refresh_undecided_sales_channel_views_for_company,
+    )
+
+    products_inspector__tasks__refresh_undecided_sales_channel_views_for_company(
+        multi_tenant_company_id=instance.multi_tenant_company_id,
+    )
 
 
 # VARIATION_MISMATCH_PRODUCT_TYPE_ERROR  ----------------------------------

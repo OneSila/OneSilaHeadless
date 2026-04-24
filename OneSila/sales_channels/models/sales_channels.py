@@ -227,12 +227,15 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     name = models.CharField(max_length=216, null=True, blank=True)
     url = models.CharField(max_length=512, null=True, blank=True)
+    include_in_todo = models.BooleanField(default=True)
+    todo_sort_order = models.PositiveIntegerField(default=10)
 
     objects = SalesChannelViewManager()
 
     class Meta:
         verbose_name = 'Sales Channel View'
         verbose_name_plural = 'Sales Channel Views'
+        ordering = ('todo_sort_order', 'id')
         search_terms = ['name']
 
     def __str__(self):
@@ -392,6 +395,28 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
             return None
 
         return None
+
+
+class RejectedSalesChannelViewAssign(models.Model):
+    """
+    Model representing a rejected assignment of a product to a sales channel view.
+    """
+
+    product = models.ForeignKey('products.Product', on_delete=models.CASCADE, db_index=True)
+    sales_channel_view = models.ForeignKey('SalesChannelView', on_delete=models.CASCADE, db_index=True)
+
+    class Meta:
+        unique_together = ('product', 'sales_channel_view')
+        verbose_name = 'Rejected Sales Channel View Assign'
+        verbose_name_plural = 'Rejected Sales Channel View Assigns'
+        ordering = ('product_id', 'sales_channel_view__name')
+        search_terms = ['product__translations__name', 'product__sku', 'sales_channel_view__name']
+        indexes = [
+            models.Index(fields=["product", "sales_channel_view"]),
+        ]
+
+    def __str__(self):
+        return f"{self.product} rejected @ {self.sales_channel_view}"
 
 
 class SalesChannelContentTemplate(models.Model):

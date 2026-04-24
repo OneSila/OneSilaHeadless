@@ -30,6 +30,7 @@ from sales_channels.models import (
     SalesChannelIntegrationPricelist,
     SalesChannelView,
     SalesChannelViewAssign,
+    RejectedSalesChannelViewAssign,
     SalesChannelContentTemplate,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
@@ -170,6 +171,7 @@ class SalesChannelIntegrationPricelistOrder:
 @order(SalesChannelView)
 class SalesChannelViewOrder:
     id: auto
+    todo_sort_order: auto
 
 
 @order(RemoteLanguage)
@@ -179,6 +181,12 @@ class RemoteLanguageOrder:
 
 @order(SalesChannelViewAssign)
 class SalesChannelViewAssignOrder:
+    id: auto
+    created_at: auto
+
+
+@order(RejectedSalesChannelViewAssign)
+class RejectedSalesChannelViewAssignOrder:
     id: auto
     created_at: auto
 

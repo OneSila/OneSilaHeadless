@@ -860,6 +860,29 @@ def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
                                        sales_channel=instance.sales_channel, view=instance.sales_channel_view)
 
 
+@receiver(post_create, sender='sales_channels.SalesChannelViewAssign')
+def sales_channel_view_assign__post_create_reject_child_variations_receiver(sender, instance, **kwargs):
+    from sales_channels.flows.product_view_status import change_product_view_status_for_assign_object
+
+    product = instance.product
+    if not product.is_configurable():
+        return
+
+    multi_tenant_user = (
+        getattr(instance, "last_update_by_multi_tenant_user", None)
+        or getattr(instance, "created_by_multi_tenant_user", None)
+    )
+
+    for variation in product.get_configurable_variations(active_only=False).iterator():
+        change_product_view_status_for_assign_object(
+            product=variation,
+            sales_channel_view=instance.sales_channel_view,
+            status="REJECT",
+            multi_tenant_company=instance.multi_tenant_company,
+            multi_tenant_user=multi_tenant_user,
+        )
+
+
 @receiver(post_delete, sender='sales_channels.SalesChannelViewAssign')
 def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
     """

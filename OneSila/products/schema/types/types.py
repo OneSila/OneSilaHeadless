@@ -64,6 +64,7 @@ class ProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
     inspector: Optional[Annotated['InspectorType', lazy('products_inspector.schema.types.types')]]
     saleschannelviewassign_set: List[Annotated['SalesChannelViewAssignType', lazy("sales_channels.schema.types.types")]]
+    rejectedsaleschannelviewassign_set: List[Annotated['RejectedSalesChannelViewAssignType', lazy("sales_channels.schema.types.types")]]
     productproperty_set: List[Annotated['ProductPropertyType', lazy("properties.schema.types.types")]]
     salesprice_set: List[Annotated['SalesPriceType', lazy("sales_prices.schema.types.types")]]
     alias_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
@@ -140,7 +141,6 @@ class ProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
     @field()
     def has_parents(self, info) -> bool:
         return ConfigurableVariation.objects.filter(variation_id=self.id).exists() or BundleVariation.objects.filter(variation_id=self.id).exists()
-
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")
 class ProductTranslationType(relay.Node, GetQuerysetMultiTenantMixin):

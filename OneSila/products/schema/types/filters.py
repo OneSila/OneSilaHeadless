@@ -30,7 +30,7 @@ from sales_channels.integrations.amazon.models import (
 )
 from sales_channels.integrations.ebay.models import EbayCategory, EbayProductCategory
 from sales_channels.integrations.shein.models import SheinCategory, SheinProductCategory
-from sales_channels.models import SalesChannelViewAssign
+from sales_channels.models import RejectedSalesChannelViewAssign, SalesChannelViewAssign
 from sales_channels.models.products import RemoteProduct
 from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
@@ -601,6 +601,53 @@ class ProductFilter(
             ).filter(assigned_to_view=False)
 
         return queryset, Q()
+
+    @custom_filter
+    def rejected_for_sales_channel_view_id(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+
+        if value not in (None, UNSET):
+            _, view_id = from_base64(value)
+            rejected_qs = RejectedSalesChannelViewAssign.objects.filter(
+                product_id=OuterRef("pk"),
+                sales_channel_view_id=view_id,
+            )
+            queryset = queryset.annotate(
+                rejected_for_view=Exists(rejected_qs)
+            ).filter(rejected_for_view=True)
+
+        return queryset, Q()
+
+    @custom_filter
+    def todo_for_sales_channel_view_id(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+
+        if value not in (None, UNSET):
+            _, view_id = from_base64(value)
+            queryset = queryset.filter_todo_for_sales_channel_view_id(view_id=view_id)
+
+        return queryset, Q()
+
+    @custom_filter
+    def has_todo_sales_channel_view(
+        self,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        return queryset.filter_has_todo_sales_channel_view(value=value), Q()
 
 
 @filter(BundleProduct)

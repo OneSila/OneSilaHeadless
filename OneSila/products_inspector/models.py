@@ -10,7 +10,8 @@ from products_inspector.managers import InspectorBlockHasImagesManager, Inspecto
     MissingStockManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
     ItemsMismatchProductTypeManager, ItemsMissingMandatoryInformationManager, VariationsMissingMandatoryInformationManager, \
     DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager, InspectorManager, \
-    RequiredDocumentTypesInspectorBlockManager, OptionalDocumentTypesInspectorBlockManager
+    RequiredDocumentTypesInspectorBlockManager, OptionalDocumentTypesInspectorBlockManager, \
+    UndecidedSalesChannelViewsInspectorBlockManager
 
 
 class Inspector(models.Model):
@@ -310,3 +311,14 @@ class OptionalDocumentTypesInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Optional Document Types")
+
+
+class UndecidedSalesChannelViewsInspectorBlock(InspectorBlock):
+    from .constants import undecided_sales_channel_views_block
+
+    objects = UndecidedSalesChannelViewsInspectorBlockManager()
+    proxy_filter_fields = undecided_sales_channel_views_block
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Inspector Block Undecided Sales Channel Views")
