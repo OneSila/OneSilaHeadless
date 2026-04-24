@@ -281,7 +281,7 @@ class DashboardCard(TimeStampMixin, MultiTenantAwareMixin):
     query = models.TextField()
     variables = models.JSONField(default=dict, blank=True)
     query_key = models.CharField(max_length=255)
-    url = models.URLField(blank=True)
+    url = models.URLField(blank=True, max_length=512)
     section = models.ForeignKey(
         DashboardSection,
         on_delete=models.CASCADE,

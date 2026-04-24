@@ -56,6 +56,7 @@ INSTALLED_LOCAL_APPS = [
     'currencies',
     'taxes',
     'products',
+    'workflows',
     'products_inspector',
     'units',
     'translations',

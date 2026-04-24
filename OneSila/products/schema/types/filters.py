@@ -36,6 +36,7 @@ from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
 from core.schema.core.types.filters import TimeStampRangeFilterMixin
 from products.product_types import CONFIGURABLE
+from workflows.models import WorkflowProductAssignment
 
 
 class ProductPropertyGlobalIdFilterMixin(AnnotationMergerMixin):
@@ -648,6 +649,27 @@ class ProductFilter(
             return queryset, Q()
 
         return queryset.filter_has_todo_sales_channel_view(value=value), Q()
+
+    @custom_filter
+    def workflow_state_id(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, workflow_state_id = from_base64(value)
+        assignment_qs = WorkflowProductAssignment.objects.filter(
+            product_id=OuterRef("pk"),
+            workflow_state_id=workflow_state_id,
+        )
+        queryset = queryset.annotate(
+            has_workflow_state=Exists(assignment_qs)
+        ).filter(has_workflow_state=True)
+
+        return queryset, Q()
 
 
 @filter(BundleProduct)

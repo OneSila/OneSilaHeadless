@@ -67,6 +67,9 @@ class ProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
     rejectedsaleschannelviewassign_set: List[Annotated['RejectedSalesChannelViewAssignType', lazy("sales_channels.schema.types.types")]]
     productproperty_set: List[Annotated['ProductPropertyType', lazy("properties.schema.types.types")]]
     salesprice_set: List[Annotated['SalesPriceType', lazy("sales_prices.schema.types.types")]]
+    workflowproductassignment_set: List[
+        Annotated['WorkflowProductAssignmentType', lazy("workflows.schema.types.types")]
+    ] = field(field_name="workflow_assignments")
     alias_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
     alias_parent_product: Optional[Annotated['ProductType', lazy("products.schema.types.types")]]
 

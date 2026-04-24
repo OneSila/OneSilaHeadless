@@ -242,6 +242,14 @@ query products($salesChannelId: String!) {
 }
 """
 
+PRODUCTS_WITH_WORKFLOW_STATE_ID_QUERY = """
+query products($id: String!) {
+  products(filters: {workflowStateId: $id}) {
+    edges { node { id } }
+  }
+}
+"""
+
 PRODUCTS_FILTER_BY_HAS_VIDEOS_IN_SALES_CHANNEL = """
 query products($salesChannelId: String!) {
   products(filters: {hasVideosInSalesChannel: $salesChannelId}) {
