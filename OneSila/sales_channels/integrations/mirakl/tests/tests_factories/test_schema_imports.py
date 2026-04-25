@@ -257,6 +257,128 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(synced_property.original_type, Property.TYPES.TEXT)
         self.assertEqual(synced_property.type, Property.TYPES.FLOAT)
 
+    def test_upsert_select_value_distinguishes_same_remote_id_across_value_lists(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="core_property",
+        )
+
+        factory._upsert_select_value(
+            remote_property=remote_property,
+            value_payload={"code": "shared_code", "label": "Shared Label"},
+            value_list_code="LIST_A",
+            value_list_label="List A",
+        )
+        factory._upsert_select_value(
+            remote_property=remote_property,
+            value_payload={"code": "shared_code", "label": "Shared Label"},
+            value_list_code="LIST_B",
+            value_list_label="List B",
+        )
+
+        self.assertEqual(
+            MiraklPropertySelectValue.objects.filter(
+                remote_property=remote_property,
+                code="shared_code",
+            ).count(),
+            2,
+        )
+        self.assertEqual(
+            sorted(
+                MiraklPropertySelectValue.objects.filter(
+                    remote_property=remote_property,
+                    code="shared_code",
+                ).values_list("value_list_code", flat=True)
+            ),
+            ["LIST_A", "LIST_B"],
+        )
+
+    def test_upsert_select_value_updates_all_matching_duplicates(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        first_local_value = baker.make(
+            "properties.PropertySelectValue",
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        second_local_value = baker.make(
+            "properties.PropertySelectValue",
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="core_property",
+            local_instance=local_property,
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_property=remote_property,
+            local_instance=first_local_value,
+            remote_id="shared_code",
+            code="shared_code",
+            value="Old Label",
+            value_list_code="LIST_A",
+            value_list_label="Old List A",
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_property=remote_property,
+            local_instance=second_local_value,
+            remote_id="shared_code",
+            code="shared_code",
+            value="Old Label",
+            value_list_code="LIST_A",
+            value_list_label="Old List A",
+        )
+
+        factory._upsert_select_value(
+            remote_property=remote_property,
+            value_payload={
+                "code": "shared_code",
+                "label": "New Label",
+                "label_translations": [{"locale": "en", "value": "New Label"}],
+            },
+            value_list_code="LIST_A",
+            value_list_label="List A",
+        )
+
+        updated_values = list(
+            MiraklPropertySelectValue.objects.filter(
+                remote_property=remote_property,
+                code="shared_code",
+                value_list_code="LIST_A",
+            ).order_by("id")
+        )
+        self.assertEqual(len(updated_values), 2)
+        self.assertTrue(all(value.value == "New Label" for value in updated_values))
+        self.assertTrue(all(value.value_list_label == "List A" for value in updated_values))
+        self.assertTrue(
+            all(
+                value.label_translations == [{"locale": "en", "value": "New Label"}]
+                for value in updated_values
+            )
+        )
+
     def test_public_definition_sync_persists_language(self):
         remote_property = baker.make(
             MiraklProperty,

@@ -891,21 +891,33 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         if not code and not label:
             return
 
-        select_value, _ = MiraklPropertySelectValue.objects.get_or_create(
-            sales_channel=self.sales_channel,
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-            remote_property=remote_property,
-            remote_id=code or label,
-        )
-        select_value.code = code
-        select_value.value = label
+        lookup = {
+            "sales_channel": self.sales_channel,
+            "multi_tenant_company": self.sales_channel.multi_tenant_company,
+            "remote_property": remote_property,
+            "remote_id": code or label,
+            "value_list_code": value_list_code,
+        }
         translations = self._ensure_json_value(value_payload.get("label_translations"), default=[])
-        select_value.label_translations = translations
-        select_value.value_label_translations = translations
-        select_value.value_list_code = value_list_code
-        select_value.value_list_label = value_list_label
-        select_value.raw_data = value_payload
-        select_value.save()
+        select_values = list(
+            MiraklPropertySelectValue.objects.filter(**lookup).order_by("id")
+        )
+        if not select_values:
+            select_values = [MiraklPropertySelectValue(**lookup)]
+
+        for select_value in select_values:
+            select_value.sales_channel = self.sales_channel
+            select_value.multi_tenant_company = self.sales_channel.multi_tenant_company
+            select_value.remote_property = remote_property
+            select_value.remote_id = code or label
+            select_value.code = code
+            select_value.value = label
+            select_value.label_translations = translations
+            select_value.value_label_translations = translations
+            select_value.value_list_code = value_list_code
+            select_value.value_list_label = value_list_label
+            select_value.raw_data = value_payload
+            select_value.save()
         self.summary_data["property_select_values"] += 1
 
     def _resolve_value_list_code(self, *, item: dict[str, Any]) -> str:
