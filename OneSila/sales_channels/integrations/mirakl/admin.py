@@ -322,8 +322,6 @@ class MiraklPropertyAdmin(admin.ModelAdmin):
         "description",
         "example",
         "default_value",
-        "value_list_code",
-        "value_list_label",
         "sales_channel__hostname",
         "local_instance__internal_name",
         "local_instance__propertytranslation__name",
@@ -395,8 +393,6 @@ class MiraklPropertyAdmin(admin.ModelAdmin):
                     "allows_unmapped_values",
                     "yes_text_value",
                     "no_text_value",
-                    "value_list_code",
-                    "value_list_label",
                 )
             },
         ),

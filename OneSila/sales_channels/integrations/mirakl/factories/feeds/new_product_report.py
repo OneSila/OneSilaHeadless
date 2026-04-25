@@ -14,6 +14,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
     MiraklSalesChannelFeedItem,
 )
+from sales_channels.integrations.mirakl.utils.offer_fields import add_offer_field_aliases
 
 
 class MiraklNewProductReportSyncFactory(GetMiraklAPIMixin):
@@ -254,10 +255,10 @@ class MiraklNewProductReportSyncFactory(GetMiraklAPIMixin):
         for row in rows:
             if not isinstance(row, dict):
                 continue
-            yield {
+            yield add_offer_field_aliases(row={
                 self._normalize_header(value=key): self._stringify(value=value)
                 for key, value in row.items()
-            }
+            })
 
     def _resolve_row_remote_product(
         self,

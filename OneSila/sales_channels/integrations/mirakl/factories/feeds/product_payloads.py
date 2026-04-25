@@ -46,6 +46,10 @@ from sales_channels.integrations.mirakl.utils.helpers import (
     build_remote_property_mapping_label,
     get_local_instance_label,
 )
+from sales_channels.integrations.mirakl.utils.offer_fields import (
+    OFFER_FIELD_KEYS as MIRAKL_OFFER_FIELD_KEYS,
+    build_offer_field_key,
+)
 from sales_channels.integrations.mirakl.utils.type_parameters import get_mirakl_type_parameter_value
 from sales_channels.models import SalesChannelFeedItem, SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPriceListItem
@@ -136,9 +140,6 @@ class _MiraklRemoteValueRunner(RemoteValueMixin):
             return True
         if original_type:
             return False
-
-        if getattr(remote_property, "value_list_code", ""):
-            return True
         return bool(
             MiraklPropertySelectValue.objects.filter(
                 remote_property=remote_property,
@@ -160,26 +161,7 @@ class MiraklProductPayloadBuilder:
         "SCRIPT",
     )
 
-    OFFER_FIELD_KEYS = [
-        "sku",
-        "product-id",
-        "product-id-type",
-        "description",
-        "internal-description",
-        "price",
-        "price-additional-info",
-        "quantity",
-        "min-quantity-alert",
-        "state",
-        "available-start-date",
-        "available-end-date",
-        "logistic-class",
-        "discount-price",
-        "discount-start-date",
-        "discount-end-date",
-        "leadtime-to-ship",
-        "update-delete",
-    ]
+    OFFER_FIELD_KEYS = list(MIRAKL_OFFER_FIELD_KEYS)
     _QUANTITY_CACHE_MISSING = object()
 
     def __init__(
@@ -529,7 +511,7 @@ class MiraklProductPayloadBuilder:
                 price = "0"
             if not quantity:
                 quantity = "0"
-        return {
+        offer_fields = {
             "sku": product_context["sku"],
             "product-id": product_context["sku"],
             "product-id-type": "SHOP_SKU",
@@ -548,6 +530,10 @@ class MiraklProductPayloadBuilder:
             "discount-end-date": self._format_date(price_data.get("end_date")),
             "leadtime-to-ship": "",
             "update-delete": self._resolve_update_delete_value(),
+        }
+        return {
+            build_offer_field_key(external_key=key): value
+            for key, value in offer_fields.items()
         }
 
     def _resolve_update_delete_value(self) -> str:
@@ -887,6 +873,10 @@ class MiraklProductPayloadBuilder:
             bullet_index=bullet_index,
             image_index=image_index,
         )
+        self._validate_product_type_item_select_values(
+            product_type_item=product_type_item,
+            product_context=product_context,
+        )
         if (
             value in (None, "")
             and product_context.get("parent_product") is None
@@ -908,6 +898,7 @@ class MiraklProductPayloadBuilder:
             value = self._build_delete_placeholder(
                 remote_property=remote_property,
                 product_context=product_context,
+                product_type_item=product_type_item,
             )
         value = self._apply_remote_validations(remote_property=remote_property, value=value, product_context=product_context)
         if value in (None, "") and self._is_required_product_type_item(product_type_item=product_type_item, product_context=product_context):
@@ -1249,6 +1240,62 @@ class MiraklProductPayloadBuilder:
             language_code=language_code or self.language,
         )
 
+    def _validate_product_type_item_select_values(
+        self,
+        *,
+        product_type_item: MiraklProductTypeItem,
+        product_context: dict[str, Any],
+    ) -> None:
+        allowed_value_list_code = str(getattr(product_type_item, "value_list_code", "") or "").strip()
+        if not allowed_value_list_code:
+            return
+
+        selected_values = self._get_selected_remote_select_values(
+            product_type_item=product_type_item,
+            product_context=product_context,
+        )
+        if not selected_values:
+            return
+
+        remote_property = product_type_item.remote_property
+        for selected_value in selected_values:
+            selected_value_list_code = str(getattr(selected_value, "value_list_code", "") or "").strip()
+            if selected_value_list_code == allowed_value_list_code:
+                continue
+            raise PreFlightCheckError(
+                f"Mirakl field '{remote_property.code}' uses remote value '{selected_value.code or selected_value.remote_id or selected_value.value}' "
+                f"from list '{selected_value_list_code or 'no list'}' but product type item requires list '{allowed_value_list_code}' "
+                f"for product {product_context['sku']}."
+            )
+
+    def _get_selected_remote_select_values(
+        self,
+        *,
+        product_type_item: MiraklProductTypeItem,
+        product_context: dict[str, Any],
+    ) -> list[MiraklPropertySelectValue]:
+        remote_property = product_type_item.remote_property
+        local_property_id = getattr(remote_property, "local_instance_id", None)
+        if local_property_id is None:
+            return []
+
+        product_property = product_context["property_by_id"].get(local_property_id)
+        if product_property is None:
+            return []
+
+        local_select_values: list[Any] = []
+        local_select_value = getattr(product_property, "value_select", None)
+        if local_select_value is not None:
+            local_select_values.append(local_select_value)
+        local_select_values.extend(list(product_property.value_multi_select.all()))
+
+        selected_values: list[MiraklPropertySelectValue] = []
+        for local_value in local_select_values:
+            mapped_value = product_context["remote_select_lookup"].get((remote_property.id, local_value.id))
+            if mapped_value is not None:
+                selected_values.append(mapped_value)
+        return selected_values
+
     def _serialize_remote_select_value(
         self,
         *,
@@ -1463,8 +1510,17 @@ class MiraklProductPayloadBuilder:
             parsed_entries.append((validator_type, validator_value))
         return parsed_entries
 
-    def _build_delete_placeholder(self, *, remote_property: MiraklProperty, product_context: dict[str, Any]) -> str:
-        select_placeholder = self._get_first_select_value(remote_property=remote_property)
+    def _build_delete_placeholder(
+        self,
+        *,
+        remote_property: MiraklProperty,
+        product_context: dict[str, Any],
+        product_type_item: MiraklProductTypeItem | None = None,
+    ) -> str:
+        select_placeholder = self._get_first_select_value(
+            remote_property=remote_property,
+            product_type_item=product_type_item,
+        )
         if select_placeholder:
             return select_placeholder
 
@@ -1481,17 +1537,22 @@ class MiraklProductPayloadBuilder:
             return date.today().isoformat()
         return self._default_delete_text()
 
-    def _get_first_select_value(self, *, remote_property: MiraklProperty) -> str:
+    def _get_first_select_value(
+        self,
+        *,
+        remote_property: MiraklProperty,
+        product_type_item: MiraklProductTypeItem | None = None,
+    ) -> str:
         if str(getattr(remote_property, "type", "") or "").upper() not in {"SELECT", "MULTISELECT"}:
             return ""
-        select_value = (
-            MiraklPropertySelectValue.objects.filter(
-                sales_channel=self.sales_channel,
-                remote_property=remote_property,
-            )
-            .order_by("id")
-            .first()
+        queryset = MiraklPropertySelectValue.objects.filter(
+            sales_channel=self.sales_channel,
+            remote_property=remote_property,
         )
+        allowed_value_list_code = str(getattr(product_type_item, "value_list_code", "") or "").strip()
+        if allowed_value_list_code:
+            queryset = queryset.filter(value_list_code=allowed_value_list_code)
+        select_value = queryset.order_by("id").first()
         if select_value is None:
             return ""
         return self._serialize_remote_select_value(select_value=select_value)

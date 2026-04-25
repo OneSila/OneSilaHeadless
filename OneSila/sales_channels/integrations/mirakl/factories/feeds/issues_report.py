@@ -16,6 +16,7 @@ from sales_channels.integrations.mirakl.models import (
     MiraklProperty,
     MiraklSalesChannelFeedItem,
 )
+from sales_channels.integrations.mirakl.utils.offer_fields import add_offer_field_aliases
 
 
 class MiraklTransformationErrorReportIssueSyncFactory:
@@ -162,10 +163,10 @@ class MiraklTransformationErrorReportIssueSyncFactory:
             for row in item.payload_data or []:
                 if not isinstance(row, dict):
                     continue
-                normalized_row = {
+                normalized_row = add_offer_field_aliases(row={
                     self._normalize_header(value=key): self._stringify(value=value)
                     for key, value in row.items()
-                }
+                })
                 lookup_key_candidates.extend(normalized_row.get(header, "") for header in self.sku_headers)
                 lookup_key_candidates.extend(normalized_row.get(header, "") for header in self.ean_headers)
 

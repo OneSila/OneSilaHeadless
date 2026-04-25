@@ -219,6 +219,166 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(remote_property.language, "fr")
         self.assertTrue(remote_property.representation_type_decided)
 
+    def test_upsert_property_preserves_existing_runtime_type_mapping(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.FLOAT,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="measurement_value",
+            local_instance=local_property,
+            original_type=Property.TYPES.FLOAT,
+            type=Property.TYPES.FLOAT,
+            raw_data={"code": "measurement_value", "hierarchy_code": ""},
+        )
+
+        synced_property = factory._upsert_property(
+            item={
+                "code": "measurement_value",
+                "label": "Measurement Value",
+                "description": "",
+                "example": "",
+                "hierarchy_code": "",
+                "type": "TEXT",
+                "type_parameters": [],
+                "roles": [],
+            }
+        )
+
+        self.assertEqual(synced_property.pk, remote_property.pk)
+        self.assertEqual(synced_property.original_type, Property.TYPES.TEXT)
+        self.assertEqual(synced_property.type, Property.TYPES.FLOAT)
+
+    def test_upsert_select_value_distinguishes_same_remote_id_across_value_lists(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="core_property",
+        )
+
+        factory._upsert_select_value(
+            remote_property=remote_property,
+            value_payload={"code": "shared_code", "label": "Shared Label"},
+            value_list_code="LIST_A",
+            value_list_label="List A",
+        )
+        factory._upsert_select_value(
+            remote_property=remote_property,
+            value_payload={"code": "shared_code", "label": "Shared Label"},
+            value_list_code="LIST_B",
+            value_list_label="List B",
+        )
+
+        self.assertEqual(
+            MiraklPropertySelectValue.objects.filter(
+                remote_property=remote_property,
+                code="shared_code",
+            ).count(),
+            2,
+        )
+        self.assertEqual(
+            sorted(
+                MiraklPropertySelectValue.objects.filter(
+                    remote_property=remote_property,
+                    code="shared_code",
+                ).values_list("value_list_code", flat=True)
+            ),
+            ["LIST_A", "LIST_B"],
+        )
+
+    def test_upsert_select_value_updates_all_matching_duplicates(self):
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        first_local_value = baker.make(
+            "properties.PropertySelectValue",
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        second_local_value = baker.make(
+            "properties.PropertySelectValue",
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+        )
+        remote_property = baker.make(
+            MiraklProperty,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            code="core_property",
+            local_instance=local_property,
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_property=remote_property,
+            local_instance=first_local_value,
+            remote_id="shared_code",
+            code="shared_code",
+            value="Old Label",
+            value_list_code="LIST_A",
+            value_list_label="Old List A",
+        )
+        baker.make(
+            MiraklPropertySelectValue,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_property=remote_property,
+            local_instance=second_local_value,
+            remote_id="shared_code",
+            code="shared_code",
+            value="Old Label",
+            value_list_code="LIST_A",
+            value_list_label="Old List A",
+        )
+
+        factory._upsert_select_value(
+            remote_property=remote_property,
+            value_payload={
+                "code": "shared_code",
+                "label": "New Label",
+                "label_translations": [{"locale": "en", "value": "New Label"}],
+            },
+            value_list_code="LIST_A",
+            value_list_label="List A",
+        )
+
+        updated_values = list(
+            MiraklPropertySelectValue.objects.filter(
+                remote_property=remote_property,
+                code="shared_code",
+                value_list_code="LIST_A",
+            ).order_by("id")
+        )
+        self.assertEqual(len(updated_values), 2)
+        self.assertTrue(all(value.value == "New Label" for value in updated_values))
+        self.assertTrue(all(value.value_list_label == "List A" for value in updated_values))
+        self.assertTrue(
+            all(
+                value.label_translations == [{"locale": "en", "value": "New Label"}]
+                for value in updated_values
+            )
+        )
+
     def test_public_definition_sync_persists_language(self):
         remote_property = baker.make(
             MiraklProperty,
@@ -497,8 +657,6 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertTrue(child.is_leaf)
 
         color_property = MiraklProperty.objects.get(sales_channel=self.sales_channel, code="color")
-        self.assertEqual(color_property.value_list_code, "COLOR_LIST")
-        self.assertEqual(color_property.value_list_label, "Colors")
         self.assertEqual(color_property.representation_type, MiraklProperty.REPRESENTATION_PROPERTY)
         self.assertEqual(color_property.example, "Red")
         self.assertFalse(color_property.is_common)
@@ -529,6 +687,8 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(color_item.requirement_level, "REQUIRED")
         self.assertTrue(color_item.required)
         self.assertTrue(color_item.variant)
+        self.assertEqual(color_item.value_list_code, "COLOR_LIST")
+        self.assertEqual(color_item.value_list_label, "Colors")
         self.assertEqual(
             MiraklPropertyApplicability.objects.filter(property=color_property, view=self.view).count(),
             1,
@@ -616,8 +776,6 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(condition_property.representation_type, MiraklProperty.REPRESENTATION_CONDITION)
         self.assertEqual(condition_property.type, Property.TYPES.SELECT)
         self.assertFalse(condition_property.allows_unmapped_values)
-        self.assertEqual(condition_property.value_list_code, "offer_states")
-        self.assertEqual(condition_property.value_list_label, "Offer states")
         self.assertEqual(
             MiraklPropertySelectValue.objects.filter(remote_property=condition_property).count(),
             2,
@@ -630,8 +788,6 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(logistic_class_property.representation_type, MiraklProperty.REPRESENTATION_LOGISTIC_CLASS)
         self.assertEqual(logistic_class_property.type, Property.TYPES.SELECT)
         self.assertFalse(logistic_class_property.allows_unmapped_values)
-        self.assertEqual(logistic_class_property.value_list_code, "logistic_classes")
-        self.assertEqual(logistic_class_property.value_list_label, "Logistic classes")
         self.assertEqual(
             MiraklPropertySelectValue.objects.filter(remote_property=logistic_class_property).count(),
             2,
@@ -642,6 +798,96 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
 
         self.import_process.refresh_from_db()
         self.assertGreaterEqual(summary["properties"], 4)
+
+    def test_run_imports_select_values_for_all_item_level_value_lists_of_same_property(self):
+        payloads = {
+            "/api/offers/states": {"offer_states": []},
+            "/api/shipping/logistic_classes": {"logistic_classes": []},
+            "/api/hierarchies": {
+                "hierarchies": [
+                    {"code": "TYPE_A", "label": "Type A", "level": 1, "parent_code": ""},
+                    {"code": "TYPE_B", "label": "Type B", "level": 1, "parent_code": ""},
+                ],
+            },
+            "/api/products/attributes": {
+                "attributes": [
+                    {
+                        "code": "core_property",
+                        "label": "Core Property",
+                        "hierarchy_code": "TYPE_A",
+                        "required": False,
+                        "variant": False,
+                        "type": "LIST",
+                        "type_parameters": [{"name": "LIST_CODE", "value": "LIST_A"}],
+                        "channels": [{"code": "WEB"}],
+                    },
+                    {
+                        "code": "core_property",
+                        "label": "Core Property",
+                        "hierarchy_code": "TYPE_B",
+                        "required": False,
+                        "variant": False,
+                        "type": "LIST",
+                        "type_parameters": [{"name": "LIST_CODE", "value": "LIST_B"}],
+                        "channels": [{"code": "WEB"}],
+                    },
+                ],
+            },
+            "/api/values_lists": {
+                "values_lists": [
+                    {
+                        "code": "LIST_A",
+                        "label": "List A",
+                        "values": [
+                            {"code": "A1", "label": "Alpha One"},
+                            {"code": "A2", "label": "Alpha Two"},
+                        ],
+                    },
+                    {
+                        "code": "LIST_B",
+                        "label": "List B",
+                        "values": [
+                            {"code": "B1", "label": "Beta One"},
+                            {"code": "B2", "label": "Beta Two"},
+                        ],
+                    },
+                ],
+            },
+        }
+
+        def mirakl_get_side_effect(*, path, params=None, timeout=None):
+            return payloads[path]
+
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        with patch.object(factory, "mirakl_get", side_effect=mirakl_get_side_effect):
+            factory.run()
+
+        remote_property = MiraklProperty.objects.get(
+            sales_channel=self.sales_channel,
+            code="core_property",
+        )
+        type_a = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="TYPE_A")
+        type_b = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="TYPE_B")
+        self.assertEqual(
+            MiraklProductTypeItem.objects.get(product_type=type_a, remote_property=remote_property).value_list_code,
+            "LIST_A",
+        )
+        self.assertEqual(
+            MiraklProductTypeItem.objects.get(product_type=type_b, remote_property=remote_property).value_list_code,
+            "LIST_B",
+        )
+        self.assertCountEqual(
+            list(
+                MiraklPropertySelectValue.objects.filter(
+                    remote_property=remote_property,
+                ).values_list("code", flat=True)
+            ),
+            ["A1", "A2", "B1", "B2"],
+        )
 
     def test_run_import_uses_roles_for_representation_type_detection(self):
         payloads = {
