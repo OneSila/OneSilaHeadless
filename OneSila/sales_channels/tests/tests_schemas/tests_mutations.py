@@ -318,7 +318,7 @@ class ProductViewStatusMutationTestCase(TransactionTestCaseMixin, TransactionTes
         self.sales_channel = baker.make(
             AmazonSalesChannel,
             multi_tenant_company=self.multi_tenant_company,
-            active=False,
+            active=True,
         )
         self.view = baker.make(
             AmazonSalesChannelView,
@@ -343,6 +343,16 @@ class ProductViewStatusMutationTestCase(TransactionTestCaseMixin, TransactionTes
             type=Product.SIMPLE,
             active=True,
             sku="STATUS-2",
+        )
+        self.inactive_sales_channel = baker.make(
+            AmazonSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=False,
+        )
+        self.inactive_view = baker.make(
+            AmazonSalesChannelView,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.inactive_sales_channel,
         )
 
     def _assign_object(self, *, product, view):
@@ -390,6 +400,18 @@ class ProductViewStatusMutationTestCase(TransactionTestCaseMixin, TransactionTes
                 product=self.product,
                 sales_channel=self.sales_channel,
                 sales_channel_view=self.view,
+            ).exists()
+        )
+
+    def test_change_product_view_status_to_added_for_inactive_sales_channel_raises_error(self):
+        response = self._change_status(status="ADDED", view=self.inactive_view)
+
+        self.assertIsNotNone(response.errors)
+        self.assertIn("Cannot add a product view for an inactive sales channel.", response.errors[0].message)
+        self.assertFalse(
+            SalesChannelViewAssign.objects.filter(
+                product=self.product,
+                sales_channel_view=self.inactive_view,
             ).exists()
         )
 
@@ -460,6 +482,35 @@ class ProductViewStatusMutationTestCase(TransactionTestCaseMixin, TransactionTes
             RejectedSalesChannelViewAssign.objects.filter(
                 product=self.other_product,
                 sales_channel_view=self.view,
+            ).exists()
+        )
+
+    def test_change_product_views_status_added_skips_inactive_sales_channel(self):
+        response = self.strawberry_test_client(
+            query=CHANGE_PRODUCT_VIEWS_STATUS_MUTATION,
+            variables={
+                "changes": [
+                    {
+                        "status": "ADDED",
+                        "assignObject": self._assign_object(product=self.product, view=self.view),
+                    },
+                    {
+                        "status": "ADDED",
+                        "assignObject": self._assign_object(product=self.other_product, view=self.inactive_view),
+                    },
+                ],
+            },
+        )
+
+        self.assertIsNone(response.errors)
+        self.assertEqual(response.data["changeProductViewsStatus"]["changesCount"], 2)
+        self.assertEqual(response.data["changeProductViewsStatus"]["createdCount"], 1)
+        self.assertEqual(response.data["changeProductViewsStatus"]["deletedCount"], 0)
+        self.assertTrue(SalesChannelViewAssign.objects.filter(product=self.product, sales_channel_view=self.view).exists())
+        self.assertFalse(
+            SalesChannelViewAssign.objects.filter(
+                product=self.other_product,
+                sales_channel_view=self.inactive_view,
             ).exists()
         )
 

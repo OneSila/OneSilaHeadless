@@ -1,6 +1,8 @@
 from django.test import TransactionTestCase
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
+from core.models import MultiTenantCompany
+from model_bakery import baker
 from products.models import Product
 from workflows.models import Workflow, WorkflowProductAssignment, WorkflowState
 
@@ -268,3 +270,223 @@ class WorkflowMutationTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertIsNone(resp.errors)
         self.assertEqual(resp.data["deleteWorkflowState"]["id"], self.to_global_id(workflow_state))
         self.assertFalse(WorkflowState.objects.filter(id=workflow_state.id).exists())
+
+    def test_bulk_assign_workflow_state_creates_assignments(self):
+        workflow = Workflow.objects.create(
+            name="Listing Flow",
+            code="LISTING_FLOW",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        workflow_state = WorkflowState.objects.create(
+            workflow=workflow,
+            value="Ready",
+            code="READY",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_1 = Product.objects.create(
+            sku="workflow-bulk-product-1",
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_2 = Product.objects.create(
+            sku="workflow-bulk-product-2",
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        mutation = """
+            mutation ($workflowState: WorkflowStatePartialInput!, $products: [ProductPartialInput!]!) {
+              bulkAssignWorkflowState(workflowState: $workflowState, products: $products) {
+                id
+                workflow {
+                  id
+                }
+                workflowState {
+                  id
+                }
+                product {
+                  id
+                }
+              }
+            }
+        """
+
+        resp = self.strawberry_test_client(
+            query=mutation,
+            variables={
+                "workflowState": {"id": self.to_global_id(workflow_state)},
+                "products": [{"id": self.to_global_id(product_1)}, {"id": self.to_global_id(product_2)}],
+            },
+        )
+
+        self.assertIsNone(resp.errors)
+        payload = resp.data["bulkAssignWorkflowState"]
+        self.assertEqual(len(payload), 2)
+        assignment_ids = {
+            self.from_global_id(item["product"]["id"])[1] for item in payload
+        }
+        self.assertEqual(assignment_ids, {str(product_1.id), str(product_2.id)})
+        self.assertTrue(
+            WorkflowProductAssignment.objects.filter(
+                workflow=workflow,
+                workflow_state=workflow_state,
+                product=product_1,
+                multi_tenant_company=self.multi_tenant_company,
+            ).exists()
+        )
+        self.assertTrue(
+            WorkflowProductAssignment.objects.filter(
+                workflow=workflow,
+                workflow_state=workflow_state,
+                product=product_2,
+                multi_tenant_company=self.multi_tenant_company,
+            ).exists()
+        )
+
+    def test_bulk_assign_workflow_state_updates_existing_assignment(self):
+        workflow = Workflow.objects.create(
+            name="Listing Flow",
+            code="LISTING_FLOW",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        old_state = WorkflowState.objects.create(
+            workflow=workflow,
+            value="Old",
+            code="OLD",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        new_state = WorkflowState.objects.create(
+            workflow=workflow,
+            value="New",
+            code="NEW",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product = Product.objects.create(
+            sku="workflow-bulk-product-3",
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        assignment = WorkflowProductAssignment.objects.create(
+            workflow=workflow,
+            workflow_state=old_state,
+            product=product,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        mutation = """
+            mutation ($workflowState: WorkflowStatePartialInput!, $products: [ProductPartialInput!]!) {
+              bulkAssignWorkflowState(workflowState: $workflowState, products: $products) {
+                id
+                workflowState {
+                  id
+                }
+              }
+            }
+        """
+
+        resp = self.strawberry_test_client(
+            query=mutation,
+            variables={
+                "workflowState": {"id": self.to_global_id(new_state)},
+                "products": [{"id": self.to_global_id(product)}],
+            },
+        )
+
+        self.assertIsNone(resp.errors)
+        self.assertEqual(len(resp.data["bulkAssignWorkflowState"]), 1)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.workflow_state_id, new_state.id)
+
+    def test_bulk_assign_workflow_state_rejects_other_company_products(self):
+        workflow = Workflow.objects.create(
+            name="Listing Flow",
+            code="LISTING_FLOW",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        workflow_state = WorkflowState.objects.create(
+            workflow=workflow,
+            value="Ready",
+            code="READY",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        other_company = baker.make(MultiTenantCompany)
+        other_product = Product.objects.create(
+            sku="workflow-bulk-other-company-product",
+            type=Product.SIMPLE,
+            multi_tenant_company=other_company,
+        )
+
+        mutation = """
+            mutation ($workflowState: WorkflowStatePartialInput!, $products: [ProductPartialInput!]!) {
+              bulkAssignWorkflowState(workflowState: $workflowState, products: $products) {
+                id
+              }
+            }
+        """
+
+        resp = self.strawberry_test_client(
+            query=mutation,
+            variables={
+                "workflowState": {"id": self.to_global_id(workflow_state)},
+                "products": [{"id": self.to_global_id(other_product)}],
+            },
+            asserts_errors=True,
+        )
+
+        self.assertIsNotNone(resp.errors)
+
+    def test_bulk_assign_workflow_state_handles_existing_legacy_assignment(self):
+        workflow = Workflow.objects.create(
+            name="Listing Flow",
+            code="LISTING_FLOW",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        old_state = WorkflowState.objects.create(
+            workflow=workflow,
+            value="Old",
+            code="OLD",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        new_state = WorkflowState.objects.create(
+            workflow=workflow,
+            value="New",
+            code="NEW",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product = Product.objects.create(
+            sku="workflow-bulk-product-legacy",
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        # Simulate a legacy row missing tenant value.
+        assignment = WorkflowProductAssignment.objects.create(
+            workflow=workflow,
+            workflow_state=old_state,
+            product=product,
+            multi_tenant_company=None,
+        )
+
+        mutation = """
+            mutation ($workflowState: WorkflowStatePartialInput!, $products: [ProductPartialInput!]!) {
+              bulkAssignWorkflowState(workflowState: $workflowState, products: $products) {
+                id
+                workflowState {
+                  id
+                }
+              }
+            }
+        """
+
+        resp = self.strawberry_test_client(
+            query=mutation,
+            variables={
+                "workflowState": {"id": self.to_global_id(new_state)},
+                "products": [{"id": self.to_global_id(product)}],
+            },
+        )
+
+        self.assertIsNone(resp.errors)
+        self.assertEqual(len(resp.data["bulkAssignWorkflowState"]), 1)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.workflow_state_id, new_state.id)

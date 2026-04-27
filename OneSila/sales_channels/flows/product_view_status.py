@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.core.exceptions import ValidationError
 from sales_channels.models import RejectedSalesChannelViewAssign, SalesChannelViewAssign
 from sales_channels.signals import product_view_status_changed
 
@@ -22,6 +23,7 @@ def change_product_view_status_for_assign_object(
     status,
     multi_tenant_company,
     multi_tenant_user=None,
+    raise_error: bool = False,
 ) -> dict[str, int]:
     status_value = _status_value(status=status)
     if status_value not in {STATUS_ADDED, STATUS_REJECT, STATUS_TODO}:
@@ -46,6 +48,11 @@ def change_product_view_status_for_assign_object(
     deleted_count = 0
 
     if status_value == STATUS_ADDED:
+        if not sales_channel_view.sales_channel.active:
+            if raise_error:
+                raise ValidationError("Cannot add a product view for an inactive sales channel.")
+            return {"created_count": 0, "deleted_count": 0}
+
         deleted_count += RejectedSalesChannelViewAssign.objects.filter(**assign_filter).delete()[0]
         _, created = SalesChannelViewAssign.objects.get_or_create(
             **common_values,

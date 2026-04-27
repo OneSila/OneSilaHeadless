@@ -33,6 +33,11 @@ class GetProductQuerysetMultiTenantMixinTest(TestCase):
             hostname="https://example.com",
             multi_tenant_company=self.multi_tenant_company,
         )
+        inactive_sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://inactive.example.com",
+            active=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
         included_view = AmazonSalesChannelView.objects.create(
             sales_channel=sales_channel,
             multi_tenant_company=self.multi_tenant_company,
@@ -42,6 +47,11 @@ class GetProductQuerysetMultiTenantMixinTest(TestCase):
             sales_channel=sales_channel,
             multi_tenant_company=self.multi_tenant_company,
             include_in_todo=False,
+        )
+        inactive_included_view = AmazonSalesChannelView.objects.create(
+            sales_channel=inactive_sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            include_in_todo=True,
         )
         added = SimpleProduct.objects.create(
             sku="manager-added",
@@ -53,6 +63,10 @@ class GetProductQuerysetMultiTenantMixinTest(TestCase):
         )
         todo = SimpleProduct.objects.create(
             sku="manager-todo",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        inactive_todo = SimpleProduct.objects.create(
+            sku="manager-inactive-todo",
             multi_tenant_company=self.multi_tenant_company,
         )
         SalesChannelViewAssign.objects.create(
@@ -69,6 +83,16 @@ class GetProductQuerysetMultiTenantMixinTest(TestCase):
         RejectedSalesChannelViewAssign.objects.create(
             product=added,
             sales_channel_view=excluded_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        RejectedSalesChannelViewAssign.objects.create(
+            product=inactive_todo,
+            sales_channel_view=included_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        RejectedSalesChannelViewAssign.objects.create(
+            product=inactive_todo,
+            sales_channel_view=inactive_included_view,
             multi_tenant_company=self.multi_tenant_company,
         )
 

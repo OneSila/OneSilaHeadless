@@ -99,6 +99,7 @@ def resolve_change_product_view_status(
         status=status,
         multi_tenant_company=multi_tenant_company,
         multi_tenant_user=multi_tenant_user,
+        raise_error=True,
     )
     return ProductViewStatusChangeResult(
         status=status,
@@ -131,6 +132,7 @@ def resolve_change_product_views_status(
             status=change.status,
             multi_tenant_company=multi_tenant_company,
             multi_tenant_user=multi_tenant_user,
+            raise_error=False,
         )
         created_count += result["created_count"]
         deleted_count += result["deleted_count"]

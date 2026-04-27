@@ -30,7 +30,7 @@ from sales_channels.integrations.amazon.models import (
 )
 from sales_channels.integrations.ebay.models import EbayCategory, EbayProductCategory
 from sales_channels.integrations.shein.models import SheinCategory, SheinProductCategory
-from sales_channels.models import RejectedSalesChannelViewAssign, SalesChannelViewAssign
+from sales_channels.models import RejectedSalesChannelViewAssign, SalesChannelView, SalesChannelViewAssign
 from sales_channels.models.products import RemoteProduct
 from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
@@ -131,6 +131,14 @@ class ProductFilter(
         return SheinProductCategory.objects.filter(
             product_id=OuterRef("pk"),
             remote_id=Subquery(category_qs.values("remote_id")[:1]),
+        )
+
+    @staticmethod
+    def _active_sales_channel_view_qs(*, view_id: str):
+        return SalesChannelView.objects.filter(
+            id=view_id,
+            multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
+            sales_channel__active=True,
         )
 
     @custom_filter
@@ -542,10 +550,16 @@ class ProductFilter(
             assigns_qs = SalesChannelViewAssign.objects.filter(
                 product_id=OuterRef("pk"),
                 sales_channel_view_id=view_id,
+                sales_channel_view__sales_channel__active=True,
             )
+            active_view_qs = self._active_sales_channel_view_qs(view_id=view_id)
             queryset = queryset.annotate(
+                has_active_view=Exists(active_view_qs),
                 assigned_to_view=Exists(assigns_qs)
-            ).filter(assigned_to_view=True)
+            ).filter(
+                has_active_view=True,
+                assigned_to_view=True,
+            )
 
         return queryset, Q()
 
@@ -596,10 +610,16 @@ class ProductFilter(
             assigns_qs = SalesChannelViewAssign.objects.filter(
                 product_id=OuterRef("pk"),
                 sales_channel_view_id=view_id,
+                sales_channel_view__sales_channel__active=True,
             )
+            active_view_qs = self._active_sales_channel_view_qs(view_id=view_id)
             queryset = queryset.annotate(
+                has_active_view=Exists(active_view_qs),
                 assigned_to_view=Exists(assigns_qs)
-            ).filter(assigned_to_view=False)
+            ).filter(
+                has_active_view=True,
+                assigned_to_view=False,
+            )
 
         return queryset, Q()
 
@@ -616,10 +636,16 @@ class ProductFilter(
             rejected_qs = RejectedSalesChannelViewAssign.objects.filter(
                 product_id=OuterRef("pk"),
                 sales_channel_view_id=view_id,
+                sales_channel_view__sales_channel__active=True,
             )
+            active_view_qs = self._active_sales_channel_view_qs(view_id=view_id)
             queryset = queryset.annotate(
+                has_active_view=Exists(active_view_qs),
                 rejected_for_view=Exists(rejected_qs)
-            ).filter(rejected_for_view=True)
+            ).filter(
+                has_active_view=True,
+                rejected_for_view=True,
+            )
 
         return queryset, Q()
 
@@ -633,7 +659,12 @@ class ProductFilter(
 
         if value not in (None, UNSET):
             _, view_id = from_base64(value)
-            queryset = queryset.filter_todo_for_sales_channel_view_id(view_id=view_id)
+            active_view_qs = self._active_sales_channel_view_qs(view_id=view_id)
+            queryset = queryset.annotate(
+                has_active_view=Exists(active_view_qs),
+            ).filter(
+                has_active_view=True,
+            ).filter_todo_for_sales_channel_view_id(view_id=view_id)
 
         return queryset, Q()
 
