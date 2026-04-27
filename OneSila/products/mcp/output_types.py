@@ -297,6 +297,29 @@ PRODUCT_PROPERTY_REQUIREMENTS_OUTPUT_SCHEMA = {
     "required": ["product_type", "requirements"],
 }
 
+WORKFLOW_STATE_REFERENCE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "code": {"type": "string"},
+        "is_default": {"type": "boolean"},
+    },
+    "required": ["id", "name", "code", "is_default"],
+}
+
+
+PRODUCT_WORKFLOW_ASSIGNMENT_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "workflow_id": {"type": "integer"},
+        "workflow_name": {"type": "string"},
+        "workflow_code": {"type": "string"},
+        "state": WORKFLOW_STATE_REFERENCE_OUTPUT_SCHEMA,
+    },
+    "required": ["workflow_id", "workflow_name", "workflow_code", "state"],
+}
+
 
 PRODUCT_SEARCH_SUMMARY_OUTPUT_SCHEMA = {
     "type": "object",
@@ -313,6 +336,10 @@ PRODUCT_SEARCH_SUMMARY_OUTPUT_SCHEMA = {
         "has_missing_required_information": {"type": "boolean"},
         "has_missing_optional_information": {"type": "boolean"},
         "has_missing_information": {"type": "boolean"},
+        "workflows": {
+            "type": "array",
+            "items": PRODUCT_WORKFLOW_ASSIGNMENT_OUTPUT_SCHEMA,
+        },
     },
     "required": [
         "id",
@@ -327,6 +354,7 @@ PRODUCT_SEARCH_SUMMARY_OUTPUT_SCHEMA = {
         "has_missing_required_information",
         "has_missing_optional_information",
         "has_missing_information",
+        "workflows",
     ],
 }
 
@@ -543,6 +571,34 @@ COMPANY_CURRENCIES_OUTPUT_SCHEMA = {
 }
 
 
+COMPANY_WORKFLOW_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "code": {"type": "string"},
+        "states": {
+            "type": "array",
+            "items": WORKFLOW_STATE_REFERENCE_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["id", "name", "code", "states"],
+}
+
+
+COMPANY_WORKFLOWS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "count": {"type": "integer"},
+        "results": {
+            "type": "array",
+            "items": COMPANY_WORKFLOW_OUTPUT_SCHEMA,
+        },
+    },
+    "required": ["count", "results"],
+}
+
+
 GET_COMPANY_DETAILS_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -561,6 +617,7 @@ GET_COMPANY_DETAILS_OUTPUT_SCHEMA = {
         "product_types": COMPANY_PRODUCT_TYPES_OUTPUT_SCHEMA,
         "vat_rates": GET_VAT_RATES_OUTPUT_SCHEMA,
         "currencies": COMPANY_CURRENCIES_OUTPUT_SCHEMA,
+        "workflows": COMPANY_WORKFLOWS_OUTPUT_SCHEMA,
     },
 }
 
@@ -592,6 +649,7 @@ PRODUCT_UPSERT_APPLIED_UPDATES_OUTPUT_SCHEMA = {
         "properties": {"type": "integer"},
         "images": {"type": "integer"},
         "website_views_assignments": {"type": "integer"},
+        "workflows": {"type": "integer"},
     },
 }
 

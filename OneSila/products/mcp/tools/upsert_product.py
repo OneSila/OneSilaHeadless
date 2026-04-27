@@ -17,6 +17,7 @@ from products.mcp.types import (
     ProductPriceUpsertInputPayload,
     ProductPropertyValueUpdateInputPayload,
     ProductTranslationUpsertInputPayload,
+    WorkflowStateUpdateInputPayload,
     UpsertProductInputPayload,
     UpsertProductsPayload,
 )
@@ -27,6 +28,7 @@ from products.mcp.update_helpers import (
     sanitize_product_prices_input,
     sanitize_product_property_updates_input,
     sanitize_sales_channel_view_ids_input,
+    sanitize_workflows_input,
     sanitize_product_translation_updates_input,
 )
 
@@ -52,6 +54,7 @@ class UpsertProductsMcpTool(BaseMcpTool):
                     "Update 1 to 10 existing products. Each item must identify the product by `product_id` or `sku`, "
                     "and must include at least one update section. Root update fields: `vat_rate_id`, `vat_rate`, `active`, `ean_code`. "
                     "Nested update sections: `translations`, `prices`, `properties`, `images`, `sales_channel_view_ids`. "
+                    "You can also update product workflow assignments via `workflows` using workflow/state codes. "
                     "Use `translations[].name` to update the product name in a language, usually the default language without `sales_channel_id` for the main product name. "
                     "Use `properties` to update property values, including the Product Type property when needed. "
                     "Use `vat_rate_id` from `get_company_details(show_vat_rates=true)` or `vat_rate` with the exact configured percentage. "
@@ -95,10 +98,12 @@ class UpsertProductsMcpTool(BaseMcpTool):
         - Add image from URL: `{sku: "ABC-1", images: [{image_url: "https://example.com/mug.jpg", type: "PACK", is_main_image: true, sort_order: 1}]}`
         - Add uploaded image: `{sku: "ABC-1", images: [{image_content: "<base64>", title: "Front view", is_main_image: true}]}`
         - Assign to storefront views: `{sku: "ABC-1", sales_channel_view_ids: [3, 5]}`
+        - Set workflow state by codes: `{sku: "ABC-1", workflows: [{"workflow_code": "CONTENT_REVIEW", "state_code": "READY"}]}`
 
         Notes:
         - `images` adds image assignments; it does not remove existing ones.
         - `sales_channel_view_ids` adds storefront assignments; it does not remove existing ones.
+        - `workflows` creates or updates a product's assignment for each provided workflow code.
         """
         try:
             multi_tenant_company = await self.get_multi_tenant_company(required=True)
@@ -203,6 +208,18 @@ class UpsertProductsMcpTool(BaseMcpTool):
         except ValueError as error:
             raise McpToolError(str(error)) from error
 
+    def _sanitize_workflows(
+        self,
+        *,
+        workflows: list[WorkflowStateUpdateInputPayload] | str | None,
+    ) -> list[WorkflowStateUpdateInputPayload] | None:
+        if workflows is None:
+            return None
+        try:
+            return sanitize_workflows_input(workflows=workflows)
+        except ValueError as error:
+            raise McpToolError(str(error)) from error
+
     def _validate_has_updates(
         self,
         *,
@@ -215,6 +232,7 @@ class UpsertProductsMcpTool(BaseMcpTool):
         properties: list[ProductPropertyValueUpdateInputPayload] | None,
         images: list[ProductImageInputPayload] | None,
         sales_channel_view_ids: list[int] | None,
+        workflows: list[WorkflowStateUpdateInputPayload] | None,
     ) -> None:
         if not any(
             [
@@ -227,10 +245,11 @@ class UpsertProductsMcpTool(BaseMcpTool):
                 properties is not None,
                 images is not None,
                 sales_channel_view_ids is not None,
+                workflows is not None,
             ]
         ):
             raise McpToolError(
-                "Each product update must include at least one section: vat_rate_id, vat_rate, active, ean_code, translations, prices, properties, images, or sales_channel_view_ids."
+                "Each product update must include at least one section: vat_rate_id, vat_rate, active, ean_code, translations, prices, properties, images, sales_channel_view_ids, or workflows."
             )
 
     def _sanitize_product_item(
@@ -275,6 +294,9 @@ class UpsertProductsMcpTool(BaseMcpTool):
         sanitized_sales_channel_view_ids = self._sanitize_sales_channel_view_ids(
             sales_channel_view_ids=product.get("sales_channel_view_ids"),
         )
+        sanitized_workflows = self._sanitize_workflows(
+            workflows=product.get("workflows"),
+        )
 
         self._validate_has_updates(
             vat_rate_id=sanitized_vat_rate_id,
@@ -286,6 +308,7 @@ class UpsertProductsMcpTool(BaseMcpTool):
             properties=sanitized_properties,
             images=sanitized_images,
             sales_channel_view_ids=sanitized_sales_channel_view_ids,
+            workflows=sanitized_workflows,
         )
 
         if sanitized_product_id is not None:
@@ -310,6 +333,8 @@ class UpsertProductsMcpTool(BaseMcpTool):
             sanitized_product["images"] = sanitized_images
         if sanitized_sales_channel_view_ids is not None:
             sanitized_product["sales_channel_view_ids"] = sanitized_sales_channel_view_ids
+        if sanitized_workflows is not None:
+            sanitized_product["workflows"] = sanitized_workflows
 
         return sanitized_product
 
@@ -346,6 +371,7 @@ class UpsertProductsMcpTool(BaseMcpTool):
                     properties=product.get("properties"),
                     images=product.get("images"),
                     sales_channel_view_ids=product.get("sales_channel_view_ids"),
+                    workflows=product.get("workflows"),
                 )
                 results.append(result)
                 assigned_view_ids.update(product.get("sales_channel_view_ids", []))

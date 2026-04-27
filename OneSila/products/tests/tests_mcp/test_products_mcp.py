@@ -37,6 +37,7 @@ from sales_channels.models import SalesChannel, SalesChannelView, SalesChannelVi
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 from currencies.models import Currency, PublicCurrency
+from workflows.models import Workflow, WorkflowProductAssignment, WorkflowState
 
 
 class DummyMcp:
@@ -333,6 +334,30 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             price=Decimal("12.50"),
             multi_tenant_company=self.multi_tenant_company,
         )
+        self.workflow = Workflow.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            name="Content Review",
+            code="CONTENT_REVIEW",
+        )
+        self.workflow_state_todo = WorkflowState.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            workflow=self.workflow,
+            value="Todo",
+            code="TODO",
+            is_default=True,
+        )
+        self.workflow_state_ready = WorkflowState.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            workflow=self.workflow,
+            value="Ready",
+            code="READY",
+        )
+        WorkflowProductAssignment.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            workflow=self.workflow,
+            workflow_state=self.workflow_state_todo,
+            product=self.product,
+        )
 
         # Keep the async MCP fixtures deterministic. Several setup actions above
         # trigger inspector refresh signals that would otherwise clear the
@@ -384,6 +409,22 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         self.assertEqual(summary["sku"], "BOOK-001")
         self.assertTrue(summary["has_images"])
         self.assertTrue(summary["has_missing_required_information"])
+        self.assertEqual(
+            summary["workflows"],
+            [
+                {
+                    "workflow_id": self.workflow.id,
+                    "workflow_name": "Content Review",
+                    "workflow_code": "CONTENT_REVIEW",
+                    "state": {
+                        "id": self.workflow_state_todo.id,
+                        "name": "Todo",
+                        "code": "TODO",
+                        "is_default": True,
+                    },
+                }
+            ],
+        )
         ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
@@ -544,6 +585,7 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
             show_product_types_usage_counts=True,
             show_vat_rates=True,
             show_currencies=True,
+            show_workflows=True,
             ctx=ctx,
         )
 
@@ -575,6 +617,25 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
         self.assertEqual(
             currencies_by_iso[self.secondary_currency.iso_code]["inherits_from_iso_code"],
             self.currency.iso_code,
+        )
+        self.assertEqual(payload["workflows"]["count"], 1)
+        self.assertEqual(payload["workflows"]["results"][0]["code"], "CONTENT_REVIEW")
+        self.assertEqual(
+            payload["workflows"]["results"][0]["states"],
+            [
+                {
+                    "id": self.workflow_state_todo.id,
+                    "name": "Todo",
+                    "code": "TODO",
+                    "is_default": True,
+                },
+                {
+                    "id": self.workflow_state_ready.id,
+                    "name": "Ready",
+                    "code": "READY",
+                    "is_default": False,
+                },
+            ],
         )
         self.assertNotIn("brand_voices", payload)
         ctx.error.assert_not_awaited()
@@ -1000,12 +1061,45 @@ class ProductMcpToolAsyncTestCase(TransactionTestCase):
 
         with self.assertRaisesMessage(
             Exception,
-            "Each product update must include at least one section: vat_rate_id, vat_rate, active, ean_code, translations, prices, properties, images, or sales_channel_view_ids.",
+            "Each product update must include at least one section: vat_rate_id, vat_rate, active, ean_code, translations, prices, properties, images, sales_channel_view_ids, or workflows.",
         ):
             async_to_sync(tool.execute)(
                 products={"sku": "BOOK-001"},
                 ctx=ctx,
             )
+
+    @patch("llm.mcp.auth.get_access_token")
+    def test_upsert_product_updates_workflow_state_by_codes(self, mock_get_access_token):
+        mock_get_access_token.return_value = self._build_access_token(
+            company_id=self.multi_tenant_company.id,
+        )
+        ctx = DummyContext()
+        tool = UpsertProductsMcpTool(mcp=DummyMcp())
+
+        result = async_to_sync(tool.execute)(
+            products={
+                "sku": "BOOK-001",
+                "workflows": [
+                    {
+                        "workflow_code": "content_review",
+                        "state_code": "ready",
+                    }
+                ],
+            },
+            ctx=ctx,
+        )
+
+        assignment = WorkflowProductAssignment.objects.get(
+            product=self.product,
+            workflow=self.workflow,
+        )
+        payload = self._get_payload(result=result)
+        self.assertEqual(assignment.workflow_state_id, self.workflow_state_ready.id)
+        self.assertEqual(
+            payload["results"][0]["applied_updates"]["workflows"],
+            1,
+        )
+        ctx.error.assert_not_awaited()
 
     @patch("llm.mcp.auth.get_access_token")
     def test_upsert_product_assigns_missing_website_views_only(self, mock_get_access_token):

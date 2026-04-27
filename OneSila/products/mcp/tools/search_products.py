@@ -66,6 +66,7 @@ class SearchProductsMcpTool(BaseMcpTool):
         - type and type_label
         - active
         - vat_rate
+        - workflows (current assignment per workflow with workflow/state codes)
         - thumbnail_url
         - has_images
         - missing-information flags
