@@ -23,8 +23,6 @@ class CreateTestOrderMixin:
                 multi_tenant_company=self.multi_tenant_company,
                 name='Internal Company')
 
-        logger.debug(f"test product has physical={product.inventory.physical()}")
-
         order = Order.objects.create(
             reference=reference,
             internal_company=internal_company,

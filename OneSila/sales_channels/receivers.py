@@ -6,7 +6,6 @@ from core.decorators import trigger_signal_for_dirty_fields
 from core.schema.core.subscriptions import refresh_subscription_receiver
 from core.signals import post_create, post_update, mutation_update, post_save
 from eancodes.signals import ean_code_released_for_product
-from inventory.models import Inventory
 from media.models import Media, MediaProductThrough
 from properties.signals import (
     product_properties_rule_configurator_updated,
@@ -612,24 +611,6 @@ def sales_channels__product_property_text_translation__pre_delete_receiver(sende
     if instance.product_property.property.is_public_information and exists:
         update_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property)
 
-
-# ------------------------------------------------------------- SEND SIGNALS FOR INVENTORY
-
-# @receiver(post_create, sender='inventory.Inventory')
-# @receiver(post_update, sender='inventory.Inventory')
-# @receiver(post_delete, sender='inventory.Inventory')
-# def sales_channels__inventory__update(sender, instance: Inventory, **kwargs):
-#     """
-#     Handles post-create, post-update, and post-delete events for the Inventory model.
-#     - Sends an update signal for the associated product's inventory.
-#     """
-#     from products.product_types import SUPPLIER
-#
-#     if instance.product.type == SUPPLIER:
-#         for product in instance.product.base_products.all().iterator():
-#             update_remote_inventory.send(sender=product.__class__, instance=product)
-#     else:
-#         update_remote_inventory.send(sender=instance.product.__class__, instance=instance.product)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRICES
 

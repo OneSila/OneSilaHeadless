@@ -9,7 +9,6 @@ from sales_channels.models import (
     RemoteCustomer,
     RemoteImage,
     RemoteImageProductAssociation,
-    RemoteInventory,
     RemoteLog,
     RemoteOrder,
     RemoteProduct,
@@ -102,16 +101,6 @@ class RemoteImageProductAssociationInput:
 
 @partial(RemoteImageProductAssociation, fields="__all__")
 class RemoteImageProductAssociationPartialInput(NodeInput):
-    pass
-
-
-@input(RemoteInventory, fields="__all__")
-class RemoteInventoryInput:
-    pass
-
-
-@partial(RemoteInventory, fields="__all__")
-class RemoteInventoryPartialInput(NodeInput):
     pass
 
 

@@ -26,7 +26,6 @@ from sales_channels.models import (
     RemoteCustomer,
     RemoteImage,
     RemoteImageProductAssociation,
-    RemoteInventory,
     RemoteLog,
     RemoteProduct,
     RemoteProductContent,
@@ -59,7 +58,6 @@ from .filters import (
     RemoteCustomerFilter,
     RemoteImageFilter,
     RemoteImageProductAssociationFilter,
-    RemoteInventoryFilter,
     RemoteLogFilter,
     RemoteOrderFilter,
     RemoteProductFilter,
@@ -92,7 +90,6 @@ from .ordering import (
     RemoteCustomerOrder,
     RemoteImageOrder,
     RemoteImageProductAssociationOrder,
-    RemoteInventoryOrder,
     RemoteLogOrder,
     RemoteOrderOrder,
     RemoteProductOrder,
@@ -323,11 +320,6 @@ class RemoteImageType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(RemoteImageProductAssociation, filters=RemoteImageProductAssociationFilter, order=RemoteImageProductAssociationOrder, pagination=True, fields='__all__')
 class RemoteImageProductAssociationType(relay.Node, GetQuerysetMultiTenantMixin):
-    sales_channel: SalesChannelType
-
-
-@type(RemoteInventory, filters=RemoteInventoryFilter, order=RemoteInventoryOrder, pagination=True, fields='__all__')
-class RemoteInventoryType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
 

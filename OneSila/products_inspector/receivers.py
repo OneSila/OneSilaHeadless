@@ -192,30 +192,6 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
                                  error_code=MISSING_OPTIONAL_PROPERTIES_ERROR,
                                  run_async=False)
 
-# MISSING_STOCK_ERROR  --------------------------------------------------
-
-
-# Deprecated: legacy ERP stock validation, no active implementation behind this block.
-# @receiver(post_update, sender='products.Product')
-# @receiver(post_update, sender='products.SimpleProduct')
-# @receiver(post_update, sender='products.BundleProduct')
-# @receiver(post_update, sender='products.AliasProduct')
-# @trigger_signal_for_dirty_fields('active', 'allow_backorder')
-# def products_inspector__inspector__trigger_block_product_active_or_allow_backorder_change(sender, instance, **kwargs):
-#     inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_STOCK_ERROR, run_async=False)
-
-
-# @receiver(post_create, sender='inventory.Inventory')
-# @receiver(post_delete, sender='inventory.Inventory')
-# @receiver(post_update, sender='inventory.Inventory')
-# def products_inspector__inspector__trigger_block_inventory_change(sender, instance, **kwargs):
-#     from products.product_types import SUPPLIER
-#
-#     if instance.product.type == SUPPLIER:
-#         for product in instance.product.base_products.all().iterator():
-#             inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_STOCK_ERROR, run_async=False)
-
-
 # MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR  ----------------------------------
 
 @receiver(post_create, sender='sales_prices.SalesPriceListItem')

@@ -216,11 +216,11 @@ Applicable: Marketplace ✅ | Direct storefront ✅
 Applicable: Marketplace ✅ | Direct storefront ✅
 1. Gradually enable additional signals once product sync is stable:
    - Properties: `create_remote_product_property`, `update_remote_product_property`, `delete_remote_product_property`.
-   - Prices and inventory: `update_remote_price`, `update_remote_inventory` (if available).
+   - Prices: `update_remote_price` (if available).
    - Media: `create_remote_image_association`, `update_remote_image_association`, `delete_remote_image`, etc.
    - Documents: `create_remote_document_association`, `update_remote_document_association`, `delete_remote_document_association` when the marketplace consumes regulatory/compliance files.
    - Orders: build dedicated receivers for order webhooks or polling flows before enabling live pushes.
-2. Each new signal should point at specialised factories (`factories/properties/...`, `factories/prices/...`, `factories/products/documents.py`, `factories/inventory/...`). For marketplaces, ensure factories accept a `view` so they can scope to the correct marketplace.
+2. Each new signal should point at specialised factories (`factories/properties/...`, `factories/prices/...`, `factories/products/documents.py`). For marketplaces, ensure factories accept a `view` so they can scope to the correct marketplace.
 3. Update tests to include the new signal wiring. Use decorator-based patching to assert the right task is enqueued without touching external services.
 4. When extending live coverage, revisit `apps.py` and ensure all receivers are imported under `ready()`.
 
@@ -281,7 +281,6 @@ Use these templates to double-check coverage per integration. Replace `<integrat
 4. `factories/properties/`: pull attribute sets, attributes, and option lists; wire GraphQL queries for property management.
 5. `factories/imports/products_imports.py`: import catalog via REST search API, storing configurable/variant relationships.
 6. `factories/products/products.py`: create/update via REST `products` endpoint, including media gallery sync and inventory extensions.
-7. `factories/inventory/`: manage stock items and reservations.
 8. `factories/orders/`: optional but recommended before enabling order sync.
 9. `factories/task_queue.py`: prefer add-task wrappers for new receivers so content/price/image/property guards stay reusable.
 10. `receivers.py`: start with product signals, then extend to properties/prices/inventory once verified.

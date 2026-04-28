@@ -41,7 +41,6 @@ urlpatterns = [
     path('currencies/', include('currencies.urls')),
     path('customs/', include('customs.urls')),
     path('eancodes/', include('eancodes.urls')),
-    path('inventory/', include('inventory.urls')),
     path('media/', include('media.urls')),
     path('sales/', include('orders.urls')),
     path('products/', include('products.urls')),

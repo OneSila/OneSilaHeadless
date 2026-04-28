@@ -537,12 +537,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """Sets the stock for the product or variation in the payload."""
 
         return  # @TODO: Come back after we decide with inventory
-        self.stock = self.local_instance.inventory.salable()
-
-        if self.is_variation:
-            self.set_variation_stock()
-
-        self.add_field_in_payload('stock', self.stock)
 
     def set_variation_stock(self):
         """Sets the stock for variations, allowing for overrides."""
@@ -1478,7 +1472,6 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
     Subclasses RemoteProductSyncFactory to handle creation-specific logic.
     """
 
-    remote_inventory_class = None
     remote_price_class = None
     remote_product_content_class = None
     remote_product_eancode_class = None
@@ -1635,16 +1628,6 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
 
     def set_stock(self):
         return  # @TODO: Come back after we decide with inventory
-        super().set_stock()
-
-        if self.remote_inventory_class:
-            self.remote_instance.inventory, _ = self.remote_inventory_class.objects.get_or_create(
-                remote_product=self.remote_instance,
-                quantity=self.stock,
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.sales_channel.multi_tenant_company
-            )
-            logger.debug(f"Created RemoteInventory for {self.remote_instance}")
 
     def set_price(self):
         if not self.sales_channel.sync_prices:

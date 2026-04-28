@@ -205,24 +205,6 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
             ).exists()
 
 
-class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
-    """
-    Polymorphic model representing the remote mirror of a product's inventory.
-    """
-
-    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='inventory',
-                                          on_delete=models.CASCADE, help_text="The remote product associated with this inventory.")
-    quantity = models.IntegerField(help_text="The quantity of the product available in the remote system.", null=True, blank=True)
-
-    class Meta:
-        unique_together = ('remote_product',)
-        verbose_name = 'Remote Inventory'
-        verbose_name_plural = 'Remote Inventories'
-
-    def __str__(self):
-        return f"Inventory for {self.remote_product} - Quantity: {self.quantity}"
-
-
 class SyncRequest(models.Model):
     """Deduplicated sync request for marketplace operations."""
 

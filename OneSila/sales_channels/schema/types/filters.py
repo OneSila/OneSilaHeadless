@@ -22,7 +22,6 @@ from sales_channels.models import (
     RemoteCustomer,
     RemoteImage,
     RemoteImageProductAssociation,
-    RemoteInventory,
     RemoteLog,
     RemoteOrder,
     RemoteProduct,
@@ -90,11 +89,6 @@ class RemoteImageFilter(SearchFilterMixin):
 
 @filter(RemoteImageProductAssociation)
 class RemoteImageProductAssociationFilter(SearchFilterMixin):
-    id: auto
-
-
-@filter(RemoteInventory)
-class RemoteInventoryFilter(SearchFilterMixin):
     id: auto
 
 
