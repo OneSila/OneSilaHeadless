@@ -3,7 +3,7 @@ from typing import Optional
 
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
-from integrations.models import Integration, PublicIntegrationType
+from integrations.models import Integration, PublicIntegrationType, PublicIssue, PublicIssueCategory
 
 
 @filter(Integration)
@@ -26,3 +26,19 @@ class PublicIntegrationTypeFilter(SearchFilterMixin):
     supports_open_ai_product_feed: auto
     sort_order: auto
     based_to: Optional["PublicIntegrationTypeFilter"]
+
+
+@filter(PublicIssueCategory)
+class PublicIssueCategoryFilter(SearchFilterMixin):
+    id: auto
+    name: auto
+    code: auto
+
+
+@filter(PublicIssue)
+class PublicIssueFilter(SearchFilterMixin):
+    id: auto
+    code: auto
+    recommended_fix: auto
+    integration_type: Optional[PublicIntegrationTypeFilter]
+    categories: Optional[PublicIssueCategoryFilter]

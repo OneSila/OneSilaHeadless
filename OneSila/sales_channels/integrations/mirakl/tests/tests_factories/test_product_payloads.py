@@ -52,6 +52,9 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             remote_id="default-view",
         )
 
+    def test_payload_validation_errors_are_registered_as_sales_channel_user_errors(self):
+        self.assertIn(MiraklPayloadValidationError, self.sales_channel._meta.user_exceptions)
+
     def _assign_product_rule(self, *, product, sales_channel=None):
         product_type_property = Property.objects.get(
             type=Property.TYPES.SELECT,
@@ -1132,6 +1135,149 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["bullet_1"], "First shared bullet")
 
+    def test_bullet_point_representations_use_sales_channel_translation_bullets(self):
+        self.multi_tenant_company.language = "en"
+        self.multi_tenant_company.save(update_fields=["language"])
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="feature_1",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_BULLET_POINT
+        remote_property.save(update_fields=["local_instance", "representation_type"])
+
+        for remote_code in ["feature_2", "feature_3"]:
+            extra_property = baker.make(
+                MiraklProperty,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                code=remote_code,
+                type="TEXT",
+                local_instance=None,
+                representation_type=MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT,
+            )
+            baker.make(
+                MiraklPropertyApplicability,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                property=extra_property,
+                view=self.view,
+            )
+            baker.make(
+                MiraklProductTypeItem,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                product_type=MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1"),
+                remote_property=extra_property,
+                required=False,
+            )
+
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="Default name",
+        )
+        sales_channel_translation = ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=self.sales_channel,
+            name="Channel name",
+        )
+        for index in range(5):
+            ProductTranslationBulletPoint.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product_translation=sales_channel_translation,
+                text=f"Channel bullet {index + 1}",
+                sort_order=index,
+            )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["feature_1"], "Channel bullet 1")
+        self.assertEqual(rows[0]["feature_2"], "Channel bullet 2")
+        self.assertEqual(rows[0]["feature_3"], "Channel bullet 3")
+
+    def test_bullet_point_representations_use_default_translation_bullets(self):
+        self.multi_tenant_company.language = "en"
+        self.multi_tenant_company.save(update_fields=["language"])
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="feature_1",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_BULLET_POINT
+        remote_property.save(update_fields=["local_instance", "representation_type"])
+
+        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        for remote_code in ["feature_2", "feature_3"]:
+            extra_property = baker.make(
+                MiraklProperty,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                code=remote_code,
+                type="TEXT",
+                local_instance=None,
+                representation_type=MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT,
+            )
+            baker.make(
+                MiraklPropertyApplicability,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                property=extra_property,
+                view=self.view,
+            )
+            baker.make(
+                MiraklProductTypeItem,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                product_type=product_type,
+                remote_property=extra_property,
+                required=False,
+            )
+
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=self.sales_channel,
+            name="Channel name",
+        )
+        default_translation = ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="Default name",
+        )
+        for index in range(5):
+            ProductTranslationBulletPoint.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product_translation=default_translation,
+                text=f"Default bullet {index + 1}",
+                sort_order=index,
+            )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["feature_1"], "Default bullet 1")
+        self.assertEqual(rows[0]["feature_2"], "Default bullet 2")
+        self.assertEqual(rows[0]["feature_3"], "Default bullet 3")
+
     def test_configurable_variations_reuse_parent_content_and_prefer_variation_images(self):
         parent_product = baker.make(
             "products.Product",
@@ -1767,6 +1913,93 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(rows[0]["product_title"], "English Name")
         self.assertEqual(rows[0]["product_title_fr"], "Nom Francais")
 
+    def test_product_title_max_length_validation_blocks_long_name(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="product_title",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_TITLE
+        remote_property.validations = 'MAX_LENGTH|70,FORBIDDEN_WORDS|"pre-order,restricted"'
+        remote_property.save()
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="A" * 71,
+        )
+
+        with self.assertRaisesMessage(
+            PreFlightCheckError,
+            "Mirakl preflight errors:\n- Mirakl field 'product_title' is longer than max length 70 for product SKU-1.",
+        ):
+            builder.build()
+
+    def test_product_title_min_length_validation_blocks_short_name(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="product_title",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_TITLE
+        remote_property.validations = "MIN_LENGTH|5"
+        remote_property.save()
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="Hat",
+        )
+
+        with self.assertRaisesMessage(
+            PreFlightCheckError,
+            "Mirakl preflight errors:\n- Mirakl field 'product_title' is shorter than min length 5 for product SKU-1.",
+        ):
+            builder.build()
+
+    def test_product_title_forbidden_words_validation_blocks_name(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="product_title",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_TITLE
+        remote_property.validations = 'FORBIDDEN_WORDS|"pre-order,restricted"'
+        remote_property.save()
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="Pre-order cotton shirt",
+        )
+
+        with self.assertRaisesMessage(
+            PreFlightCheckError,
+            "Mirakl preflight errors:\n- Mirakl field 'product_title' contains forbidden word 'pre order' for product SKU-1.",
+        ):
+            builder.build()
+
     def test_translated_text_property_uses_remote_language_mapping(self):
         self.multi_tenant_company.language = "en"
         self.multi_tenant_company.save(update_fields=["language"])
@@ -1889,6 +2122,34 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
                 product_context={"sku": "SKU-1"},
             )
 
+    def test_product_reference_validation_is_collected_as_preflight_error(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="ean",
+            local_property=local_property,
+            required=True,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_EAN
+        remote_property.validations = ["PRODUCT_REFERENCE|EAN-13"]
+        remote_property.save()
+        baker.make(
+            EanCode,
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            ean_code="123",
+        )
+
+        with self.assertRaisesMessage(
+            PreFlightCheckError,
+            "Mirakl preflight errors:\n- Mirakl field 'ean' is not a valid product reference for product SKU-1.",
+        ):
+            builder.build()
+
     def test_delete_action_builds_minimal_product_reference_placeholder(self):
         local_property = baker.make(
             Property,
@@ -1989,11 +2250,21 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         self.assertEqual(
             builder._apply_remote_validations(
                 remote_property=remote_property,
-                value="Elegant table lamp",
+                value="Lamp",
                 product_context={"sku": "SKU-1"},
             ),
-            "Elegant ta",
+            "Lamp",
         )
+
+        with self.assertRaisesMessage(
+            MiraklPayloadValidationError,
+            "Mirakl field 'product_title' is longer than max length 10 for product SKU-1.",
+        ):
+            builder._apply_remote_validations(
+                remote_property=remote_property,
+                value="Elegant table lamp",
+                product_context={"sku": "SKU-1"},
+            )
 
         with self.assertRaisesMessage(
             MiraklPayloadValidationError,
@@ -2001,9 +2272,18 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         ):
             builder._apply_remote_validations(
                 remote_property=remote_property,
-                value="Scarface lamp",
+                value="Scarface",
                 product_context={"sku": "SKU-1"},
             )
+
+        self.assertEqual(
+            builder._apply_remote_validations(
+                remote_property=remote_property,
+                value="Elegant",
+                product_context={"sku": "SKU-1"},
+            ),
+            "Elegant",
+        )
 
     def test_precision_type_parameter_truncates_numeric_value(self):
         local_property = baker.make(

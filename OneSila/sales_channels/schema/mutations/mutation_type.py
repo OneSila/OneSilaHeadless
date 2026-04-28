@@ -12,6 +12,15 @@ from .fields import (
     resync_sales_channel_assign,
     refresh_website_models_mutation,
 )
+from .product_view_status import (
+    ProductViewStatus,
+    ProductViewStatusBulkChangeResult,
+    ProductViewStatusChangeInput,
+    ProductViewStatusChangeResult,
+    SalesChannelViewAssignObjectInput,
+    resolve_change_product_view_status,
+    resolve_change_product_views_status,
+)
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
     SalesChannelViewAssignType, SalesChannelContentTemplateType, SalesChannelImportType, RemoteLanguageType, \
     RemoteCurrencyType, ImportPropertyType, SalesChannelContentTemplateCheckType, FormattedIssueType, \
@@ -77,12 +86,36 @@ class SalesChannelsMutation:
     delete_sales_channel_content_template: SalesChannelContentTemplateType = delete()
     delete_sales_channel_content_templates: List[SalesChannelContentTemplateType] = delete()
 
-    create_sales_channel_view_assign: SalesChannelViewAssignType = create(SalesChannelViewAssignInput)
     resync_sales_channel_view_assign: SalesChannelViewAssignType = resync_sales_channel_assign()
-    create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(List[SalesChannelViewAssignInput])
-    update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
-    delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
-    delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete(is_bulk=True)
+
+    # create_sales_channel_view_assign: SalesChannelViewAssignType = create(SalesChannelViewAssignInput)
+    # create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(List[SalesChannelViewAssignInput])
+    # update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
+    # delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
+    # delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete(is_bulk=True)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def change_product_view_status(
+        self,
+        *,
+        status: ProductViewStatus,
+        assign_object: SalesChannelViewAssignObjectInput,
+        info: Info,
+    ) -> ProductViewStatusChangeResult:
+        return resolve_change_product_view_status(
+            status=status,
+            assign_object=assign_object,
+            info=info,
+        )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def change_product_views_status(
+        self,
+        *,
+        changes: List[ProductViewStatusChangeInput],
+        info: Info,
+    ) -> ProductViewStatusBulkChangeResult:
+        return resolve_change_product_views_status(changes=changes, info=info)
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def resync_sales_channel_view_assigns(

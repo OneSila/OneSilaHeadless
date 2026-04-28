@@ -19,11 +19,13 @@ from products.mcp.types import (
     ProductTranslationUpsertInputPayload,
     ProductUpsertAppliedUpdatesPayload,
     ProductUpsertPayload,
+    WorkflowStateUpdateInputPayload,
 )
 from products.models import Product, ProductTranslation
 from properties.mcp.helpers import get_company_language_codes
 from properties.models import Property
 from sales_channels.models import SalesChannel, SalesChannelView, SalesChannelViewAssign
+from workflows.models import Workflow, WorkflowProductAssignment, WorkflowState
 
 
 def parse_boolean_input(*, value, field_name: str) -> bool:
@@ -352,6 +354,50 @@ def sanitize_sales_channel_view_ids_input(
         sanitized_ids.append(view_id)
 
     return sanitized_ids
+
+
+def sanitize_workflows_input(
+    *,
+    workflows: list[WorkflowStateUpdateInputPayload] | str | None,
+) -> list[WorkflowStateUpdateInputPayload] | None:
+    if workflows is None:
+        return None
+    if isinstance(workflows, str):
+        try:
+            workflows = json.loads(workflows)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "workflows must be a list of objects with workflow_code and state_code, or a JSON string encoding that list."
+            ) from error
+
+    if not isinstance(workflows, list) or not workflows:
+        raise ValueError("workflows must be a non-empty list.")
+
+    sanitized_workflows: list[WorkflowStateUpdateInputPayload] = []
+    seen_workflow_codes: set[str] = set()
+    for workflow_update in workflows:
+        if not isinstance(workflow_update, dict):
+            raise ValueError("Each workflow update must be an object.")
+
+        workflow_code = str(workflow_update.get("workflow_code", "")).strip().upper()
+        state_code = str(workflow_update.get("state_code", "")).strip().upper()
+
+        if not workflow_code:
+            raise ValueError("Each workflow update must include workflow_code.")
+        if not state_code:
+            raise ValueError("Each workflow update must include state_code.")
+        if workflow_code in seen_workflow_codes:
+            raise ValueError("Duplicate workflow_code in workflows updates.")
+
+        seen_workflow_codes.add(workflow_code)
+        sanitized_workflows.append(
+            {
+                "workflow_code": workflow_code,
+                "state_code": state_code,
+            }
+        )
+
+    return sanitized_workflows
 
 
 def sanitize_product_prices_input(
@@ -819,6 +865,88 @@ def assign_product_to_sales_channel_views(
     return created_count
 
 
+def resolve_workflow_updates(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    workflows: list[WorkflowStateUpdateInputPayload],
+) -> list[tuple[Workflow, WorkflowState]]:
+    workflow_codes = {
+        workflow_update["workflow_code"]
+        for workflow_update in workflows
+    }
+    state_codes = {
+        workflow_update["state_code"]
+        for workflow_update in workflows
+    }
+    workflows_by_code = {
+        workflow.code: workflow
+        for workflow in Workflow.objects.filter(
+            multi_tenant_company=multi_tenant_company,
+            code__in=workflow_codes,
+        )
+    }
+    missing_workflow_codes = sorted(workflow_codes - set(workflows_by_code))
+    if missing_workflow_codes:
+        raise ValueError(
+            "Workflow not found for one of the provided workflow_code values. "
+            "Use get_company_details with show_workflows=true to get valid workflow codes."
+        )
+
+    states = list(
+        WorkflowState.objects.select_related("workflow").filter(
+            workflow__multi_tenant_company=multi_tenant_company,
+            code__in=state_codes,
+        )
+    )
+    states_by_workflow_and_code = {
+        (state.workflow_id, state.code): state
+        for state in states
+    }
+
+    resolved_updates: list[tuple[Workflow, WorkflowState]] = []
+    for workflow_update in workflows:
+        workflow = workflows_by_code[workflow_update["workflow_code"]]
+        state = states_by_workflow_and_code.get((workflow.id, workflow_update["state_code"]))
+        if state is None:
+            raise ValueError(
+                f"State code {workflow_update['state_code']!r} does not belong to workflow {workflow.code!r}. "
+                "Use get_company_details with show_workflows=true to get valid workflow/state code pairs."
+            )
+        resolved_updates.append((workflow, state))
+
+    return resolved_updates
+
+
+def apply_workflow_updates(
+    *,
+    multi_tenant_company: MultiTenantCompany,
+    product: Product,
+    workflows: list[WorkflowStateUpdateInputPayload],
+) -> int:
+    resolved_updates = resolve_workflow_updates(
+        multi_tenant_company=multi_tenant_company,
+        workflows=workflows,
+    )
+    changed_count = 0
+    for workflow, state in resolved_updates:
+        assignment, created = WorkflowProductAssignment.objects.get_or_create(
+            multi_tenant_company=multi_tenant_company,
+            workflow=workflow,
+            product=product,
+            defaults={"workflow_state": state},
+        )
+        if created:
+            changed_count += 1
+            continue
+
+        if assignment.workflow_state_id != state.id:
+            assignment.workflow_state = state
+            assignment.save(update_fields=["workflow_state"])
+            changed_count += 1
+
+    return changed_count
+
+
 def run_upsert_product_updates(
     *,
     import_process: McpToolRun,
@@ -833,6 +961,7 @@ def run_upsert_product_updates(
     properties: list[ProductPropertyValueUpdateInputPayload] | None,
     images: list[ProductImageInputPayload] | None,
     sales_channel_view_ids: list[int] | None,
+    workflows: list[WorkflowStateUpdateInputPayload] | None,
 ) -> ProductUpsertPayload:
     applied_updates: ProductUpsertAppliedUpdatesPayload = {}
 
@@ -913,6 +1042,12 @@ def run_upsert_product_updates(
                 multi_tenant_company=multi_tenant_company,
                 product=product,
                 sales_channel_view_ids=sales_channel_view_ids,
+            )
+        if workflows:
+            applied_updates["workflows"] = apply_workflow_updates(
+                multi_tenant_company=multi_tenant_company,
+                product=product,
+                workflows=workflows,
             )
 
     product.refresh_from_db()

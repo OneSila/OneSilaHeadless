@@ -242,6 +242,14 @@ query products($salesChannelId: String!) {
 }
 """
 
+PRODUCTS_WITH_WORKFLOW_STATE_ID_QUERY = """
+query products($id: String!) {
+  products(filters: {workflowStateId: $id}) {
+    edges { node { id } }
+  }
+}
+"""
+
 PRODUCTS_FILTER_BY_HAS_VIDEOS_IN_SALES_CHANNEL = """
 query products($salesChannelId: String!) {
   products(filters: {hasVideosInSalesChannel: $salesChannelId}) {
@@ -366,6 +374,46 @@ PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY = """
 query Products($view: String!) {
   products(filters: {notAssignedToSalesChannelViewId: $view}) {
     edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_REJECTED_FOR_VIEW_QUERY = """
+query Products($view: String!) {
+  products(filters: {rejectedForSalesChannelViewId: $view}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_TODO_FOR_VIEW_QUERY = """
+query Products($view: String!) {
+  products(filters: {todoForSalesChannelViewId: $view}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_HAS_TODO_VIEW_QUERY = """
+query Products($hasTodo: Boolean!) {
+  products(filters: {hasTodoSalesChannelView: $hasTodo}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_REJECTED_VIEW_ASSIGN_SET_QUERY = """
+query Products($sku: String!) {
+  products(filters: {sku: {exact: $sku}}) {
+    edges {
+      node {
+        id
+        rejectedsaleschannelviewassignSet {
+          id
+          salesChannelView { id }
+        }
+      }
+    }
   }
 }
 """

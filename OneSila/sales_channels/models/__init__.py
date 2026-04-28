@@ -5,6 +5,7 @@ from .sales_channels import (
     SalesChannelIntegrationPricelist,
     SalesChannelContentTemplate,
     SalesChannelViewAssign,
+    RejectedSalesChannelViewAssign,
     RemoteLanguage,
 )
 from .gpt import SalesChannelGptFeed

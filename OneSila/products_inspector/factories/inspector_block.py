@@ -11,7 +11,8 @@ from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR,
     MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_STOCK_ERROR, \
     MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
-    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR, REQUIRED_DOCUMENT_TYPES_ERROR, OPTIONAL_DOCUMENT_TYPES_ERROR
+    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR, REQUIRED_DOCUMENT_TYPES_ERROR, OPTIONAL_DOCUMENT_TYPES_ERROR, \
+    UNDECIDED_SALES_CHANNEL_VIEWS_ERROR
 from products_inspector.models import InspectorBlock
 from products_inspector.signals import *
 from ..constants import blocks
@@ -696,3 +697,26 @@ class OptionalDocumentTypesInspectorBlockFactory(DocumentTypesInspectorBlockFact
             failure_signal=inspector_optional_document_types_failed,
             save_inspector=save_inspector,
         )
+
+
+@InspectorBlockFactoryRegistry.register(UNDECIDED_SALES_CHANNEL_VIEWS_ERROR)
+class UndecidedSalesChannelViewsInspectorBlockFactory(InspectorBlockFactory):
+    def __init__(self, block, save_inspector=True):
+        super().__init__(
+            block,
+            success_signal=inspector_undecided_sales_channel_views_success,
+            failure_signal=inspector_undecided_sales_channel_views_failed,
+            save_inspector=save_inspector,
+        )
+
+    def _check(self):
+        from products.models import Product
+
+        has_todo_views = (
+            Product.objects
+            .filter(id=self.product.id)
+            .filter_has_todo_sales_channel_view(value=True)
+            .exists()
+        )
+        if has_todo_views:
+            raise InspectorBlockFailed("Product has undecided sales channel views that still need a decision.")

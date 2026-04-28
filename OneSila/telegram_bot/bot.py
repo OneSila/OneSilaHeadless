@@ -12,6 +12,9 @@ from django.conf import settings
 from .actions import restart_huey
 from core.models.multi_tenant import MultiTenantUser
 
+if TYPE_CHECKING:
+    from integrations.models import PublicIssueRequest
+
 logger = logging.getLogger(__name__)
 
 # Load default spaCy model
@@ -106,6 +109,31 @@ def _build_user_creation_message(*, user: "MultiTenantUser") -> str:
     return "\n".join(lines)
 
 
+def _build_public_issue_request_message(*, public_issue_request: "PublicIssueRequest") -> str:
+    integration_type = public_issue_request.integration_type
+    created_by = getattr(public_issue_request, "created_by_multi_tenant_user", None)
+    company = getattr(public_issue_request, "multi_tenant_company", None)
+    lines = [
+        "New public issue request created",
+        f"Request id: {public_issue_request.id}",
+        f"Integration: {integration_type.key}",
+        f"Issue: {public_issue_request.issue}",
+    ]
+
+    if public_issue_request.description:
+        lines.append(f"Description: {public_issue_request.description}")
+    if public_issue_request.submission_id:
+        lines.append(f"Submission id: {public_issue_request.submission_id}")
+    if public_issue_request.product_sku:
+        lines.append(f"Product SKU: {public_issue_request.product_sku}")
+    if created_by:
+        lines.append(f"Created by: {created_by.username}")
+    if company:
+        lines.append(f"Company: {company.name} ({company.id})")
+
+    return "\n".join(lines)
+
+
 async def notify_new_user_creation(*, chat_id: str, user: "MultiTenantUser"):
 
     if not bot:
@@ -117,6 +145,19 @@ async def notify_new_user_creation(*, chat_id: str, user: "MultiTenantUser"):
         return
 
     message = _build_user_creation_message(user=user)
+    await bot.bot.send_message(chat_id=chat_id, text=message)
+
+
+async def notify_public_issue_request_created(*, chat_id: str, public_issue_request: "PublicIssueRequest"):
+    if not bot:
+        logger.warning("Telegram bot token missing; cannot notify admins for %s", public_issue_request)
+        return
+
+    if not chat_id:
+        logger.warning("Empty chat id for Telegram notification about %s", public_issue_request)
+        return
+
+    message = _build_public_issue_request_message(public_issue_request=public_issue_request)
     await bot.bot.send_message(chat_id=chat_id, text=message)
 
 

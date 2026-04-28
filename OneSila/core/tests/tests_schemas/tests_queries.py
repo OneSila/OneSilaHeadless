@@ -29,11 +29,11 @@ class TransactionTestCaseMixin:
     def strawberry_test_client(self, asserts_errors=False, **kwargs):
         test_client = TestClient('/graphql/')
         with test_client.login(self.user):
-            return test_client.query(asserts_errors=asserts_errors, **kwargs)
+            return test_client.query(assert_no_errors=asserts_errors, **kwargs)
 
     def strawberry_anonymous_test_client(self, **kwargs):
         test_client = TestClient('/graphql/')
-        return test_client.query(asserts_errors=False, **kwargs)
+        return test_client.query(assert_no_errors=False, **kwargs)
 
 
 class TestCountryQuery(TransactionTestCaseMixin, TransactionTestCase):

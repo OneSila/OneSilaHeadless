@@ -3,9 +3,11 @@ from typing import Optional, List as TypingList
 from .fields import create_product
 from strawberry import Info
 import strawberry_django
+from django.core.exceptions import ValidationError
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
-from products.models import Product
+from products.models import Product, ProductTranslation
+from products.schema.types.enums import ContentField
 from ..types.types import (
     ProductType,
     BundleProductType,
@@ -220,3 +222,42 @@ class ProductsMutation:
             create_relationships=create_relationships,
         )
         return duplicated
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def clean_translation_field(
+        self,
+        *,
+        info: Info,
+        translation: ProductTranslationPartialInput,
+        field: ContentField,
+    ) -> ProductTranslationType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        translation_obj = ProductTranslation.objects.filter(
+            id=translation.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        ).first()
+        if not translation_obj:
+            raise PermissionError("Invalid company")
+
+        if field == ContentField.BULLET_POINTS:
+            translation_obj.bullet_points.all().delete()
+            return translation_obj
+
+        if field == ContentField.NAME:
+            setattr(translation_obj, "name", "")
+            translation_obj.save(update_fields=["name"])
+            return translation_obj
+
+        nullable_fields = {
+            ContentField.DESCRIPTION: "description",
+            ContentField.SHORT_DESCRIPTION: "short_description",
+            ContentField.SUBTITLE: "subtitle",
+            ContentField.URL_KEY: "url_key",
+        }
+        field_name = nullable_fields.get(field)
+        if not field_name:
+            raise ValidationError("Unsupported translation field.")
+
+        setattr(translation_obj, field_name, None)
+        translation_obj.save(update_fields=[field_name])
+        return translation_obj

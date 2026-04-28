@@ -1,6 +1,6 @@
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
-from integrations.models import Integration, PublicIntegrationType
+from integrations.models import Integration, PublicIntegrationType, PublicIssue
 
 
 @order(Integration)
@@ -23,3 +23,14 @@ class PublicIntegrationTypeOrder:
     supports_open_ai_product_feed: auto
     sort_order: auto
     created_at: auto
+
+
+@order(PublicIssue)
+class PublicIssueOrder:
+    id: auto
+    code: auto
+    issue: auto
+    cause: auto
+    recommended_fix: auto
+    created_at: auto
+    updated_at: auto

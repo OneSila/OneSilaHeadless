@@ -38,6 +38,7 @@ AMAZON_VALIDATION_ISSUES_ERROR = 125 # deprecated (replaced by channel-specific 
 AMAZON_REMOTE_ISSUES_ERROR = 126 # deprecated (replaced by channel-specific issue dashboards)
 REQUIRED_DOCUMENT_TYPES_ERROR = 127
 OPTIONAL_DOCUMENT_TYPES_ERROR = 128
+UNDECIDED_SALES_CHANNEL_VIEWS_ERROR = 129  # frontend-only workflow block; refreshed by explicit status mutations
 DOCUMENT_TYPES_BLOCK_ERROR_CODES = (
     REQUIRED_DOCUMENT_TYPES_ERROR,
     OPTIONAL_DOCUMENT_TYPES_ERROR,
@@ -62,6 +63,7 @@ ERROR_TYPES = (
     (NON_CONFIGURABLE_RULE_ERROR, _('Configurable product has no applicable configurator rules')),
     (REQUIRED_DOCUMENT_TYPES_ERROR, _('Product is missing required document types')),
     (OPTIONAL_DOCUMENT_TYPES_ERROR, _('Product is missing optional document types')),
+    (UNDECIDED_SALES_CHANNEL_VIEWS_ERROR, _('Product has undecided sales channel views')),
 )
 
 
@@ -246,6 +248,16 @@ optional_document_types_block = {
     'supplier_product_applicability': NONE,
 }
 
+undecided_sales_channel_views_block = {
+    'error_code': UNDECIDED_SALES_CHANNEL_VIEWS_ERROR,
+    'simple_product_applicability': OPTIONAL,
+    'configurable_product_applicability': OPTIONAL,
+    'manufacturable_product_applicability': OPTIONAL,
+    'bundle_product_applicability': OPTIONAL,
+    'dropship_product_applicability': OPTIONAL,
+    'supplier_product_applicability': NONE,
+}
+
 
 blocks = [
     has_image_block,
@@ -266,4 +278,5 @@ blocks = [
     non_configurable_rule_block,
     required_document_types_block,
     optional_document_types_block,
+    undecided_sales_channel_views_block,
 ]

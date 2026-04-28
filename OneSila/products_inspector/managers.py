@@ -226,3 +226,12 @@ class OptionalDocumentTypesInspectorBlockQuerySet(QuerySetProxyModelMixin, Inspe
 class OptionalDocumentTypesInspectorBlockManager(InspectorBlockManager):
     def get_queryset(self):
         return OptionalDocumentTypesInspectorBlockQuerySet(self.model, using=self._db)
+
+
+class UndecidedSalesChannelViewsInspectorBlockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
+    pass
+
+
+class UndecidedSalesChannelViewsInspectorBlockManager(InspectorBlockManager):
+    def get_queryset(self):
+        return UndecidedSalesChannelViewsInspectorBlockQuerySet(self.model, using=self._db)

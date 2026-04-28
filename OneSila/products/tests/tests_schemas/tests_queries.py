@@ -8,7 +8,7 @@ from taxes.models import VatRate
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from products.product_types import CONFIGURABLE
 from sales_channels.models.products import RemoteProduct
-from sales_channels.models import SalesChannelViewAssign
+from sales_channels.models import RejectedSalesChannelViewAssign, SalesChannelViewAssign
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonSalesChannelView,
@@ -723,6 +723,32 @@ class ProductFilterIntegrationsQueryTestCase(ProductFilterQueryMixin, Transactio
         )
         self.assertSetEqual(ids, {p1.id})
 
+    def test_filter_by_assigned_to_sales_channel_view_id_ignores_inactive_sales_channel(self):
+        from .queries import PRODUCTS_ASSIGNED_TO_VIEW_QUERY
+
+        inactive_sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://inactive.example.com",
+            active=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        inactive_view = AmazonSalesChannelView.objects.create(
+            sales_channel=inactive_sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        SalesChannelViewAssign.objects.create(
+            product=product,
+            sales_channel=inactive_sales_channel,
+            sales_channel_view=inactive_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_ASSIGNED_TO_VIEW_QUERY,
+            variables={"view": self.to_global_id(inactive_view)},
+        )
+        self.assertSetEqual(ids, set())
+
     def test_filter_by_not_assigned_to_sales_channel_view_id(self):
         from .queries import PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY
 
@@ -759,6 +785,265 @@ class ProductFilterIntegrationsQueryTestCase(ProductFilterQueryMixin, Transactio
             variables={"view": self.to_global_id(view1)},
         )
         self.assertSetEqual(ids, {p2.id, p3.id})
+
+    def test_filter_by_not_assigned_to_sales_channel_view_id_ignores_inactive_sales_channel(self):
+        from .queries import PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY
+
+        inactive_sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://inactive-not-assigned.example.com",
+            active=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        inactive_view = AmazonSalesChannelView.objects.create(
+            sales_channel=inactive_sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+        ids = self._query_ids(
+            query=PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY,
+            variables={"view": self.to_global_id(inactive_view)},
+        )
+        self.assertSetEqual(ids, set())
+
+    def test_filter_by_rejected_for_sales_channel_view_id(self):
+        from .queries import PRODUCTS_REJECTED_FOR_VIEW_QUERY
+
+        sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        view1 = AmazonSalesChannelView.objects.create(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        view2 = AmazonSalesChannelView.objects.create(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        p1 = SimpleProduct.objects.create(sku="rejected-1", multi_tenant_company=self.multi_tenant_company)
+        SimpleProduct.objects.create(sku="rejected-2", multi_tenant_company=self.multi_tenant_company)
+        p3 = SimpleProduct.objects.create(sku="rejected-3", multi_tenant_company=self.multi_tenant_company)
+        RejectedSalesChannelViewAssign.objects.create(
+            product=p1,
+            sales_channel_view=view1,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        RejectedSalesChannelViewAssign.objects.create(
+            product=p3,
+            sales_channel_view=view2,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_REJECTED_FOR_VIEW_QUERY,
+            variables={"view": self.to_global_id(view1)},
+        )
+        self.assertSetEqual(ids, {p1.id})
+
+    def test_filter_by_rejected_for_sales_channel_view_id_ignores_inactive_sales_channel(self):
+        from .queries import PRODUCTS_REJECTED_FOR_VIEW_QUERY
+
+        inactive_sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://inactive-rejected.example.com",
+            active=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        inactive_view = AmazonSalesChannelView.objects.create(
+            sales_channel=inactive_sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product = SimpleProduct.objects.create(sku="inactive-rejected", multi_tenant_company=self.multi_tenant_company)
+        RejectedSalesChannelViewAssign.objects.create(
+            product=product,
+            sales_channel_view=inactive_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_REJECTED_FOR_VIEW_QUERY,
+            variables={"view": self.to_global_id(inactive_view)},
+        )
+        self.assertSetEqual(ids, set())
+
+    def test_filter_by_todo_for_sales_channel_view_id(self):
+        from .queries import PRODUCTS_TODO_FOR_VIEW_QUERY
+
+        sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        view = AmazonSalesChannelView.objects.create(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        p1 = SimpleProduct.objects.create(sku="todo-1", multi_tenant_company=self.multi_tenant_company)
+        p2 = SimpleProduct.objects.create(sku="todo-2", multi_tenant_company=self.multi_tenant_company)
+        p3 = SimpleProduct.objects.create(sku="todo-3", multi_tenant_company=self.multi_tenant_company)
+        SalesChannelViewAssign.objects.create(
+            product=p1,
+            sales_channel=sales_channel,
+            sales_channel_view=view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        RejectedSalesChannelViewAssign.objects.create(
+            product=p2,
+            sales_channel_view=view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_TODO_FOR_VIEW_QUERY,
+            variables={"view": self.to_global_id(view)},
+        )
+        self.assertSetEqual(ids, {p3.id})
+
+    def test_filter_by_todo_for_sales_channel_view_id_ignores_inactive_sales_channel(self):
+        from .queries import PRODUCTS_TODO_FOR_VIEW_QUERY
+
+        inactive_sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://inactive-todo.example.com",
+            active=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        inactive_view = AmazonSalesChannelView.objects.create(
+            sales_channel=inactive_sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        SimpleProduct.objects.create(sku="inactive-todo", multi_tenant_company=self.multi_tenant_company)
+
+        ids = self._query_ids(
+            query=PRODUCTS_TODO_FOR_VIEW_QUERY,
+            variables={"view": self.to_global_id(inactive_view)},
+        )
+        self.assertSetEqual(ids, set())
+
+    def test_filter_by_has_todo_sales_channel_view(self):
+        from .queries import PRODUCTS_HAS_TODO_VIEW_QUERY
+
+        sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        included_view = AmazonSalesChannelView.objects.create(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            include_in_todo=True,
+        )
+        excluded_view = AmazonSalesChannelView.objects.create(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            include_in_todo=False,
+        )
+        p1 = SimpleProduct.objects.create(sku="global-todo-1", multi_tenant_company=self.multi_tenant_company)
+        p2 = SimpleProduct.objects.create(sku="global-todo-2", multi_tenant_company=self.multi_tenant_company)
+        p3 = SimpleProduct.objects.create(sku="global-todo-3", multi_tenant_company=self.multi_tenant_company)
+        SalesChannelViewAssign.objects.create(
+            product=p1,
+            sales_channel=sales_channel,
+            sales_channel_view=included_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        RejectedSalesChannelViewAssign.objects.create(
+            product=p2,
+            sales_channel_view=included_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        RejectedSalesChannelViewAssign.objects.create(
+            product=p1,
+            sales_channel_view=excluded_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_HAS_TODO_VIEW_QUERY,
+            variables={"hasTodo": True},
+        )
+        self.assertSetEqual(ids, {p3.id})
+
+    def test_filter_by_has_todo_sales_channel_view_ignores_inactive_sales_channel(self):
+        from .queries import PRODUCTS_HAS_TODO_VIEW_QUERY
+
+        active_sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://active-has-todo.example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        inactive_sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://inactive-has-todo.example.com",
+            active=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        active_view = AmazonSalesChannelView.objects.create(
+            sales_channel=active_sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            include_in_todo=True,
+        )
+        inactive_view = AmazonSalesChannelView.objects.create(
+            sales_channel=inactive_sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            include_in_todo=True,
+        )
+        completed = SimpleProduct.objects.create(sku="has-todo-completed", multi_tenant_company=self.multi_tenant_company)
+        inactive_only = SimpleProduct.objects.create(sku="has-todo-inactive-only", multi_tenant_company=self.multi_tenant_company)
+        SalesChannelViewAssign.objects.create(
+            product=completed,
+            sales_channel=active_sales_channel,
+            sales_channel_view=active_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        RejectedSalesChannelViewAssign.objects.create(
+            product=inactive_only,
+            sales_channel_view=active_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_HAS_TODO_VIEW_QUERY,
+            variables={"hasTodo": True},
+        )
+        self.assertSetEqual(ids, set())
+
+        RejectedSalesChannelViewAssign.objects.create(
+            product=inactive_only,
+            sales_channel_view=inactive_view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_HAS_TODO_VIEW_QUERY,
+            variables={"hasTodo": True},
+        )
+        self.assertSetEqual(ids, set())
+
+    def test_product_exposes_rejected_sales_channel_view_assign_set(self):
+        from .queries import PRODUCTS_REJECTED_VIEW_ASSIGN_SET_QUERY
+
+        sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        view = AmazonSalesChannelView.objects.create(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product = SimpleProduct.objects.create(sku="rejected-set", multi_tenant_company=self.multi_tenant_company)
+        rejected = RejectedSalesChannelViewAssign.objects.create(
+            product=product,
+            sales_channel_view=view,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        resp = self.strawberry_test_client(
+            query=PRODUCTS_REJECTED_VIEW_ASSIGN_SET_QUERY,
+            variables={"sku": product.sku},
+        )
+
+        self.assertIsNone(resp.errors)
+        node = resp.data["products"]["edges"][0]["node"]
+        self.assertEqual(
+            node["rejectedsaleschannelviewassignSet"][0]["id"],
+            self.to_global_id(rejected),
+        )
 
     def test_filter_by_present_on_store_sales_channel_id(self):
         from .queries import PRODUCTS_FILTER_BY_PRESENT_ON_STORE_SALES_CHANNEL

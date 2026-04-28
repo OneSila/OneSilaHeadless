@@ -18,6 +18,7 @@ from .types.types import (
     SalesChannelIntegrationPricelistType,
     SalesChannelViewType,
     SalesChannelViewAssignType,
+    RejectedSalesChannelViewAssignType,
     SalesChannelContentTemplateType,
     RemoteLanguageType,
     RemoteCurrencyType,
@@ -28,7 +29,7 @@ from .types.types import (
     RemotePropertySelectValueType,
 )
 from .types.types import RemoteLogType, RemoteProductType, SalesChannelType, \
-    SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType, RemoteLanguageType, \
+    SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType, RejectedSalesChannelViewAssignType, RemoteLanguageType, \
     RemoteCurrencyType, SalesChannelImportType, IntegrationType
 
 
@@ -66,6 +67,9 @@ class SalesChannelsQuery:
 
     sales_channel_view_assign: SalesChannelViewAssignType = node()
     sales_channel_view_assigns: DjangoListConnection[SalesChannelViewAssignType] = connection()
+
+    rejected_sales_channel_view_assign: RejectedSalesChannelViewAssignType = node()
+    rejected_sales_channel_view_assigns: DjangoListConnection[RejectedSalesChannelViewAssignType] = connection()
 
     sales_channel_content_template: SalesChannelContentTemplateType = node()
     sales_channel_content_templates: DjangoListConnection[SalesChannelContentTemplateType] = connection()

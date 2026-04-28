@@ -1,6 +1,6 @@
 from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
     QuerySetProxyModelMixin, MultiTenantQuerySet, MultiTenantManager
-from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models import Exists, Subquery, OuterRef, Value, CharField
 from django.db.models.functions import Coalesce
 
 
@@ -16,6 +16,57 @@ class ProductQuerySet(MultiTenantQuerySet):
 
     def filter_has_prices(self):
         return self.filter(type__in=self.model.HAS_PRICES_TYPES)
+
+    def filter_has_todo_sales_channel_view(self, *, value: bool = True):
+        from sales_channels.models import SalesChannelView
+
+        todo_views_qs = SalesChannelView.objects.filter(
+            multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
+            include_in_todo=True,
+            sales_channel__active=True,
+        ).exclude(
+            saleschannelviewassign__product_id=OuterRef("pk"),
+        ).exclude(
+            rejectedsaleschannelviewassign__product_id=OuterRef("pk"),
+        )
+
+        return self.annotate(
+            has_todo_sales_channel_view=Exists(todo_views_qs),
+        ).filter(has_todo_sales_channel_view=value)
+
+    def filter_todo_for_sales_channel_view_id(self, *, view_id):
+        from sales_channels.models import (
+            RejectedSalesChannelViewAssign,
+            SalesChannelView,
+            SalesChannelViewAssign,
+        )
+
+        active_view_qs = SalesChannelView.objects.filter(
+            id=view_id,
+            multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
+            sales_channel__active=True,
+        )
+
+        assigns_qs = SalesChannelViewAssign.objects.filter(
+            product_id=OuterRef("pk"),
+            sales_channel_view_id=view_id,
+            sales_channel_view__sales_channel__active=True,
+        )
+        rejected_qs = RejectedSalesChannelViewAssign.objects.filter(
+            product_id=OuterRef("pk"),
+            sales_channel_view_id=view_id,
+            sales_channel_view__sales_channel__active=True,
+        )
+
+        return self.annotate(
+            has_active_view=Exists(active_view_qs),
+            assigned_to_view=Exists(assigns_qs),
+            rejected_for_view=Exists(rejected_qs),
+        ).filter(
+            has_active_view=True,
+            assigned_to_view=False,
+            rejected_for_view=False,
+        )
 
     def with_translated_name(self, language_code=None):
         from .models import ProductTranslation
@@ -233,6 +284,12 @@ class ProductManager(MultiTenantManager):
 
     def duplicate_product(self, product, **kwargs):
         return self.get_queryset().duplicate_product(product, **kwargs)
+
+    def filter_has_todo_sales_channel_view(self, *, value: bool = True):
+        return self.get_queryset().filter_has_todo_sales_channel_view(value=value)
+
+    def filter_todo_for_sales_channel_view_id(self, *, view_id):
+        return self.get_queryset().filter_todo_for_sales_channel_view_id(view_id=view_id)
 
 
 class ConfigurableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):

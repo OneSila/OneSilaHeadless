@@ -153,6 +153,12 @@ class UpsertProductInputPayload(TypedDict, total=False):
     properties: list[ProductPropertyValueUpdateInputPayload]
     images: list[ProductImageInputPayload]
     sales_channel_view_ids: list[int]
+    workflows: list["WorkflowStateUpdateInputPayload"]
+
+
+class WorkflowStateUpdateInputPayload(TypedDict):
+    workflow_code: str
+    state_code: str
 
 
 class ProductTranslationPayload(TypedDict, total=False):
@@ -215,6 +221,21 @@ class ProductSearchSummaryPayload(TypedDict):
     has_missing_required_information: bool
     has_missing_optional_information: bool
     has_missing_information: bool
+    workflows: list["ProductWorkflowAssignmentPayload"]
+
+
+class WorkflowStateReferencePayload(TypedDict):
+    id: int
+    name: str
+    code: str
+    is_default: bool
+
+
+class ProductWorkflowAssignmentPayload(TypedDict):
+    workflow_id: int
+    workflow_name: str
+    workflow_code: str
+    state: WorkflowStateReferencePayload
 
 
 class ProductBaseDetailPayload(TypedDict):
@@ -309,12 +330,25 @@ class CompanyCurrenciesPayload(TypedDict):
     results: list[CompanyCurrencyPayload]
 
 
+class CompanyWorkflowPayload(TypedDict):
+    id: int
+    name: str
+    code: str
+    states: list[WorkflowStateReferencePayload]
+
+
+class CompanyWorkflowsPayload(TypedDict):
+    count: int
+    results: list[CompanyWorkflowPayload]
+
+
 class CompanyDetailsPayload(TypedDict, total=False):
     message: str
     languages: CompanyLanguagesPayload
     product_types: CompanyProductTypesPayload
     vat_rates: GetVatRatesPayload
     currencies: CompanyCurrenciesPayload
+    workflows: CompanyWorkflowsPayload
 
 
 class SearchSalesChannelsPayload(TypedDict):
@@ -334,6 +368,7 @@ class ProductUpsertAppliedUpdatesPayload(TypedDict, total=False):
     properties: int
     images: int
     website_views_assignments: int
+    workflows: int
 
 
 class ProductUpsertPayload(TypedDict, total=False):

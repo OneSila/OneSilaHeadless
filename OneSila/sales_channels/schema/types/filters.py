@@ -37,6 +37,7 @@ from sales_channels.models import (
     SalesChannelIntegrationPricelist,
     SalesChannelView,
     SalesChannelViewAssign,
+    RejectedSalesChannelViewAssign,
     SalesChannelContentTemplate,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
@@ -215,6 +216,8 @@ class SalesChannelViewFilter(SearchFilterMixin):
     search: Optional[str]
     id: auto
     remote_id: auto
+    include_in_todo: auto
+    todo_sort_order: auto
     sales_channel: Optional[SalesChannelFilter]
 
 
@@ -243,6 +246,13 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
             return queryset, Q()
 
         return queryset.filter_by_status(status=str(value)), Q()
+
+
+@filter(RejectedSalesChannelViewAssign)
+class RejectedSalesChannelViewAssignFilter(SearchFilterMixin):
+    id: auto
+    sales_channel_view: Optional[SalesChannelViewFilter]
+    product: Optional[ProductFilter]
 
     @custom_filter
     def has_sync_requests(

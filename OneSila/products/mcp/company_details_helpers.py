@@ -10,14 +10,18 @@ from products.mcp.types import (
     CompanyCurrenciesPayload,
     CompanyCurrencyPayload,
     CompanyDetailsPayload,
+    CompanyWorkflowPayload,
+    CompanyWorkflowsPayload,
     CompanyProductTypePayload,
     CompanyProductTypesPayload,
+    WorkflowStateReferencePayload,
 )
 from properties.mcp.helpers import (
     serialize_company_languages,
     serialize_property_reference,
 )
 from properties.models import PropertySelectValue
+from workflows.models import Workflow
 
 
 def serialize_company_currency(*, currency: Currency) -> CompanyCurrencyPayload:
@@ -110,6 +114,42 @@ def get_company_product_types_payload(
     }
 
 
+def serialize_workflow_state_reference(*, state) -> WorkflowStateReferencePayload:
+    return {
+        "id": state.id,
+        "name": state.value,
+        "code": state.code,
+        "is_default": bool(state.is_default),
+    }
+
+
+def serialize_company_workflow(*, workflow: Workflow) -> CompanyWorkflowPayload:
+    return {
+        "id": workflow.id,
+        "name": workflow.name,
+        "code": workflow.code,
+        "states": [
+            serialize_workflow_state_reference(state=state)
+            for state in workflow.states.all()
+        ],
+    }
+
+
+def get_company_workflows_payload(*, multi_tenant_company: MultiTenantCompany) -> CompanyWorkflowsPayload:
+    workflows = list(
+        Workflow.objects.filter(multi_tenant_company=multi_tenant_company)
+        .prefetch_related("states")
+        .order_by("sort_order", "name", "id")
+    )
+    return {
+        "count": len(workflows),
+        "results": [
+            serialize_company_workflow(workflow=workflow)
+            for workflow in workflows
+        ],
+    }
+
+
 def get_company_details_payload(
     *,
     multi_tenant_company: MultiTenantCompany,
@@ -119,6 +159,7 @@ def get_company_details_payload(
     show_product_types_usage_counts: bool,
     show_vat_rates: bool,
     show_currencies: bool,
+    show_workflows: bool,
 ) -> CompanyDetailsPayload:
     include_product_types = (
         show_product_types
@@ -131,6 +172,7 @@ def get_company_details_payload(
             include_product_types,
             show_vat_rates,
             show_currencies,
+            show_workflows,
         ]
     ):
         return {
@@ -157,6 +199,10 @@ def get_company_details_payload(
         )
     if show_currencies:
         payload["currencies"] = get_company_currencies_payload(
+            multi_tenant_company=multi_tenant_company,
+        )
+    if show_workflows:
+        payload["workflows"] = get_company_workflows_payload(
             multi_tenant_company=multi_tenant_company,
         )
     return payload

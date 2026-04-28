@@ -1,11 +1,12 @@
 from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
+from django.urls import reverse
 from django.test import RequestFactory, TransactionTestCase
 
-from integrations.admin import PublicIntegrationTypeAdmin
-from integrations.models import PublicIntegrationType
-from integrations.tests.helpers import PublicIntegrationTypeSchemaMixin
+from integrations.admin import PublicIntegrationTypeAdmin, PublicIssueRequestAdmin
+from integrations.models import PublicIntegrationType, PublicIssueRequest
+from integrations.tests.helpers import PublicIntegrationTypeSchemaMixin, PublicIssueSchemaMixin
 
 
 class PublicIntegrationTypeAdminTests(PublicIntegrationTypeSchemaMixin, TransactionTestCase):
@@ -61,3 +62,9 @@ class PublicIntegrationTypeAdminTests(PublicIntegrationTypeSchemaMixin, Transact
 
         self.assertFalse(queryset.filter(active=True).exists())
         message_user_mock.assert_called_once()
+
+
+class PublicIssueRequestAdminTests(PublicIssueSchemaMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.admin = PublicIssueRequestAdmin(PublicIssueRequest, AdminSite())

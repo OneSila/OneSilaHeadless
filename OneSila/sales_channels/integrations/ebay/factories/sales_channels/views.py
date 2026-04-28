@@ -13,7 +13,11 @@ class EbaySalesChannelViewPullFactory(GetEbayAPIMixin, PullRemoteInstanceMixin):
         'url': 'url',
         'is_default': 'is_default',
     }
-    update_field_mapping = field_mapping
+    update_field_mapping = {
+        'remote_id': 'marketplace_id',
+        'url': 'url',
+        'is_default': 'is_default',
+    }
     get_or_create_fields = ['remote_id']
 
     allow_create = True

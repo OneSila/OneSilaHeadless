@@ -564,7 +564,9 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             remote_property.example = self._clean_string(item.get("example"))
             remote_property.is_common = not bool(self._clean_string(item.get("hierarchy_code")))
             remote_property.original_type = property_type
-            if self._should_refresh_runtime_property_type(
+            if getattr(remote_property, "local_instance", None) is not None and getattr(remote_property.local_instance, "type", None):
+                remote_property.type = remote_property.local_instance.type
+            elif self._should_refresh_runtime_property_type(
                 remote_property=remote_property,
                 existing_original_type=existing_original_type,
                 existing_runtime_type=existing_runtime_type,

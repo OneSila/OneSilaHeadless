@@ -32,8 +32,10 @@ from products.mcp.types import (
     ProductSearchSummaryPayload,
     ProductTranslationPayload,
     ProductVatRatePayload,
+    ProductWorkflowAssignmentPayload,
     ProductWebsiteViewAssignPayload,
     SalesChannelReferencePayload,
+    WorkflowStateReferencePayload,
 )
 from products.models import Product, ProductTranslation
 from products_inspector.models import InspectorBlock
@@ -42,6 +44,7 @@ from properties.mcp.helpers import serialize_property_reference
 from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem, ProductProperty
 from sales_channels.models import SalesChannelViewAssign
 from sales_prices.models import SalesPrice
+from workflows.models import WorkflowProductAssignment
 
 
 PRODUCT_TYPE_LABELS = {
@@ -192,13 +195,43 @@ def get_product_type_label(*, type_value: str) -> str:
 
 
 def get_product_summary_queryset(*, multi_tenant_company: MultiTenantCompany) -> QuerySet[Product]:
+    workflow_assignment_queryset = (
+        WorkflowProductAssignment.objects.select_related(
+            "workflow",
+            "workflow_state",
+        ).order_by("workflow__sort_order", "workflow__name", "workflow_id", "id")
+    )
     return (
         Product.objects.filter(multi_tenant_company=multi_tenant_company)
         .with_translated_name(language_code=multi_tenant_company.language)
         .select_related("vat_rate", "inspector")
         .annotate(has_images=Exists(_get_product_image_exists_queryset()))
-        .prefetch_related(_get_product_image_prefetch())
+        .prefetch_related(
+            _get_product_image_prefetch(),
+            Prefetch("workflow_assignments", queryset=workflow_assignment_queryset),
+        )
     )
+
+
+def _serialize_workflow_state_reference(*, workflow_state) -> WorkflowStateReferencePayload:
+    return {
+        "id": workflow_state.id,
+        "name": workflow_state.value,
+        "code": workflow_state.code,
+        "is_default": bool(workflow_state.is_default),
+    }
+
+
+def serialize_product_workflows(*, product: Product) -> list[ProductWorkflowAssignmentPayload]:
+    return [
+        {
+            "workflow_id": assignment.workflow_id,
+            "workflow_name": assignment.workflow.name,
+            "workflow_code": assignment.workflow.code,
+            "state": _serialize_workflow_state_reference(workflow_state=assignment.workflow_state),
+        }
+        for assignment in product.workflow_assignments.all()
+    ]
 
 
 def get_product_detail_queryset(*, multi_tenant_company: MultiTenantCompany) -> QuerySet[Product]:
@@ -624,6 +657,7 @@ def serialize_product_search_summary(
         "has_missing_required_information": inspector_data["has_missing_required_information"],
         "has_missing_optional_information": inspector_data["has_missing_optional_information"],
         "has_missing_information": inspector_data["has_missing_information"],
+        "workflows": serialize_product_workflows(product=product),
     }
 
 

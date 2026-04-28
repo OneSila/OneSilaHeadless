@@ -34,6 +34,7 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
         show_product_types_usage_counts: Annotated[bool, Field(description="Also include product-type usage counts. This automatically enables `show_product_types`.")] = False,
         show_vat_rates: Annotated[bool, Field(description="Opt in to configured VAT rates when you need `vat_rate_id` for create or upsert, or when you want to confirm the exact percentage.")] = False,
         show_currencies: Annotated[bool, Field(description="Opt in to company currencies when you need valid currency codes for price writes.")] = False,
+        show_workflows: Annotated[bool, Field(description="Opt in to workflows with their codes and available states when you need to assign or update product workflow states.")] = False,
         ctx: Context = CurrentContext(),
     ) -> ToolResult:
         """
@@ -44,6 +45,7 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
         - product types for create-time product type assignment
         - VAT rates for create/upsert VAT assignment
         - currencies for price writes
+        - workflows and states for workflow assignment writes
 
         Do not use this as a general fallback after `search_products`. It is not a product-count or
         product-inspection tool. If you need a product count, use `search_products`. If you need the
@@ -79,6 +81,10 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
                     value=show_currencies,
                     field_name="show_currencies",
                 ) or False,
+                show_workflows=self.sanitize_optional_bool(
+                    value=show_workflows,
+                    field_name="show_workflows",
+                ) or False,
             )
             await ctx.info(
                 f"Loaded company details for company_id={multi_tenant_company.id} "
@@ -107,6 +113,7 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
         show_product_types_usage_counts: bool,
         show_vat_rates: bool,
         show_currencies: bool,
+        show_workflows: bool,
     ) -> CompanyDetailsPayload:
         try:
             return get_company_details_payload(
@@ -117,6 +124,7 @@ class GetCompanyDetailsMcpTool(BaseMcpTool):
                 show_product_types_usage_counts=show_product_types_usage_counts,
                 show_vat_rates=show_vat_rates,
                 show_currencies=show_currencies,
+                show_workflows=show_workflows,
             )
         except ValueError as error:
             raise McpToolError(str(error)) from error

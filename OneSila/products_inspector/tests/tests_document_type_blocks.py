@@ -9,15 +9,18 @@ from products.models import ConfigurableProduct, SimpleProduct
 from products_inspector.constants import (
     OPTIONAL_DOCUMENT_TYPES_ERROR,
     REQUIRED_DOCUMENT_TYPES_ERROR,
+    UNDECIDED_SALES_CHANNEL_VIEWS_ERROR,
 )
+from sales_channels.flows.product_view_status import change_product_view_status_for_assign_object
 from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinDocumentType,
     SheinProductCategory,
     SheinSalesChannel,
 )
-from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceSalesChannelView
 from sales_channels.models.documents import RemoteDocumentType
+from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.products import RemoteProductCategory
 
 
@@ -261,6 +264,7 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
             multi_tenant_company_id=self.multi_tenant_company.id,
             product_ids=[product.id],
         )
+        required_block.refresh_from_db()
 
         mock_refresh_task.reset_mock()
 
@@ -321,6 +325,117 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
         self.assertEqual(
             mock_refresh_task.call_args.kwargs["multi_tenant_company_id"],
             self.multi_tenant_company.id,
+        )
+
+    def _create_view(self, *, include_in_todo=True):
+        return WoocommerceSalesChannelView.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            name="Main",
+            url="https://example.com",
+            include_in_todo=include_in_todo,
+        )
+
+    def test_undecided_sales_channel_views_block_fails_for_included_view(self):
+        self.sales_channel.active = True
+        self.sales_channel.save(update_fields=["active"])
+        self._create_view(include_in_todo=True)
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sku="undecided-1",
+        )
+
+        inspector_block = product.inspector.blocks.get(
+            error_code=UNDECIDED_SALES_CHANNEL_VIEWS_ERROR,
+        )
+
+        self.assertFalse(inspector_block.successfully_checked)
+
+    def test_undecided_sales_channel_views_block_ignores_excluded_view(self):
+        self._create_view(include_in_todo=False)
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sku="undecided-2",
+        )
+
+        inspector_block = product.inspector.blocks.get(
+            error_code=UNDECIDED_SALES_CHANNEL_VIEWS_ERROR,
+        )
+
+        self.assertTrue(inspector_block.successfully_checked)
+
+    def test_undecided_sales_channel_views_block_rechecks_once_for_status_change(self):
+        self.sales_channel.active = True
+        self.sales_channel.save(update_fields=["active"])
+        view = self._create_view(include_in_todo=True)
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sku="undecided-3",
+        )
+        inspector_block = product.inspector.blocks.get(
+            error_code=UNDECIDED_SALES_CHANNEL_VIEWS_ERROR,
+        )
+        self.assertFalse(inspector_block.successfully_checked)
+
+        with patch(
+            "products_inspector.receivers.inspector_block_refresh.send",
+        ) as refresh_mock:
+            SalesChannelViewAssign.objects.create(
+                product=product,
+                sales_channel=view.sales_channel,
+                sales_channel_view=view,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+            change_product_view_status_for_assign_object(
+                product=product,
+                sales_channel_view=view,
+                status="REJECT",
+                multi_tenant_company=self.multi_tenant_company,
+                multi_tenant_user=self.user,
+            )
+
+        self.assertGreaterEqual(refresh_mock.call_count, 1)
+        called_error_codes = [
+            call.kwargs.get("error_code")
+            for call in refresh_mock.call_args_list
+        ]
+        self.assertIn(UNDECIDED_SALES_CHANNEL_VIEWS_ERROR, called_error_codes)
+
+        change_product_view_status_for_assign_object(
+            product=product,
+            sales_channel_view=view,
+            status="REJECT",
+            multi_tenant_company=self.multi_tenant_company,
+            multi_tenant_user=self.user,
+        )
+        inspector_block.refresh_from_db()
+        self.assertTrue(inspector_block.successfully_checked)
+
+        change_product_view_status_for_assign_object(
+            product=product,
+            sales_channel_view=view,
+            status="TODO",
+            multi_tenant_company=self.multi_tenant_company,
+            multi_tenant_user=self.user,
+        )
+        inspector_block.refresh_from_db()
+        self.assertFalse(inspector_block.successfully_checked)
+
+    @patch("products_inspector.tasks.products_inspector__tasks__refresh_undecided_sales_channel_views_for_company")
+    def test_sales_channel_view_include_in_todo_toggle_rechecks_whole_catalog(self, refresh_mock):
+        from products_inspector.receivers import (
+            products_inspector__inspector__trigger_undecided_sales_channel_views_for_view_todo_toggle,
+        )
+
+        view = self._create_view(include_in_todo=True)
+        view.include_in_todo = False
+        products_inspector__inspector__trigger_undecided_sales_channel_views_for_view_todo_toggle(
+            sender=view.__class__,
+            instance=view,
+        )
+
+        refresh_mock.assert_called_once_with(
+            multi_tenant_company_id=self.multi_tenant_company.id,
         )
 
     def test_unrelated_update_signals_do_not_hit_document_type_receivers(self):

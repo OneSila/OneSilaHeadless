@@ -8,9 +8,11 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelView,
     AmazonProductBrowseNode,
 )
+from workflows.models import Workflow, WorkflowProductAssignment, WorkflowState
 from .tests_schemas.queries import (
     PRODUCTS_ASSIGNED_TO_VIEW_QUERY,
     PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY,
+    PRODUCTS_WITH_WORKFLOW_STATE_ID_QUERY,
     PRODUCTS_WITH_VALUE_SELECT_IDS_QUERY,
     PRODUCTS_WITH_VALUE_SELECT_ID_QUERY,
     PRODUCTS_WITH_PROPERTY_ID_QUERY,
@@ -206,3 +208,58 @@ class ProductFilterValueSelectIdsTestCase(TransactionTestCaseMixin, TransactionT
             for edge in resp.data["products"]["edges"]
         } & expected_ids
         self.assertSetEqual(found_ids, {self.p2.id})
+
+
+class ProductFilterWorkflowStateTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.workflow = Workflow.objects.create(
+            name="Add Products",
+            code="ADD_PRODUCTS",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.state_untouched = WorkflowState.objects.create(
+            workflow=self.workflow,
+            value="Untouched",
+            code="UNTOUCHED",
+            sort_order=10,
+            is_default=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.state_enrich = WorkflowState.objects.create(
+            workflow=self.workflow,
+            value="To Enrich",
+            code="TO_ENRICH",
+            sort_order=20,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.p1 = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.p2 = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.p3 = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+        WorkflowProductAssignment.objects.create(
+            workflow=self.workflow,
+            product=self.p1,
+            workflow_state=self.state_untouched,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        WorkflowProductAssignment.objects.create(
+            workflow=self.workflow,
+            product=self.p2,
+            workflow_state=self.state_enrich,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_workflow_state_id_filters_products(self):
+        resp = self.strawberry_test_client(
+            query=PRODUCTS_WITH_WORKFLOW_STATE_ID_QUERY,
+            variables={"id": self.to_global_id(self.state_untouched)},
+        )
+        self.assertIsNone(resp.errors)
+        expected_ids = {self.p1.id, self.p2.id, self.p3.id}
+        found_ids = {
+            int(self.from_global_id(edge["node"]["id"])[1])
+            for edge in resp.data["products"]["edges"]
+        } & expected_ids
+        self.assertSetEqual(found_ids, {self.p1.id})

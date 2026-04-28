@@ -18,6 +18,7 @@ from lead_times.schema import LeadTimesQuery
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
 from notifications.schema import NotificationsQuery, NotificationsMutation
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
+from workflows.schema import WorkflowsMutation, WorkflowsQuery, WorkflowsSubscription
 from products_inspector.schema import ProductsInspectorSubscription, ProductsInspectorMutation
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
 from sales_channels.integrations.ebay.schema import EbaySalesChannelMutation, EbaySalesChannelsQuery, \
@@ -68,6 +69,7 @@ class Query(
         WoocommerceSalesChannelsQuery,
         EbaySalesChannelsQuery,
         ProductsQuery,
+        WorkflowsQuery,
         PropertiesQuery,
         SalesPricesQuery,
         SalesChannelsQuery,
@@ -95,6 +97,7 @@ class Mutation(
         EbaySalesChannelMutation,
         ProductsInspectorMutation,
         ProductsMutation,
+        WorkflowsMutation,
         PropertiesMutation,
         IntegrationsMutation,
         ImportsExportsMutation,
@@ -117,6 +120,7 @@ class Subscription(
         MultiTenantSubscription,
         ProductsInspectorSubscription,
         ProductsSubscription,
+        WorkflowsSubscription,
         PropertiesSubscription,
         SalesPriceSubscription,
         MagentoSalesChannelsSubscription,

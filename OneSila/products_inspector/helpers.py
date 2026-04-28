@@ -29,8 +29,6 @@ def _send_document_type_block_refresh(*, product):
             error_code=error_code,
             run_async=False,
         )
-
-
 def _refresh_document_type_blocks_for_products(
     *,
     product_ids,

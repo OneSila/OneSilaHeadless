@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from polymorphic.models import PolymorphicModel
-from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator, URLValidator
 from core import models
 import logging
 from django.utils.timezone import now
@@ -12,6 +12,9 @@ from datetime import datetime
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from core.locales import LANGUAGE_MAX_LENGTH
+from core.upload_paths import tenant_upload_to
+from core.validators import no_dots_in_filename, validate_image_extension
+from get_absolute_url.helpers import generate_absolute_url
 
 from integrations.validators import hostname_validator
 from core.managers import Manager as SharedManager
@@ -603,3 +606,171 @@ class IntegrationObjectMixin(models.Model):
 
         # Call the original save method
         super().save(*args, **kwargs)
+
+class PublicIssueRequest(models.Model):
+    NEW = "NEW"
+    REJECTED = "REJECTED"
+    ACCEPTED = "ACCEPTED"
+
+    STATUS_CHOICES = [
+        (NEW, "New"),
+        (REJECTED, "Rejected"),
+        (ACCEPTED, "Accepted"),
+    ]
+
+    integration_type = models.ForeignKey(
+        PublicIntegrationType,
+        on_delete=models.PROTECT,
+        related_name="public_issue_requests",
+    )
+    issue = models.TextField()
+    description = models.TextField(null=True, blank=True)
+    submission_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    product_sku = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=NEW, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        search_terms = [
+            "issue",
+            "description",
+            "submission_id",
+            "product_sku",
+            "status",
+            "integration_type__key",
+            "integration_type__type",
+            "integration_type__subtype",
+        ]
+
+    def __str__(self):
+        return self.issue[:80]
+
+
+class PublicIssue(models.SharedModel):
+    integration_type = models.ForeignKey(
+        PublicIntegrationType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="public_issues",
+    )
+    code = models.CharField(
+        max_length=4,
+        unique=True,
+        blank=True,
+        db_index=True,
+        validators=[
+            RegexValidator(
+                regex=r"^\d{4}$",
+                message="Public issue code must be exactly 4 digits.",
+            ),
+        ],
+    )
+    issue = models.TextField()
+    cause = models.TextField(null=True, blank=True)
+    recommended_fix = models.TextField(null=True, blank=True)
+    request_reference = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+
+    objects = SharedManager()
+
+    class Meta:
+        ordering = ("integration_type__key", "code")
+        search_terms = [
+            "code",
+            "issue",
+            "cause",
+            "recommended_fix",
+            "integration_type__key",
+            "integration_type__type",
+            "integration_type__subtype",
+            "categories__name",
+            "categories__code",
+        ]
+
+    def _generate_unique_code(self):
+        used_codes = set(
+            self.__class__.objects
+            .exclude(id=self.id)
+            .exclude(code="")
+            .values_list("code", flat=True)
+        )
+
+        for number in range(1, 10000):
+            code = f"{number:04d}"
+            if code not in used_codes:
+                return code
+
+        raise ValidationError("No public issue codes are available.")
+
+    def save(self, *, force_insert=False, force_update=False, using=None, update_fields=None):
+        if not self.code:
+            self.code = self._generate_unique_code()
+            if update_fields is not None:
+                update_fields = set(update_fields)
+                update_fields.add("code")
+
+        super().save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,
+        )
+
+    def __str__(self):
+        return f"{self.code} - {self.integration_type or 'Common'}"
+
+class PublicIssueCategory(models.SharedModel):
+    public_issue = models.ForeignKey(
+        PublicIssue,
+        on_delete=models.CASCADE,
+        related_name="categories",
+    )
+    name = models.CharField(max_length=255)
+    code = models.CharField(max_length=64, db_index=True)
+
+    objects = SharedManager()
+
+    class Meta:
+        ordering = ("name", "code")
+        search_terms = ["name", "code", "public_issue__code", "public_issue__issue"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["public_issue", "code"],
+                name="unique_public_issue_category_code_per_issue",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+class PublicIssueImage(models.SharedModel):
+    public_issue = models.ForeignKey(
+        PublicIssue,
+        on_delete=models.CASCADE,
+        related_name="images",
+    )
+    image = models.ImageField(
+        upload_to=tenant_upload_to("public_issue_images"),
+        validators=[validate_image_extension, no_dots_in_filename],
+    )
+
+    objects = SharedManager()
+
+    class Meta:
+        ordering = ("id",)
+        search_terms = ["public_issue__code", "public_issue__issue"]
+
+    def __str__(self):
+        return f"Image for {self.public_issue.code}"
+
+    @property
+    def image_url(self):
+        if not self.image:
+            return None
+
+        image_url = getattr(self.image, "url", None)
+        if not image_url:
+            return None
+
+        return f"{generate_absolute_url(trailing_slash=False)}{image_url}"
