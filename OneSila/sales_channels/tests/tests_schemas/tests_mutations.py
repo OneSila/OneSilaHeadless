@@ -361,7 +361,7 @@ class ProductViewStatusMutationTestCase(TransactionTestCaseMixin, TransactionTes
             "view": {"id": self.to_global_id(view)},
         }
 
-    def _change_status(self, *, status, product=None, view=None):
+    def _change_status(self, *, status, product=None, view=None, asserts_errors=False):
         return self.strawberry_test_client(
             query=CHANGE_PRODUCT_VIEW_STATUS_MUTATION,
             variables={
@@ -371,6 +371,7 @@ class ProductViewStatusMutationTestCase(TransactionTestCaseMixin, TransactionTes
                     view=view or self.view,
                 ),
             },
+            asserts_errors=asserts_errors,
         )
 
     def test_change_product_view_status_to_reject_creates_rejection(self):
@@ -404,10 +405,10 @@ class ProductViewStatusMutationTestCase(TransactionTestCaseMixin, TransactionTes
         )
 
     def test_change_product_view_status_to_added_for_inactive_sales_channel_raises_error(self):
-        response = self._change_status(status="ADDED", view=self.inactive_view)
+        response = self._change_status(status="ADDED", view=self.inactive_view, asserts_errors=True)
 
         self.assertIsNotNone(response.errors)
-        self.assertIn("Cannot add a product view for an inactive sales channel.", response.errors[0].message)
+        self.assertIn("Cannot add a product view for an inactive sales channel.", response.errors[0]["message"])
         self.assertFalse(
             SalesChannelViewAssign.objects.filter(
                 product=self.product,

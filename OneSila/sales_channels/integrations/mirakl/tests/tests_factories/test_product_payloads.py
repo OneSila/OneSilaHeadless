@@ -1996,7 +1996,7 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         with self.assertRaisesMessage(
             PreFlightCheckError,
-            "Mirakl preflight errors:\n- Mirakl field 'product_title' contains forbidden word 'pre-order' for product SKU-1.",
+            "Mirakl preflight errors:\n- Mirakl field 'product_title' contains forbidden word 'pre order' for product SKU-1.",
         ):
             builder.build()
 

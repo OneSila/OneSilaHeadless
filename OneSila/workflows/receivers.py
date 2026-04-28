@@ -33,6 +33,7 @@ def _create_auto_workflow_assignments_for_product(*, product):
         WorkflowProductAssignment.objects.get_or_create(
             workflow=workflow,
             product=product,
+            multi_tenant_company=product.multi_tenant_company,
             defaults={
                 "workflow_state": default_state,
                 "multi_tenant_company": product.multi_tenant_company,

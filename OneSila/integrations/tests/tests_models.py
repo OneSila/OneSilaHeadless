@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.test import TransactionTestCase
 
+from core.models import MultiTenantCompany
 from integrations.models import (
     PublicIntegrationType,
     PublicIntegrationTypeTranslation,
@@ -79,7 +80,7 @@ class PublicIssueModelTests(PublicIssueSchemaMixin, TransactionTestCase):
         image = PublicIssueImage(image="public_issue_images/example.jpg")
 
         self.assertEqual(
-            image.get_image_url(),
+            image.image_url,
             f"https://app.example.com{image.image.url}",
         )
         generate_absolute_url_mock.assert_called_once_with(trailing_slash=False)
@@ -87,6 +88,7 @@ class PublicIssueModelTests(PublicIssueSchemaMixin, TransactionTestCase):
 
 class PublicIssueRequestReceiverTests(PublicIssueSchemaMixin, TransactionTestCase):
     def test_post_create_signal_triggers_telegram_admin_notification_factory(self):
+        multi_tenant_company = MultiTenantCompany.objects.create(name="Public Issue Request Company")
         integration_type = PublicIntegrationType.objects.create(
             key="ebay_public_issue_request_receiver_test",
             type="ebay",
@@ -100,12 +102,14 @@ class PublicIssueRequestReceiverTests(PublicIssueSchemaMixin, TransactionTestCas
                 description="It happened while syncing an Ebay listing.",
                 submission_id="SUBMISSION-1",
                 product_sku="TEST-1",
+                multi_tenant_company=multi_tenant_company,
             )
 
         factory_mock.assert_called_once_with(public_issue_request=request)
         factory_mock.return_value.run.assert_called_once_with()
 
     def test_public_issue_with_request_reference_marks_request_accepted(self):
+        multi_tenant_company = MultiTenantCompany.objects.create(name="Public Issue Acceptance Company")
         integration_type = PublicIntegrationType.objects.create(
             key="ebay_public_issue_request_acceptance_test",
             type="ebay",
@@ -114,6 +118,7 @@ class PublicIssueRequestReceiverTests(PublicIssueSchemaMixin, TransactionTestCas
         request = PublicIssueRequest.objects.create(
             integration_type=integration_type,
             issue="The integration log says SKU TEST-1 failed validation.",
+            multi_tenant_company=multi_tenant_company,
         )
 
         PublicIssue.objects.create(

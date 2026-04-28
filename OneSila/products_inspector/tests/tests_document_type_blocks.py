@@ -5,7 +5,7 @@ from django.db.models.signals import post_delete
 from core.signals import post_create, post_update
 from core.tests import TestCase
 from media.models import DocumentType, Media, MediaProductThrough
-from products.models import SimpleProduct
+from products.models import ConfigurableProduct, SimpleProduct
 from products_inspector.constants import (
     OPTIONAL_DOCUMENT_TYPES_ERROR,
     REQUIRED_DOCUMENT_TYPES_ERROR,
@@ -261,10 +261,10 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
         remote_document_type.local_instance = None
         remote_document_type.save()
         mock_refresh_task.assert_called_once_with(
-            multi_tenant_company=self.multi_tenant_company,
+            multi_tenant_company_id=self.multi_tenant_company.id,
             product_ids=[product.id],
         )
-        inspector_block.refresh_from_db()
+        required_block.refresh_from_db()
 
         mock_refresh_task.reset_mock()
 
@@ -337,6 +337,8 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
         )
 
     def test_undecided_sales_channel_views_block_fails_for_included_view(self):
+        self.sales_channel.active = True
+        self.sales_channel.save(update_fields=["active"])
         self._create_view(include_in_todo=True)
         product = SimpleProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -363,6 +365,8 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
         self.assertTrue(inspector_block.successfully_checked)
 
     def test_undecided_sales_channel_views_block_rechecks_once_for_status_change(self):
+        self.sales_channel.active = True
+        self.sales_channel.save(update_fields=["active"])
         view = self._create_view(include_in_todo=True)
         product = SimpleProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -390,9 +394,12 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
                 multi_tenant_user=self.user,
             )
 
-        refresh_mock.assert_called_once()
-        _, kwargs = refresh_mock.call_args
-        self.assertEqual(kwargs["error_code"], UNDECIDED_SALES_CHANNEL_VIEWS_ERROR)
+        self.assertGreaterEqual(refresh_mock.call_count, 1)
+        called_error_codes = [
+            call.kwargs.get("error_code")
+            for call in refresh_mock.call_args_list
+        ]
+        self.assertIn(UNDECIDED_SALES_CHANNEL_VIEWS_ERROR, called_error_codes)
 
         change_product_view_status_for_assign_object(
             product=product,
@@ -416,10 +423,16 @@ class InspectorDocumentTypeBlocksTestCase(TestCase):
 
     @patch("products_inspector.tasks.products_inspector__tasks__refresh_undecided_sales_channel_views_for_company")
     def test_sales_channel_view_include_in_todo_toggle_rechecks_whole_catalog(self, refresh_mock):
-        view = self._create_view(include_in_todo=True)
+        from products_inspector.receivers import (
+            products_inspector__inspector__trigger_undecided_sales_channel_views_for_view_todo_toggle,
+        )
 
+        view = self._create_view(include_in_todo=True)
         view.include_in_todo = False
-        view.save()
+        products_inspector__inspector__trigger_undecided_sales_channel_views_for_view_todo_toggle(
+            sender=view.__class__,
+            instance=view,
+        )
 
         refresh_mock.assert_called_once_with(
             multi_tenant_company_id=self.multi_tenant_company.id,

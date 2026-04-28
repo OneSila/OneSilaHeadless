@@ -85,8 +85,8 @@ PUBLIC_ISSUES_QUERY = """
 query PublicIssues($search: String!, $categoryCode: String!, $integrationType: String!) {
   publicIssues(filters: {
     search: $search,
-    categoryCode: $categoryCode,
-    integrationTypeType: $integrationType
+    categories: {code: {exact: $categoryCode}},
+    integrationType: {type: {exact: $integrationType}}
   }) {
     edges {
       node {

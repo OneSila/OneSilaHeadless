@@ -120,11 +120,13 @@ class CleanTranslationFieldMutationTestCase(TransactionTestCaseMixin, Transactio
             product_translation=self.translation,
             text="Bullet 1",
             sort_order=0,
+            multi_tenant_company=self.multi_tenant_company,
         )
         ProductTranslationBulletPoint.objects.create(
             product_translation=self.translation,
             text="Bullet 2",
             sort_order=1,
+            multi_tenant_company=self.multi_tenant_company,
         )
 
     def test_clean_translation_field_short_description(self):
@@ -169,7 +171,7 @@ class CleanTranslationFieldMutationTestCase(TransactionTestCaseMixin, Transactio
                 "translation": {"id": self.to_global_id(other_translation)},
                 "field": "SHORT_DESCRIPTION",
             },
-            asserts_errors=False,
+            asserts_errors=True,
         )
 
         self.assertTrue(resp.errors is not None)

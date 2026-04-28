@@ -464,8 +464,9 @@ class WorkflowMutationTestCase(TransactionTestCaseMixin, TransactionTestCase):
             workflow=workflow,
             workflow_state=old_state,
             product=product,
-            multi_tenant_company=None,
+            multi_tenant_company=self.multi_tenant_company,
         )
+        WorkflowProductAssignment.objects.filter(id=assignment.id).update(multi_tenant_company_id=None)
 
         mutation = """
             mutation ($workflowState: WorkflowStatePartialInput!, $products: [ProductPartialInput!]!) {

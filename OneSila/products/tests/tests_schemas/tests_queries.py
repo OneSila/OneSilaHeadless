@@ -1041,7 +1041,7 @@ class ProductFilterIntegrationsQueryTestCase(ProductFilterQueryMixin, Transactio
         self.assertIsNone(resp.errors)
         node = resp.data["products"]["edges"][0]["node"]
         self.assertEqual(
-            node["rejectedSaleschannelviewassignSet"][0]["id"],
+            node["rejectedsaleschannelviewassignSet"][0]["id"],
             self.to_global_id(rejected),
         )
 

@@ -408,7 +408,7 @@ query Products($sku: String!) {
     edges {
       node {
         id
-        rejectedSaleschannelviewassignSet {
+        rejectedsaleschannelviewassignSet {
           id
           salesChannelView { id }
         }

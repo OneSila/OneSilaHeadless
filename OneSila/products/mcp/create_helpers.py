@@ -134,6 +134,7 @@ def run_create_product_with_sections(
                 properties=properties,
                 images=images,
                 sales_channel_view_ids=sales_channel_view_ids,
+                workflows=None,
             )
 
         return build_create_product_payload(

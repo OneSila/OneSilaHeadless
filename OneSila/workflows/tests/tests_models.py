@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import ProtectedError
 from django.test import TestCase
 
@@ -21,11 +22,12 @@ class WorkflowModelTestCase(TestCase):
 
     def test_workflow_code_is_unique_per_company(self):
         with self.assertRaises(IntegrityError):
-            Workflow.objects.create(
-                name="Duplicate",
-                code="ADD_PRODUCTS",
-                multi_tenant_company=self.company,
-            )
+            with transaction.atomic():
+                Workflow.objects.create(
+                    name="Duplicate",
+                    code="ADD_PRODUCTS",
+                    multi_tenant_company=self.company,
+                )
 
         other_workflow = Workflow.objects.create(
             name="Allowed in other tenant",
@@ -36,11 +38,11 @@ class WorkflowModelTestCase(TestCase):
 
     def test_workflow_code_is_generated_from_name_when_empty(self):
         workflow = Workflow.objects.create(
-            name="Add Products",
+            name="Import Products",
             multi_tenant_company=self.company,
         )
 
-        self.assertEqual(workflow.code, "ADD_PRODUCTS")
+        self.assertEqual(workflow.code, "IMPORT_PRODUCTS")
 
     def test_only_one_default_state_per_workflow(self):
         WorkflowState.objects.create(

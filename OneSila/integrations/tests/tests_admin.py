@@ -78,6 +78,7 @@ class PublicIssueRequestAdminTests(PublicIssueSchemaMixin, TransactionTestCase):
         public_issue_request = PublicIssueRequest.objects.create(
             integration_type=integration_type,
             issue="The integration log says SKU TEST-1 failed validation.",
+            multi_tenant_company=self.multi_tenant_company,
         )
 
         button = self.admin.create_public_issue_button(public_issue_request)
