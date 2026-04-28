@@ -430,7 +430,7 @@ class WorkflowMutationTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 "workflowState": {"id": self.to_global_id(workflow_state)},
                 "products": [{"id": self.to_global_id(other_product)}],
             },
-            asserts_errors=True,
+            asserts_errors=False,
         )
 
         self.assertIsNotNone(resp.errors)

@@ -171,7 +171,7 @@ class CleanTranslationFieldMutationTestCase(TransactionTestCaseMixin, Transactio
                 "translation": {"id": self.to_global_id(other_translation)},
                 "field": "SHORT_DESCRIPTION",
             },
-            asserts_errors=True,
+            asserts_errors=False,
         )
 
         self.assertTrue(resp.errors is not None)

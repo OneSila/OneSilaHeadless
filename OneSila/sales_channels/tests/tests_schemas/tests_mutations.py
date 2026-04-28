@@ -405,7 +405,7 @@ class ProductViewStatusMutationTestCase(TransactionTestCaseMixin, TransactionTes
         )
 
     def test_change_product_view_status_to_added_for_inactive_sales_channel_raises_error(self):
-        response = self._change_status(status="ADDED", view=self.inactive_view, asserts_errors=True)
+        response = self._change_status(status="ADDED", view=self.inactive_view, asserts_errors=False)
 
         self.assertIsNotNone(response.errors)
         self.assertIn("Cannot add a product view for an inactive sales channel.", response.errors[0]["message"])
