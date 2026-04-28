@@ -14,7 +14,6 @@ from core.schema.multi_tenant import MultiTenantQuery, MultiTenantMutation, Mult
 from core.schema.timezones import TimeZoneQuery
 from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSubscription
 from eancodes.schema import EanCodesQuery, EanCodesMutation, EanCodesSubscription
-from lead_times.schema import LeadTimesQuery
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
 from notifications.schema import NotificationsQuery, NotificationsMutation
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
@@ -58,7 +57,6 @@ class Query(
         IntegrationsQuery,
         ImportsExportsQuery,
         LanguageQuery,
-        LeadTimesQuery,
         MediaQuery,
         NotificationsQuery,
         MultiTenantQuery,

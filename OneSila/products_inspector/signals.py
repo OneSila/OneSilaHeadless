@@ -63,10 +63,6 @@ inspector_missing_supplier_prices_success = ModelSignal(use_caching=True)
 inspector_missing_stock_failed = ModelSignal(use_caching=True)
 inspector_missing_stock_success = ModelSignal(use_caching=True)
 
-# signals for missing lead time out of stock
-inspector_missing_lead_time_failed = ModelSignal(use_caching=True)
-inspector_missing_lead_time_success = ModelSignal(use_caching=True)
-
 # signals for missing price for manual pricelists
 inspector_missing_manual_pricelist_override_failed = ModelSignal(use_caching=True)
 inspector_missing_manual_pricelist_override_success = ModelSignal(use_caching=True)

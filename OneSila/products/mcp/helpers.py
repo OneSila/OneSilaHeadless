@@ -113,10 +113,6 @@ PRODUCT_INSPECTOR_ISSUE_METADATA = {
         "title": "Products Missing Stock",
         "description": "Ensure these products have stock or allow backorder.",
     },
-    115: {
-        "title": "Products Missing Lead Time When Out of Stock",
-        "description": "Specify lead times for these products when out of stock.",
-    },
     116: {
         "title": "Manual Price List Prices Missing Override Prices",
         "description": "Add override prices to manual price list prices where auto-update is disabled.",

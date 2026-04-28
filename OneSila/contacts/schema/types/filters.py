@@ -58,7 +58,6 @@ class InvoiceAddressFilter(SearchFilterMixin):
 class ShippingAddressFilter(SearchFilterMixin):
     id: auto
     company: CompanyFilter | None
-    leadtimeforshippingaddress: Optional[lazy['LeadTimeForShippingAddressFilter', "lead_times.schema.types.filters"]]
 
 
 @filter(InventoryShippingAddress)
