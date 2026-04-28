@@ -817,13 +817,19 @@ class MiraklProductPayloadBuilder:
         preferred_language = str(language_code or self.language or "").strip()
         if preferred_language:
             for translation in translations:
-                if translation.language == preferred_language and translation.sales_channel_id in (None, self.sales_channel.id):
+                if translation.language == preferred_language and translation.sales_channel_id == self.sales_channel.id:
+                    return translation
+            for translation in translations:
+                if translation.language == preferred_language and translation.sales_channel_id is None:
                     return translation
             for translation in translations:
                 if translation.language == preferred_language:
                     return translation
         for translation in translations:
-            if translation.sales_channel_id in (None, self.sales_channel.id):
+            if translation.sales_channel_id == self.sales_channel.id:
+                return translation
+        for translation in translations:
+            if translation.sales_channel_id is None:
                 return translation
         return translations[0]
 
@@ -1080,6 +1086,22 @@ class MiraklProductPayloadBuilder:
                     for point in translation.bullet_points.all()
                     if self._stringify(point.text)
                 ]
+            if not bullet_points:
+                sibling_translations = list(product_context.get("translations") or [])
+                for sibling_translation in sibling_translations:
+                    if translation is not None and sibling_translation.id == translation.id:
+                        continue
+                    if translation is not None and sibling_translation.language != translation.language:
+                        continue
+                    if sibling_translation.sales_channel_id not in (None, self.sales_channel.id):
+                        continue
+                    bullet_points = [
+                        self._stringify(point.text)
+                        for point in sibling_translation.bullet_points.all()
+                        if self._stringify(point.text)
+                    ]
+                    if bullet_points:
+                        break
         if not bullet_points:
             short_description = self._normalize_content_value(content_payload.get("shortDescription")) or product_context["short_description"]
             description = self._normalize_content_value(content_payload.get("description")) or product_context["description"]

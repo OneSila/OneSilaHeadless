@@ -1135,6 +1135,149 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["bullet_1"], "First shared bullet")
 
+    def test_bullet_point_representations_use_sales_channel_translation_bullets(self):
+        self.multi_tenant_company.language = "en"
+        self.multi_tenant_company.save(update_fields=["language"])
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="feature_1",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_BULLET_POINT
+        remote_property.save(update_fields=["local_instance", "representation_type"])
+
+        for remote_code in ["feature_2", "feature_3"]:
+            extra_property = baker.make(
+                MiraklProperty,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                code=remote_code,
+                type="TEXT",
+                local_instance=None,
+                representation_type=MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT,
+            )
+            baker.make(
+                MiraklPropertyApplicability,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                property=extra_property,
+                view=self.view,
+            )
+            baker.make(
+                MiraklProductTypeItem,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                product_type=MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1"),
+                remote_property=extra_property,
+                required=False,
+            )
+
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="Default name",
+        )
+        sales_channel_translation = ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=self.sales_channel,
+            name="Channel name",
+        )
+        for index in range(5):
+            ProductTranslationBulletPoint.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product_translation=sales_channel_translation,
+                text=f"Channel bullet {index + 1}",
+                sort_order=index,
+            )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["feature_1"], "Channel bullet 1")
+        self.assertEqual(rows[0]["feature_2"], "Channel bullet 2")
+        self.assertEqual(rows[0]["feature_3"], "Channel bullet 3")
+
+    def test_bullet_point_representations_use_default_translation_bullets(self):
+        self.multi_tenant_company.language = "en"
+        self.multi_tenant_company.save(update_fields=["language"])
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, remote_property, product = self._build_builder(
+            remote_code="feature_1",
+            local_property=local_property,
+            required=False,
+        )
+        remote_property.local_instance = None
+        remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_BULLET_POINT
+        remote_property.save(update_fields=["local_instance", "representation_type"])
+
+        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        for remote_code in ["feature_2", "feature_3"]:
+            extra_property = baker.make(
+                MiraklProperty,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                code=remote_code,
+                type="TEXT",
+                local_instance=None,
+                representation_type=MiraklProperty.REPRESENTATION_PRODUCT_BULLET_POINT,
+            )
+            baker.make(
+                MiraklPropertyApplicability,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                property=extra_property,
+                view=self.view,
+            )
+            baker.make(
+                MiraklProductTypeItem,
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                product_type=product_type,
+                remote_property=extra_property,
+                required=False,
+            )
+
+        ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=self.sales_channel,
+            name="Channel name",
+        )
+        default_translation = ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language="en",
+            sales_channel=None,
+            name="Default name",
+        )
+        for index in range(5):
+            ProductTranslationBulletPoint.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product_translation=default_translation,
+                text=f"Default bullet {index + 1}",
+                sort_order=index,
+            )
+
+        _, rows = builder.build()
+
+        self.assertEqual(rows[0]["feature_1"], "Default bullet 1")
+        self.assertEqual(rows[0]["feature_2"], "Default bullet 2")
+        self.assertEqual(rows[0]["feature_3"], "Default bullet 3")
+
     def test_configurable_variations_reuse_parent_content_and_prefer_variation_images(self):
         parent_product = baker.make(
             "products.Product",
