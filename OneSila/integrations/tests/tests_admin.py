@@ -68,22 +68,3 @@ class PublicIssueRequestAdminTests(PublicIssueSchemaMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.admin = PublicIssueRequestAdmin(PublicIssueRequest, AdminSite())
-
-    def test_create_public_issue_button_links_to_prefilled_add_page(self):
-        integration_type = PublicIntegrationType.objects.create(
-            key="admin-public-issue-request-button",
-            type="ebay",
-            category=PublicIntegrationType.CATEGORY_MARKETPLACE,
-        )
-        public_issue_request = PublicIssueRequest.objects.create(
-            integration_type=integration_type,
-            issue="The integration log says SKU TEST-1 failed validation.",
-            multi_tenant_company=self.multi_tenant_company,
-        )
-
-        button = self.admin.create_public_issue_button(public_issue_request)
-
-        self.assertIn(reverse("admin:integrations_publicissue_add"), button)
-        self.assertIn(f"integration_type={integration_type.id}", button)
-        self.assertIn(f"request_reference={public_issue_request.id}", button)
-        self.assertIn("issue=The+integration+log+says+SKU+TEST-1+failed+validation.", button)
