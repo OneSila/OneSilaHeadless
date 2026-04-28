@@ -1,6 +1,5 @@
 from django.db import transaction
 
-from contacts.models import InternalCompany, Address
 from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password

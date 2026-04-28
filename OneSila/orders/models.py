@@ -2,7 +2,6 @@ from core import models
 from currency_converter import CurrencyConverter, RateNotFoundError
 
 from .managers import OrderItemManager, OrderManager
-from .documents import PrintOrder
 
 
 class Order(models.SetStatusMixin, models.Model):
@@ -33,13 +32,6 @@ class Order(models.SetStatusMixin, models.Model):
 
     def __str__(self):
         return '#{}'.format(self.id)
-
-    def print(self):
-        filename = f"{self.reference or self.__str__()}.pdf"
-        printer = PrintOrder(self)
-        printer.generate()
-        pdf = printer.pdf
-        return filename, pdf
 
     def total_value_custom_currency(self, currency_symbol):
         '''return the total_value in the given currency'''
