@@ -16,7 +16,6 @@ from sales_channels.models import (
     RemoteCustomer,
     RemoteImage,
     RemoteImageProductAssociation,
-    RemoteInventory,
     RemoteLog,
     RemoteOrder,
     RemoteProduct,
@@ -105,11 +104,6 @@ class RemoteImageOrder:
 
 @order(RemoteImageProductAssociation)
 class RemoteImageProductAssociationOrder:
-    id: auto
-
-
-@order(RemoteInventory)
-class RemoteInventoryOrder:
     id: auto
 
 

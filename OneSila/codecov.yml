@@ -1,0 +1,8 @@
+ignore:
+  - "OneSila/settings/**/*"
+  - "telegram_bot/**/*"
+  - "customs/**/*"
+  - "orders/**/*"
+  - "webhooks/**/*"
+  - "lead_times/**/*"
+  - "contacts/**/*"

@@ -2,7 +2,6 @@ from core import models
 from currency_converter import CurrencyConverter, RateNotFoundError
 
 from .managers import OrderItemManager, OrderManager
-from .documents import PrintOrder
 
 
 class Order(models.SetStatusMixin, models.Model):
@@ -31,23 +30,8 @@ class Order(models.SetStatusMixin, models.Model):
         else:
             return total_value
 
-    @property
-    def on_stock(self):
-        if self.status not in self.DONE_TYPES:
-            for i in self.orderitem_set.all():
-                if i.qty_on_stock() < i.quantity:
-                    return False
-            return True
-
     def __str__(self):
         return '#{}'.format(self.id)
-
-    def print(self):
-        filename = f"{self.reference or self.__str__()}.pdf"
-        printer = PrintOrder(self)
-        printer.generate()
-        pdf = printer.pdf
-        return filename, pdf
 
     def total_value_custom_currency(self, currency_symbol):
         '''return the total_value in the given currency'''
@@ -85,19 +69,6 @@ class OrderItem(models.Model):
         currency_symbol = self.order.currency.symbol
         subtotal = self.subtotal
         return f"{currency_symbol} {subtotal}"
-
-    def qty_on_stock(self):
-        # Firstly, dont bother calculating this for order-items that dont need processing
-        # it's a expensive function
-        if self.order.status not in Order.DONE_TYPES:
-            # It can often happen that an order looks to be on stock, but if we look closer
-            # and compare with older, unprocessed orders, we'll be short on stock.
-            # So first deduct the required items for older orders and then check.
-            older_orderitems_with_identical_items = OrderItem.objects.filter(
-                order__id__lt=self.order.id,
-                product=self.product).exclude(order__status__in=Order.DONE_TYPES)
-            older_required_quantity = sum([i.quantity for i in older_orderitems_with_identical_items])
-            return self.product.inventory.physical() - older_required_quantity
 
     @property
     def value_gbp(self):

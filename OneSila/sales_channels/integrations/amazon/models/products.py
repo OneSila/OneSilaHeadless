@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from sales_channels.models.products import (
     RemoteProduct,
-    RemoteInventory,
     RemotePrice,
     RemoteProductContent,
     RemoteImageProductAssociation,
@@ -131,11 +130,6 @@ class AmazonProduct(RemoteProduct):
             return self.STATUS_COMPLETED
 
         return self.STATUS_PARTIALLY_LISTED
-
-
-class AmazonInventory(RemoteInventory):
-    """Amazon specific remote inventory."""
-    pass
 
 
 class AmazonPrice(RemotePrice):

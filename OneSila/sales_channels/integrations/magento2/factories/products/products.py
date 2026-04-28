@@ -11,7 +11,7 @@ from sales_channels.integrations.magento2.factories.products.images import Magen
     MagentoMediaProductThroughDeleteFactory
 from sales_channels.integrations.magento2.factories.properties.properties import MagentoProductPropertyCreateFactory, MagentoProductPropertyUpdateFactory, \
     MagentoProductPropertyDeleteFactory, MagentoAttributeSetCreateFactory
-from sales_channels.integrations.magento2.models import MagentoProduct, MagentoInventory, MagentoPrice, MagentoProductContent, \
+from sales_channels.integrations.magento2.models import MagentoProduct, MagentoPrice, MagentoProductContent, \
     MagentoProductProperty
 from sales_channels.integrations.magento2.models.products import MagentoEanCode
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet
@@ -288,7 +288,6 @@ class MagentoProductUpdateFactory(RemoteProductUpdateFactory, MagentoProductSync
 
 
 class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSyncFactory):
-    remote_inventory_class = MagentoInventory
     remote_price_class = MagentoPrice
     remote_product_content_class = MagentoProductContent
     remote_product_eancode_class = MagentoEanCode

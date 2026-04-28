@@ -1,6 +1,5 @@
 from sales_channels.models.products import (
     RemoteProduct,
-    RemoteInventory,
     RemotePrice,
     RemoteProductContent,
     RemoteImageProductAssociation,
@@ -11,13 +10,6 @@ from sales_channels.models.products import (
 class MagentoProduct(RemoteProduct):
     """
     Magento-specific model for remote products, inheriting from the general RemoteProduct.
-    """
-    pass
-
-
-class MagentoInventory(RemoteInventory):
-    """
-    Magento-specific model for remote inventory, inheriting from the general RemoteInventory.
     """
     pass
 

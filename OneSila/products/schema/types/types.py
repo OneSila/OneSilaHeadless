@@ -38,7 +38,6 @@ from products.models import (
 from decimal import Decimal
 
 from strawberry.relay.utils import to_base64
-from contacts.schema.types.types import CompanyType
 from core.schema.core.types.types import relay, type, field, Annotated, lazy, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin, GetProductQuerysetMultiTenantMixin
 

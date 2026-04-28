@@ -1,7 +1,4 @@
-from contacts.schema.types.input import CustomerPartialInput
-from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
-from typing import List, Optional
 from sales_prices.models import SalesPrice, SalesPriceList, \
     SalesPriceListItem
 
@@ -16,14 +13,14 @@ class SalesPricePartialInput(NodeInput):
     pass
 
 
-@input(SalesPriceList, fields="__all__")
+@input(SalesPriceList, fields="__all__", exclude=["customers"])
 class SalesPriceListInput:
-    customers: Optional[List[CustomerPartialInput]]
+    pass
 
 
-@partial(SalesPriceList, fields="__all__")
+@partial(SalesPriceList, fields="__all__", exclude=["customers"])
 class SalesPriceListPartialInput(NodeInput):
-    customers: Optional[List[CustomerPartialInput]]
+    pass
 
 
 @input(SalesPriceListItem, fields="__all__")

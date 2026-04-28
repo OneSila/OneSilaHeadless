@@ -28,7 +28,6 @@ from .products import (
     RemoteImage,
     RemoteProductContent,
     RemotePrice,
-    RemoteInventory,
     RemoteCategory,
     RemoteImageProductAssociation,
     RemoteEanCode,

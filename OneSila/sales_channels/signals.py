@@ -13,7 +13,6 @@ create_remote_product_property = ModelSignal(use_caching=True)
 update_remote_product_property = ModelSignal(use_caching=True)
 delete_remote_product_property = ModelSignal(use_caching=True)
 
-update_remote_inventory = ModelSignal(use_caching=True)
 update_remote_price = ModelSignal(use_caching=True)
 update_remote_product_content = ModelSignal(use_caching=True)
 

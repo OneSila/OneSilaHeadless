@@ -1,6 +1,6 @@
 from .orders import AmazonOrder, AmazonOrderItem
 from .products import (
-    AmazonProduct, AmazonInventory, AmazonPrice,
+    AmazonProduct, AmazonPrice,
     AmazonProductContent, AmazonImageProductAssociation,
     AmazonCategory, AmazonEanCode, AmazonExternalProductId,
     AmazonGtinExemption, AmazonVariationTheme

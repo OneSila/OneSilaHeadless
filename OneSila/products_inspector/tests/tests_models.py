@@ -5,7 +5,6 @@ from currencies.currencies import currencies
 from currencies.models import Currency
 from eancodes.models import EanCode
 from eancodes.signals import ean_code_released_for_product
-from inventory.models import Inventory, InventoryLocation
 from products.models import ConfigurableProduct, SimpleProduct, BundleVariation, BundleProduct, ConfigurableVariation
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceSalesChannelView
 from sales_channels.models import SalesChannelViewAssign
@@ -673,79 +672,6 @@ class InspectorBlockMissingPropertiesTest(TestCase):
         self.assertTrue(inspector_block.successfully_checked)
         self.assertIsNone(inspector_block.fixing_message)
 
-
-# class InspectorBlockMissingStockTest(TestCase):
-#
-#     def setUp(self):
-#         super().setUp()
-#         self.simple_product = SimpleProduct.objects.create(
-#             multi_tenant_company=self.multi_tenant_company,
-#             active=True,
-#             allow_backorder=False
-#         )
-#
-#         self.dropship_product = DropshipProduct.objects.create(
-#             multi_tenant_company=self.multi_tenant_company,
-#             active=True,
-#             allow_backorder=False
-#         )
-#
-#         self.supplier = Supplier.objects.create(name="Supplier Company", multi_tenant_company=self.multi_tenant_company)
-#         self.shipping_address = ShippingAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.supplier)
-#         self.inventory_location, _ = InventoryLocation.objects.get_or_create(
-#             shippingaddress=self.shipping_address,
-#             name='InventoryTestCase',
-#             multi_tenant_company=self.multi_tenant_company)
-#
-#
-#     def test_inspector_block_missing_stock_with_no_backorder(self):
-#         # Test missing stock with no backorder allowed for SimpleProduct
-#
-#         inspector_block = self.simple_product.inspector.blocks.get(error_code=MISSING_STOCK_ERROR)
-#         inspector_block.refresh_from_db()
-#
-#         # The product has no stock, no backorder allowed, and is active and for sale
-#         self.assertFalse(inspector_block.successfully_checked)
-#
-#         # Now, add stock to the product
-#         self.supplier_inventory.quantity = 10
-#         self.supplier_inventory.save()
-#
-#         # Refresh the inspector block after updating the stock
-#         inspector_block.refresh_from_db()
-#
-#         self.assertTrue(inspector_block.successfully_checked)
-#
-#     def test_inspector_block_missing_stock_with_backorder_allowed(self):
-#         # Test missing stock but with backorder allowed for DropshipProduct
-#
-#         # Update the product to allow backorder
-#         self.dropship_product.allow_backorder = True
-#         self.dropship_product.save()
-#
-#         inspector_block = self.dropship_product.inspector.blocks.get(error_code=MISSING_STOCK_ERROR)
-#         inspector_block.refresh_from_db()
-#
-#         # The product allows backorder, so the inspector block should be successfully checked
-#         self.assertTrue(inspector_block.successfully_checked)
-#
-#     def test_inspector_block_missing_stock_on_inventory_deletion(self):
-#         # First, set some stock so the inspector block is successful
-#         self.supplier_inventory.quantity = 10
-#         self.supplier_inventory.save()
-#
-#         inspector_block = self.simple_product.inspector.blocks.get(error_code=MISSING_STOCK_ERROR)
-#         inspector_block.refresh_from_db()
-#
-#         self.assertTrue(inspector_block.successfully_checked)
-#
-#         # Now delete the inventory and check the inspector block again
-#         self.supplier_inventory.delete()
-#
-#         inspector_block.refresh_from_db()
-#
-#         # The product should now be flagged as missing stock
-#         self.assertFalse(inspector_block.successfully_checked)
 
 class InspectorBlockMissingManualPriceListOverrideTest(TestCase):
 

@@ -204,18 +204,6 @@ def sales_channels__magento__product_property__delete(sender, instance, **kwargs
     )
     task_runner.run()
 
-# @receiver(update_remote_inventory, sender='products.Product')
-# def sales_channels__magento__inventory__update(sender, instance, **kwargs):
-#     from .tasks import update_magento_inventory_db_task
-#
-#     task_kwargs = {'product_id': instance.id}
-#     run_product_specific_sales_channel_task_flow(
-#         task_func=update_magento_inventory_db_task,
-#         multi_tenant_company=instance.multi_tenant_company,
-#         product=instance,
-#         **task_kwargs)
-
-
 @receiver(update_remote_price, sender='products.Product')
 def sales_channels__magento__price__update(sender, instance, **kwargs):
     from .tasks import update_magento_price_db_task
