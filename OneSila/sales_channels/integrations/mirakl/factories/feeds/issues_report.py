@@ -20,7 +20,7 @@ from sales_channels.integrations.mirakl.utils.offer_fields import add_offer_fiel
 
 
 class MiraklTransformationErrorReportIssueSyncFactory:
-    """Parse Mirakl product import issue reports and upsert product issues."""
+    """Parse Mirakl product import issue reports and persist product issues."""
 
     SOURCE_ERROR_REPORT_ERROR = "error_report_error"
     SOURCE_ERROR_REPORT_WARNING = "error_report_warning"
@@ -32,17 +32,24 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         self.sales_channel = self._resolve_sales_channel_instance(feed=feed)
         self.sku_headers = self._get_candidate_sku_headers()
         self.ean_headers = self._get_candidate_ean_headers()
+        self._cleared_issue_source_keys: set[tuple[int, str]] = set()
 
     def run(self) -> int:
         remote_product_lookup = self._build_remote_product_lookup()
         touched_remote_product_ids: set[int] = set()
-        synced_issues = self._sync_csv_error_report(
+        synced_issues = self._sync_report(
+            file_field=self.feed.error_report_file,
             remote_product_lookup=remote_product_lookup,
             touched_remote_product_ids=touched_remote_product_ids,
+            source_error=self.SOURCE_ERROR_REPORT_ERROR,
+            source_warning=self.SOURCE_ERROR_REPORT_WARNING,
         )
-        synced_issues += self._sync_transformation_error_report(
+        synced_issues += self._sync_report(
+            file_field=self.feed.transformation_error_report_file,
             remote_product_lookup=remote_product_lookup,
             touched_remote_product_ids=touched_remote_product_ids,
+            source_error=self.SOURCE_TRANSFORMATION_ERROR,
+            source_warning=self.SOURCE_TRANSFORMATION_WARNING,
         )
 
         self._refresh_remote_product_statuses(
@@ -50,31 +57,28 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         )
         return synced_issues
 
-    def _sync_csv_error_report(
+    def _sync_report(
         self,
         *,
+        file_field,
         remote_product_lookup: dict[str, MiraklProduct],
         touched_remote_product_ids: set[int],
+        source_error: str,
+        source_warning: str,
     ) -> int:
-        if not self.feed.error_report_file:
+        if not file_field:
             return 0
 
         try:
-            with self.feed.error_report_file.open("rb") as file_handle:
+            with file_field.open("rb") as file_handle:
                 content = file_handle.read()
         except OSError:
             return 0
         if not content:
             return 0
 
-        text = self._decode_csv_bytes(content=content)
-        if not text.strip():
-            return 0
-
         synced_issues = 0
-        dialect = self._detect_csv_dialect(text=text)
-        for raw_row in csv.DictReader(io.StringIO(text), dialect=dialect):
-            row = self._normalize_mapping_row(raw_row=raw_row)
+        for row_index, row in self._iter_report_rows(file_field=file_field, content=content):
             if not row:
                 continue
             remote_product = self._resolve_remote_product(
@@ -87,62 +91,67 @@ class MiraklTransformationErrorReportIssueSyncFactory:
             synced_issues += self._upsert_issues(
                 remote_product=remote_product,
                 row=row,
-                source_error=self.SOURCE_ERROR_REPORT_ERROR,
-                source_warning=self.SOURCE_ERROR_REPORT_WARNING,
+                row_index=row_index,
+                source_error=source_error,
+                source_warning=source_warning,
             )
             touched_remote_product_ids.add(remote_product.id)
         return synced_issues
 
-    def _sync_transformation_error_report(
+    def _iter_report_rows(
         self,
         *,
-        remote_product_lookup: dict[str, MiraklProduct],
-        touched_remote_product_ids: set[int],
-    ) -> int:
-        if not self.feed.transformation_error_report_file:
-            return 0
-
-        filename = str(getattr(self.feed.transformation_error_report_file, "name", "") or "")
+        file_field,
+        content: bytes,
+    ) -> Iterable[tuple[int, dict[str, str]]]:
+        filename = str(getattr(file_field, "name", "") or "")
         extension = os.path.splitext(filename)[1].lower()
-        if extension not in {".xlsx", ".xlsm"}:
-            return 0
+        if extension in {".xlsx", ".xlsm"} or content.startswith(b"PK"):
+            rows = list(self._iter_workbook_rows(content=content))
+            if rows:
+                return rows
+            return list(self._iter_csv_rows(content=content))
 
-        synced_issues = 0
-        with self.feed.transformation_error_report_file.open("rb") as file_handle:
-            try:
-                workbook = load_workbook(filename=file_handle, read_only=True, data_only=True)
-            except (InvalidFileException, OSError, ValueError, EOFError, KeyError, RuntimeError, TypeError):
-                return 0
+        rows = list(self._iter_csv_rows(content=content))
+        if rows:
+            return rows
+        return list(self._iter_workbook_rows(content=content))
 
-            try:
-                worksheet = workbook.active
-                row_iter = worksheet.iter_rows(values_only=True)
-                headers = next(row_iter, None)
-                if not headers:
-                    return 0
+    def _iter_csv_rows(self, *, content: bytes) -> Iterable[tuple[int, dict[str, str]]]:
+        text = self._decode_csv_bytes(content=content)
+        if not text.strip():
+            return []
 
-                normalized_headers = [self._normalize_header(value=header) for header in headers]
-                for values in row_iter:
-                    row = self._build_row(headers=headers, normalized_headers=normalized_headers, values=values)
-                    if not row:
-                        continue
-                    remote_product = self._resolve_remote_product(
-                        row=row,
-                        remote_product_lookup=remote_product_lookup,
-                    )
-                    if remote_product is None:
-                        continue
+        rows: list[tuple[int, dict[str, str]]] = []
+        dialect = self._detect_csv_dialect(text=text)
+        for row_index, raw_row in enumerate(csv.DictReader(io.StringIO(text), dialect=dialect), start=1):
+            row = self._normalize_mapping_row(raw_row=raw_row)
+            if row:
+                rows.append((row_index, row))
+        return rows
 
-                    synced_issues += self._upsert_issues(
-                        remote_product=remote_product,
-                        row=row,
-                        source_error=self.SOURCE_TRANSFORMATION_ERROR,
-                        source_warning=self.SOURCE_TRANSFORMATION_WARNING,
-                    )
-                    touched_remote_product_ids.add(remote_product.id)
-            finally:
-                workbook.close()
-        return synced_issues
+    def _iter_workbook_rows(self, *, content: bytes) -> Iterable[tuple[int, dict[str, str]]]:
+        try:
+            workbook = load_workbook(filename=io.BytesIO(content), read_only=True, data_only=True)
+        except (InvalidFileException, OSError, ValueError, EOFError, KeyError, RuntimeError, TypeError):
+            return []
+
+        rows: list[tuple[int, dict[str, str]]] = []
+        try:
+            worksheet = workbook.active
+            row_iter = worksheet.iter_rows(values_only=True)
+            headers = next(row_iter, None)
+            if not headers:
+                return []
+
+            normalized_headers = [self._normalize_header(value=header) for header in headers]
+            for row_index, values in enumerate(row_iter, start=1):
+                row = self._build_row(headers=headers, normalized_headers=normalized_headers, values=values)
+                if row:
+                    rows.append((row_index, row))
+        finally:
+            workbook.close()
+        return rows
 
     def _resolve_sales_channel_instance(self, *, feed):
         sales_channel = feed.sales_channel
@@ -293,17 +302,22 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         *,
         remote_product: MiraklProduct,
         row: dict[str, str],
+        row_index: int,
         source_error: str,
         source_warning: str,
     ) -> int:
+        self._clear_existing_report_issues(
+            remote_product=remote_product,
+            sources=(source_error, source_warning),
+        )
         created_or_updated = 0
         line_number = row.get("line_number") or row.get("line_number_") or row.get("line")
         for source, severity, column_name, is_rejected in (
             (source_error, "ERROR", "errors", source_error == self.SOURCE_ERROR_REPORT_ERROR),
             (source_warning, "WARNING", "warnings", False),
         ):
-            for code, message in self._parse_issue_entries(value=row.get(column_name, "")):
-                self._upsert_issue(
+            for entry_index, (code, message) in enumerate(self._parse_issue_entries(value=row.get(column_name, "")), start=1):
+                self._create_issue(
                     remote_product=remote_product,
                     source=source,
                     severity=severity,
@@ -311,12 +325,31 @@ class MiraklTransformationErrorReportIssueSyncFactory:
                     code=code,
                     message=message,
                     line_number=line_number,
+                    row_index=row_index,
+                    column_name=column_name,
+                    entry_index=entry_index,
                     row=row,
                 )
                 created_or_updated += 1
         return created_or_updated
 
-    def _upsert_issue(
+    def _clear_existing_report_issues(
+        self,
+        *,
+        remote_product: MiraklProduct,
+        sources: tuple[str, str],
+    ) -> None:
+        for source in sources:
+            key = (remote_product.id, source)
+            if key in self._cleared_issue_source_keys:
+                continue
+            MiraklProductIssue.objects.filter(
+                remote_product=remote_product,
+                raw_data__source=source,
+            ).delete()
+            self._cleared_issue_source_keys.add(key)
+
+    def _create_issue(
         self,
         *,
         remote_product: MiraklProduct,
@@ -326,54 +359,32 @@ class MiraklTransformationErrorReportIssueSyncFactory:
         code: str,
         message: str | None,
         line_number: str | None,
+        row_index: int,
+        column_name: str,
+        entry_index: int,
         row: dict[str, str],
     ) -> None:
-        issue = (
-            MiraklProductIssue.objects.filter(
-                remote_product=remote_product,
-                main_code=code,
-                severity=severity,
-                raw_data__source=source,
-            )
-            .order_by("id")
-            .first()
-        )
         raw_data = {
             "source": source,
             "feed_id": self.feed.id,
             "line_number": line_number,
+            "row_index": row_index,
+            "column_name": column_name,
+            "entry_index": entry_index,
             "row": row,
         }
-        if issue is None:
-            issue = MiraklProductIssue.objects.create(
-                multi_tenant_company=remote_product.multi_tenant_company,
-                remote_product=remote_product,
-                main_code=code,
-                code=code,
-                message=message,
-                severity=severity,
-                reason_label=None,
-                attribute_code=None,
-                is_rejected=is_rejected,
-                raw_data=raw_data,
-            )
-        else:
-            issue.code = code
-            issue.message = message
-            issue.reason_label = None
-            issue.attribute_code = None
-            issue.is_rejected = is_rejected
-            issue.raw_data = raw_data
-            issue.save(
-                update_fields=[
-                    "code",
-                    "message",
-                    "reason_label",
-                    "attribute_code",
-                    "is_rejected",
-                    "raw_data",
-                ]
-            )
+        issue = MiraklProductIssue.objects.create(
+            multi_tenant_company=remote_product.multi_tenant_company,
+            remote_product=remote_product,
+            main_code=code,
+            code=code,
+            message=message,
+            severity=severity,
+            reason_label=None,
+            attribute_code=None,
+            is_rejected=is_rejected,
+            raw_data=raw_data,
+        )
 
         if self.feed.sales_channel_view_id:
             issue.views.set([self.feed.sales_channel_view])

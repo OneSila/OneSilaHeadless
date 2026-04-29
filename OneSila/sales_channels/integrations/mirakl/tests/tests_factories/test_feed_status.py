@@ -324,6 +324,170 @@ class MiraklImportStatusSyncFactoryTests(DisableMiraklConnectionMixin, TestCase)
         self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
         new_product_report_mock.assert_called_once()
 
+    def test_run_marks_feed_partial_when_transformation_failed_for_some_items(self):
+        submitted_feed = baker.make(
+            MiraklSalesChannelFeed,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            remote_id="2012",
+            product_remote_id="2012",
+        )
+        clean_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="SKU-TRANSFORM-CLEAN",
+            syncing_current_percentage=100,
+        )
+        rejected_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="SKU-TRANSFORM-REJECTED",
+            syncing_current_percentage=100,
+        )
+        clean_feed_item = baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=submitted_feed,
+            remote_product=clean_remote_product,
+            status=MiraklSalesChannelFeedItem.STATUS_PENDING,
+        )
+        rejected_feed_item = baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=submitted_feed,
+            remote_product=rejected_remote_product,
+            status=MiraklSalesChannelFeedItem.STATUS_PENDING,
+        )
+        baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=rejected_remote_product,
+            code="1000",
+            main_code="1000",
+            severity="ERROR",
+            message="Transformation validation failed.",
+            raw_data={"source": "transformation_error_report_error"},
+        )
+        tracking = {
+            "import_id": 2012,
+            "import_status": "TRANSFORMATION_FAILED",
+            "reason_status": "Transformation failed",
+            "has_error_report": False,
+            "has_new_product_report": False,
+            "has_transformation_error_report": True,
+            "has_transformed_file": False,
+            "transform_lines_read": 2,
+            "transform_lines_in_success": 1,
+            "transform_lines_in_error": 1,
+            "transform_lines_with_warning": 0,
+        }
+        download_response = Mock(
+            status_code=200,
+            content=b"report-content",
+            headers={"Content-Type": "text/csv"},
+        )
+
+        with patch.object(
+            MiraklImportStatusSyncFactory,
+            "mirakl_paginated_get",
+            return_value=[tracking],
+        ), patch.object(
+            MiraklImportStatusSyncFactory,
+            "_request",
+            side_effect=[download_response],
+        ):
+            MiraklImportStatusSyncFactory(sales_channel=self.sales_channel).run()
+
+        submitted_feed.refresh_from_db()
+        clean_feed_item.refresh_from_db()
+        rejected_feed_item.refresh_from_db()
+        clean_remote_product.refresh_from_db()
+        rejected_remote_product.refresh_from_db()
+
+        self.assertEqual(submitted_feed.status, MiraklSalesChannelFeed.STATUS_PARTIAL)
+        self.assertEqual(clean_feed_item.status, MiraklSalesChannelFeedItem.STATUS_SUCCESS)
+        self.assertEqual(rejected_feed_item.status, MiraklSalesChannelFeedItem.STATUS_FAILED)
+        self.assertEqual(clean_remote_product.status, MiraklProduct.STATUS_COMPLETED)
+        self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
+    def test_run_marks_feed_failed_when_transformation_failed_for_all_items(self):
+        submitted_feed = baker.make(
+            MiraklSalesChannelFeed,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            type=MiraklSalesChannelFeed.TYPE_COMBINED,
+            status=MiraklSalesChannelFeed.STATUS_SUBMITTED,
+            remote_id="2013",
+            product_remote_id="2013",
+        )
+        rejected_remote_product = baker.make(
+            MiraklProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_sku="SKU-TRANSFORM-ONLY-REJECTED",
+            syncing_current_percentage=100,
+        )
+        rejected_feed_item = baker.make(
+            MiraklSalesChannelFeedItem,
+            multi_tenant_company=self.multi_tenant_company,
+            feed=submitted_feed,
+            remote_product=rejected_remote_product,
+            status=MiraklSalesChannelFeedItem.STATUS_PENDING,
+        )
+        baker.make(
+            MiraklProductIssue,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=rejected_remote_product,
+            code="1000",
+            main_code="1000",
+            severity="ERROR",
+            message="Transformation validation failed.",
+            raw_data={"source": "transformation_error_report_error"},
+        )
+        tracking = {
+            "import_id": 2013,
+            "import_status": "TRANSFORMATION_FAILED",
+            "reason_status": "Transformation failed",
+            "has_error_report": False,
+            "has_new_product_report": False,
+            "has_transformation_error_report": True,
+            "has_transformed_file": False,
+            "transform_lines_read": 1,
+            "transform_lines_in_success": 0,
+            "transform_lines_in_error": 1,
+            "transform_lines_with_warning": 0,
+        }
+        download_response = Mock(
+            status_code=200,
+            content=b"report-content",
+            headers={"Content-Type": "text/csv"},
+        )
+
+        with patch.object(
+            MiraklImportStatusSyncFactory,
+            "mirakl_paginated_get",
+            return_value=[tracking],
+        ), patch.object(
+            MiraklImportStatusSyncFactory,
+            "_request",
+            side_effect=[download_response],
+        ):
+            MiraklImportStatusSyncFactory(sales_channel=self.sales_channel).run()
+
+        submitted_feed.refresh_from_db()
+        rejected_feed_item.refresh_from_db()
+        rejected_remote_product.refresh_from_db()
+
+        self.assertEqual(submitted_feed.status, MiraklSalesChannelFeed.STATUS_FAILED)
+        self.assertEqual(submitted_feed.error_message, "Transformation failed")
+        self.assertEqual(rejected_feed_item.status, MiraklSalesChannelFeedItem.STATUS_FAILED)
+        self.assertEqual(rejected_feed_item.error_message, "Transformation validation failed.")
+        self.assertEqual(rejected_remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
     def test_run_uses_last_request_date_when_present(self):
         boundary = timezone.now() - timedelta(minutes=30)
         self.sales_channel.last_product_imports_request_date = boundary

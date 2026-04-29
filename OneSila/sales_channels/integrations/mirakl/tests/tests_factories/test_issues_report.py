@@ -188,6 +188,116 @@ class MiraklTransformationErrorReportIssueSyncFactoryTests(DisableMiraklConnecti
         self.remote_product.refresh_from_db()
         self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
 
+    def test_run_parses_csv_transformation_report_and_rejects_products(self):
+        self.feed.transformation_error_report_file.save(
+            "mirakl-product-transform-errors.csv",
+            ContentFile(
+                "\n".join(
+                    [
+                        '"product_category","product_id","ean","line_number","errors","warnings"',
+                        '"Toys/Dress Up & Role Play","ILFD4043XS+5029+1479-58","5056863153211","3","1000|The attribute main_image is required","3004|Description should be shorter"',
+                    ]
+                )
+            ),
+            save=True,
+        )
+
+        synced_issues = MiraklTransformationErrorReportIssueSyncFactory(feed=self.feed).run()
+
+        self.assertEqual(synced_issues, 2)
+        error_issue = MiraklProductIssue.objects.get(
+            remote_product=self.remote_product,
+            code="1000",
+        )
+        self.assertEqual(error_issue.severity, "ERROR")
+        self.assertFalse(error_issue.is_rejected)
+        self.assertEqual(error_issue.raw_data["source"], "transformation_error_report_error")
+        self.assertEqual(error_issue.raw_data["row_index"], 1)
+        self.assertEqual(error_issue.raw_data["column_name"], "errors")
+        self.assertEqual(error_issue.raw_data["entry_index"], 1)
+
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
+    def test_run_parses_xlsx_error_report_and_rejects_products(self):
+        self.feed.error_report_file.save(
+            "mirakl-product-errors.xlsx",
+            ContentFile(self._build_workbook_bytes()),
+            save=True,
+        )
+
+        synced_issues = MiraklTransformationErrorReportIssueSyncFactory(feed=self.feed).run()
+
+        self.assertEqual(synced_issues, 3)
+        error_issue = MiraklProductIssue.objects.get(
+            remote_product=self.remote_product,
+            code="1000",
+        )
+        self.assertEqual(error_issue.raw_data["source"], "error_report_error")
+        self.assertTrue(error_issue.is_rejected)
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, MiraklProduct.STATUS_APPROVAL_REJECTED)
+
+    def test_run_preserves_multiple_issues_with_same_code(self):
+        self.feed.error_report_file.save(
+            "mirakl-product-errors.csv",
+            ContentFile(
+                "\n".join(
+                    [
+                        '"product_category","product_id","ean","line_number","errors"',
+                        '"Toys/Dress Up & Role Play","ILFD4043XS+5029+1479-58","5056863153211","3","MCM-05000|The colour_hex_code attribute is required.,MCM-05000|The main_product_image attribute is required.,MCM-05000|The main_image attribute is required."',
+                    ]
+                )
+            ),
+            save=True,
+        )
+
+        synced_issues = MiraklTransformationErrorReportIssueSyncFactory(feed=self.feed).run()
+
+        self.assertEqual(synced_issues, 3)
+        issues = list(
+            MiraklProductIssue.objects.filter(
+                remote_product=self.remote_product,
+                code="MCM-05000",
+            ).order_by("id")
+        )
+        self.assertEqual(len(issues), 3)
+        self.assertEqual(
+            [issue.message for issue in issues],
+            [
+                "The colour_hex_code attribute is required.",
+                "The main_product_image attribute is required.",
+                "The main_image attribute is required.",
+            ],
+        )
+
+    def test_run_replaces_existing_report_issues_on_rerun(self):
+        self.feed.error_report_file.save(
+            "mirakl-product-errors.csv",
+            ContentFile(
+                "\n".join(
+                    [
+                        '"product_category","product_id","ean","line_number","errors"',
+                        '"Toys/Dress Up & Role Play","ILFD4043XS+5029+1479-58","5056863153211","3","MCM-05000|The colour_hex_code attribute is required.,MCM-05000|The main_image attribute is required."',
+                    ]
+                )
+            ),
+            save=True,
+        )
+
+        first_synced = MiraklTransformationErrorReportIssueSyncFactory(feed=self.feed).run()
+        second_synced = MiraklTransformationErrorReportIssueSyncFactory(feed=self.feed).run()
+
+        self.assertEqual(first_synced, 2)
+        self.assertEqual(second_synced, 2)
+        self.assertEqual(
+            MiraklProductIssue.objects.filter(
+                remote_product=self.remote_product,
+                code="MCM-05000",
+            ).count(),
+            2,
+        )
+
     def test_run_matches_payload_rows_with_namespaced_offer_keys(self):
         item = self.feed.items.get()
         item.payload_data = [

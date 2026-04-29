@@ -24,12 +24,11 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
     TRANSITIONAL_STATUSES = {
         "TRANSFORMATION_WAITING",
         "TRANSFORMATION_RUNNING",
-        "TRANSFORMATION_FAILED",
         "WAITING",
         "RUNNING",
         "SENT",
     }
-    FINAL_REMOTE_STATUSES = {"COMPLETE", "FAILED", "CANCELLED"}
+    FINAL_REMOTE_STATUSES = {"COMPLETE", "FAILED", "CANCELLED", "TRANSFORMATION_FAILED"}
 
     def __init__(self, *, sales_channel) -> None:
         self.sales_channel = sales_channel
@@ -152,10 +151,12 @@ class MiraklImportStatusSyncFactory(GetMiraklAPIMixin):
             return SalesChannelFeed.STATUS_CANCELLED
         if raw_status == "FAILED":
             return SalesChannelFeed.STATUS_FAILED
-        if raw_status == "COMPLETE":
+        if raw_status in {"COMPLETE", "TRANSFORMATION_FAILED"}:
             if feed.transform_lines_in_error and feed.transform_lines_in_success:
                 return SalesChannelFeed.STATUS_PARTIAL
             if feed.transform_lines_in_error:
+                return SalesChannelFeed.STATUS_FAILED
+            if raw_status == "TRANSFORMATION_FAILED":
                 return SalesChannelFeed.STATUS_FAILED
             return SalesChannelFeed.STATUS_SUCCESS
         return SalesChannelFeed.STATUS_SUBMITTED
