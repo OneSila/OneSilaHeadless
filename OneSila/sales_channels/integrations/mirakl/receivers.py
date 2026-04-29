@@ -2,6 +2,7 @@ from core.receivers import receiver
 from core.signals import post_create, post_update
 from sales_channels.integrations.mirakl.models import (
     MiraklProductCategory,
+    MiraklProductType,
     MiraklPropertySelectValue,
     MiraklSalesChannel,
     MiraklSalesChannelFeed,
@@ -60,6 +61,22 @@ def mirakl__property_select_value__propagate_local_mapping(sender, instance: Mir
     MiraklPropertySelectValueSiblingMappingFactory(
         remote_select_value=instance,
     ).run()
+
+
+@receiver(post_update, sender="mirakl.MiraklProductType")
+def mirakl__product_type__clone_remote_items(sender, instance: MiraklProductType, **kwargs):
+    if not instance.is_dirty_field("remote_id"):
+        return
+    if not instance.remote_id or not instance.local_instance_id:
+        return
+    if instance.items.exists():
+        return
+
+    from sales_channels.integrations.mirakl.factories.sync import (
+        MiraklProductTypeItemCloneFactory,
+    )
+
+    MiraklProductTypeItemCloneFactory(product_type=instance).run()
 
 
 @receiver(post_create, sender="mirakl.MiraklProductCategory")

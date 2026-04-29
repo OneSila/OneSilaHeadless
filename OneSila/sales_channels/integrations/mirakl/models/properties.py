@@ -155,14 +155,13 @@ class MiraklProductType(RemoteObjectMixin, models.Model):
         verbose_name_plural = "Mirakl Product Types"
         constraints = [
             models.UniqueConstraint(
-                fields=["sales_channel", "remote_id"],
-                name="unique_mirakl_product_type_per_channel",
-            ),
-            models.UniqueConstraint(
                 fields=["sales_channel", "local_instance"],
                 condition=models.Q(local_instance__isnull=False),
                 name="unique_mirakl_product_type_local_rule_per_channel",
             ),
+        ]
+        indexes = [
+            models.Index(fields=["sales_channel", "remote_id"]),
         ]
         search_terms = ["remote_id", "name"]
 

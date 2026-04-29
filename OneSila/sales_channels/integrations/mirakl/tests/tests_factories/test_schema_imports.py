@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from core.tests import TestCase
 from model_bakery import baker
-from properties.models import Property
+from properties.models import ProductPropertiesRule, Property, PropertySelectValue
 
 from sales_channels.integrations.mirakl.factories.imports.schema_imports import (
     MiraklSchemaImportProcessor,
@@ -141,6 +141,80 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             ),
             MiraklProperty.REPRESENTATION_PROPERTY,
         )
+
+    def test_sync_categories_updates_duplicate_remote_product_types(self):
+        product_type_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            is_product_type=True,
+            type=Property.TYPES.SELECT,
+        )
+        first_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=product_type_property,
+        )
+        second_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=product_type_property,
+        )
+        first_rule = baker.make(
+            ProductPropertiesRule,
+            multi_tenant_company=self.multi_tenant_company,
+            product_type=first_value,
+            sales_channel=self.sales_channel,
+        )
+        second_rule = baker.make(
+            ProductPropertiesRule,
+            multi_tenant_company=self.multi_tenant_company,
+            product_type=second_value,
+            sales_channel=None,
+        )
+        first_product_type = baker.make(
+            MiraklProductType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=first_rule,
+            remote_id="DUP",
+            name="Old",
+        )
+        second_product_type = baker.make(
+            MiraklProductType,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=second_rule,
+            remote_id="DUP",
+            name="Old",
+        )
+        factory = MiraklFullSchemaSyncFactory(
+            sales_channel=self.sales_channel,
+            import_process=self.import_process,
+        )
+
+        factory.sync_categories(
+            hierarchies=[
+                {
+                    "code": "DUP",
+                    "label": "Duplicate Category",
+                    "level": 1,
+                    "parent_code": "",
+                }
+            ]
+        )
+
+        self.assertEqual(
+            MiraklProductType.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_id="DUP",
+            ).count(),
+            2,
+        )
+        first_product_type.refresh_from_db()
+        second_product_type.refresh_from_db()
+        self.assertEqual(first_product_type.name, "Duplicate Category")
+        self.assertEqual(second_product_type.name, "Duplicate Category")
+        self.assertEqual(first_product_type.category, second_product_type.category)
 
     def test_detect_representation_type_keeps_video_named_property_as_property(self):
         factory = MiraklFullSchemaSyncFactory(
@@ -670,14 +744,14 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
                 {"name": "format", "value": "text"},
             ],
         )
-        child_product_type = MiraklProductType.objects.get(
+        child_product_type = MiraklProductType.objects.filter(
             sales_channel=self.sales_channel,
             remote_id="CHILD",
-        )
-        parent_product_type = MiraklProductType.objects.get(
+        ).order_by("id").first()
+        parent_product_type = MiraklProductType.objects.filter(
             sales_channel=self.sales_channel,
             remote_id="PARENT",
-        )
+        ).order_by("id").first()
         self.assertEqual(
             MiraklProductTypeItem.objects.filter(product_type=child_product_type, remote_property=color_property).count(),
             1,
@@ -870,8 +944,16 @@ class MiraklFullSchemaSyncFactoryTests(DisableMiraklConnectionMixin, TestCase):
             sales_channel=self.sales_channel,
             code="core_property",
         )
-        type_a = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="TYPE_A")
-        type_b = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="TYPE_B")
+        type_a = (
+            MiraklProductType.objects.filter(sales_channel=self.sales_channel, remote_id="TYPE_A")
+            .order_by("id")
+            .first()
+        )
+        type_b = (
+            MiraklProductType.objects.filter(sales_channel=self.sales_channel, remote_id="TYPE_B")
+            .order_by("id")
+            .first()
+        )
         self.assertEqual(
             MiraklProductTypeItem.objects.get(product_type=type_a, remote_property=remote_property).value_list_code,
             "LIST_A",

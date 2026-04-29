@@ -18,8 +18,11 @@ from properties.models import (
 )
 from sales_prices.models import SalesPrice
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
-from sales_channels.integrations.amazon.models import AmazonProduct, AmazonSalesChannelView
+from sales_channels.integrations.amazon.models import AmazonProduct, AmazonProductType, AmazonSalesChannelView
+from sales_channels.integrations.ebay.models import EbayProductType, EbaySalesChannel, EbaySalesChannelView
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+from sales_channels.integrations.mirakl.models import MiraklProductType
+from sales_channels.integrations.shein.models import SheinProductType, SheinSalesChannel
 from sales_channels.models import RejectedSalesChannelViewAssign, SalesChannelViewAssign
 from sales_channels.tests.helpers import DisableMiraklConnectionMixin
 
@@ -69,6 +72,12 @@ MAP_SALES_CHANNEL_PERFECT_MATCH_SELECT_VALUES_MUTATION = """
 MAP_SALES_CHANNEL_PERFECT_MATCH_PROPERTIES_MUTATION = """
     mutation($salesChannel: SalesChannelPartialInput!) {
       mapSalesChannelPerfectMatchProperties(salesChannel: $salesChannel)
+    }
+"""
+
+CREATE_SALES_CHANNEL_PRODUCT_TYPES_FROM_LOCAL_RULES_MUTATION = """
+    mutation($salesChannel: SalesChannelPartialInput!) {
+      createSalesChannelProductTypesFromLocalRules(salesChannel: $salesChannel)
     }
 """
 
@@ -611,3 +620,129 @@ class PerfectMatchMappingMutationTestCase(
         self.assertIsNone(response.errors)
         self.assertTrue(response.data["mapSalesChannelPerfectMatchProperties"])
         task_mock.assert_called_once_with(sales_channel_id=self.sales_channel.id)
+
+
+class CreateProductTypesFromLocalRulesMutationTestCase(
+    DisableMiraklConnectionMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
+    def _create_rule(self, *, sales_channel, value):
+        product_type_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            is_product_type=True,
+            type=Property.TYPES.SELECT,
+        )
+        product_type_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=product_type_property,
+            value=value,
+        )
+        return baker.make(
+            "properties.ProductPropertiesRule",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            product_type=product_type_value,
+        )
+
+    def _run_mutation(self, *, sales_channel):
+        return self.strawberry_test_client(
+            query=CREATE_SALES_CHANNEL_PRODUCT_TYPES_FROM_LOCAL_RULES_MUTATION,
+            variables={"salesChannel": {"id": self.to_global_id(sales_channel)}},
+        )
+
+    def test_create_sales_channel_product_types_from_local_rules_supports_amazon(self):
+        sales_channel = baker.make(
+            AmazonSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+        )
+        rule = self._create_rule(sales_channel=sales_channel, value="Amazon Tops")
+
+        response = self._run_mutation(sales_channel=sales_channel)
+
+        self.assertIsNone(response.errors)
+        self.assertTrue(response.data["createSalesChannelProductTypesFromLocalRules"])
+        self.assertEqual(
+            AmazonProductType.objects.filter(
+                sales_channel=sales_channel,
+                local_instance=rule,
+                multi_tenant_company=self.multi_tenant_company,
+            ).count(),
+            1,
+        )
+
+    def test_create_sales_channel_product_types_from_local_rules_supports_ebay(self):
+        sales_channel = baker.make(
+            EbaySalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+        )
+        marketplace = baker.make(
+            EbaySalesChannelView,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            is_default=True,
+        )
+        rule = self._create_rule(sales_channel=sales_channel, value="eBay Tops")
+
+        response = self._run_mutation(sales_channel=sales_channel)
+
+        self.assertIsNone(response.errors)
+        self.assertTrue(response.data["createSalesChannelProductTypesFromLocalRules"])
+        self.assertEqual(
+            EbayProductType.objects.filter(
+                sales_channel=sales_channel,
+                local_instance=rule,
+                marketplace=marketplace,
+                multi_tenant_company=self.multi_tenant_company,
+            ).count(),
+            1,
+        )
+
+    def test_create_sales_channel_product_types_from_local_rules_supports_shein(self):
+        sales_channel = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+        )
+        rule = self._create_rule(sales_channel=sales_channel, value="Shein Tops")
+
+        response = self._run_mutation(sales_channel=sales_channel)
+
+        self.assertIsNone(response.errors)
+        self.assertTrue(response.data["createSalesChannelProductTypesFromLocalRules"])
+        self.assertEqual(
+            SheinProductType.objects.filter(
+                sales_channel=sales_channel,
+                local_instance=rule,
+                multi_tenant_company=self.multi_tenant_company,
+            ).count(),
+            1,
+        )
+
+    def test_create_sales_channel_product_types_from_local_rules_supports_mirakl(self):
+        sales_channel = baker.make(
+            MiraklSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="mirakl-product-types.example.com",
+            shop_id=124,
+            api_key="secret",
+            active=True,
+        )
+        rule = self._create_rule(sales_channel=sales_channel, value="Mirakl Tops")
+
+        response = self._run_mutation(sales_channel=sales_channel)
+
+        self.assertIsNone(response.errors)
+        self.assertTrue(response.data["createSalesChannelProductTypesFromLocalRules"])
+        self.assertEqual(
+            MiraklProductType.objects.filter(
+                sales_channel=sales_channel,
+                local_instance=rule,
+                multi_tenant_company=self.multi_tenant_company,
+            ).count(),
+            1,
+        )

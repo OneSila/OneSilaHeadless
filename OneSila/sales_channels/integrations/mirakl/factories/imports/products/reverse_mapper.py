@@ -66,13 +66,15 @@ class MiraklReverseProductMapper:
             if normalized_name and normalized_name not in self._leaf_category_remote_id_by_name:
                 self._leaf_category_remote_id_by_name[normalized_name] = str(item.remote_id or "").strip()
         self._product_types = list(
-            MiraklProductType.objects.filter(sales_channel=sales_channel).select_related("local_instance", "category")
+            MiraklProductType.objects.filter(sales_channel=sales_channel)
+            .select_related("local_instance", "category")
+            .order_by("id")
         )
-        self._product_type_by_remote_id = {
-            str(item.remote_id or "").strip(): item
-            for item in self._product_types
-            if str(item.remote_id or "").strip()
-        }
+        self._product_types_by_remote_id = {}
+        for item in self._product_types:
+            remote_id = str(item.remote_id or "").strip()
+            if remote_id:
+                self._product_types_by_remote_id.setdefault(remote_id, []).append(item)
         self._product_type_by_name = {}
         for item in self._product_types:
             normalized_name = self._normalize_lookup_token(value=item.name)
@@ -642,11 +644,15 @@ class MiraklReverseProductMapper:
 
     def _resolve_product_rule(self, *, category_code: str, raw_category_value: str):
         if category_code:
-            product_type = self._product_type_by_remote_id.get(category_code)
+            product_type = self._get_first_mapped_product_type_by_remote_id(
+                remote_id=category_code,
+            )
             if product_type is not None and product_type.local_instance_id:
                 return product_type.local_instance
 
-        direct_remote_match = self._product_type_by_remote_id.get(str(raw_category_value or "").strip())
+        direct_remote_match = self._get_first_mapped_product_type_by_remote_id(
+            remote_id=str(raw_category_value or "").strip(),
+        )
         if direct_remote_match is not None and direct_remote_match.local_instance_id:
             return direct_remote_match.local_instance
 
@@ -654,6 +660,12 @@ class MiraklReverseProductMapper:
             product_type = self._product_type_by_name.get(candidate)
             if product_type is not None and product_type.local_instance_id:
                 return product_type.local_instance
+        return None
+
+    def _get_first_mapped_product_type_by_remote_id(self, *, remote_id: str):
+        for product_type in self._product_types_by_remote_id.get(remote_id, []):
+            if product_type.local_instance_id:
+                return product_type
         return None
 
     def _build_lookup_candidates(self, *, value: str) -> list[str]:

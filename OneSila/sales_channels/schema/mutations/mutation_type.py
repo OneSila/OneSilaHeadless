@@ -358,6 +358,33 @@ class SalesChannelsMutation:
         raise ValidationError("Unsupported sales channel integration.")
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def create_sales_channel_product_types_from_local_rules(
+        self,
+        info: Info,
+        *,
+        sales_channel: SalesChannelPartialInput,
+    ) -> bool:
+        from sales_channels.factories.properties.product_types_from_local_rules import (
+            create_product_types_from_local_rules_for_sales_channel,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        try:
+            channel = SalesChannel.objects.get(
+                id=sales_channel.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except SalesChannel.DoesNotExist as exc:
+            raise PermissionError("Invalid company") from exc
+
+        resolved_channel = channel.get_real_instance()
+        create_product_types_from_local_rules_for_sales_channel(
+            sales_channel=resolved_channel,
+        )
+        return True
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def duplicate_sales_channel_select_value_mapping(
         self,
         info: Info,

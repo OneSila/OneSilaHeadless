@@ -176,6 +176,39 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
 
         self.assertEqual(rows[0]["collection"], "")
 
+    def test_resolve_product_type_prefers_matching_local_rule_for_duplicate_remote_id(self):
+        local_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        builder, _, product = self._build_builder(
+            remote_code="collection",
+            local_property=local_property,
+            required=False,
+        )
+        matching_rule = self._assign_product_rule(
+            product=product,
+            sales_channel=self.sales_channel,
+        )
+        category = MiraklCategory.objects.get(
+            sales_channel=self.sales_channel,
+            remote_id="cat-1",
+        )
+        matching_product_type = baker.make(
+            MiraklProductType,
+            category=category,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=matching_rule,
+            remote_id="cat-1",
+        )
+
+        self.assertEqual(
+            builder._resolve_product_type(product=product),
+            matching_product_type,
+        )
+
     def test_field_without_applicability_is_included_when_channel_validation_is_disabled(self):
         self.sales_channel.product_data_validation_by_channel = False
         self.sales_channel.save(update_fields=["product_data_validation_by_channel"])
@@ -773,7 +806,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             property=local_property,
             value_select=local_select_value,
         )
-        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        product_type = (
+            MiraklProductType.objects.filter(sales_channel=self.sales_channel, remote_id="cat-1")
+            .order_by("id")
+            .first()
+        )
         product_type_item = MiraklProductTypeItem.objects.get(
             product_type=product_type,
             remote_property=remote_property,
@@ -821,7 +858,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
             property=local_property,
             value_select=local_select_value,
         )
-        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        product_type = (
+            MiraklProductType.objects.filter(sales_channel=self.sales_channel, remote_id="cat-1")
+            .order_by("id")
+            .first()
+        )
         product_type_item = MiraklProductTypeItem.objects.get(
             product_type=product_type,
             remote_property=remote_property,
@@ -1173,7 +1214,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
                 MiraklProductTypeItem,
                 multi_tenant_company=self.multi_tenant_company,
                 sales_channel=self.sales_channel,
-                product_type=MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1"),
+                product_type=(
+                    MiraklProductType.objects.filter(sales_channel=self.sales_channel, remote_id="cat-1")
+                    .order_by("id")
+                    .first()
+                ),
                 remote_property=extra_property,
                 required=False,
             )
@@ -1223,7 +1268,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_BULLET_POINT
         remote_property.save(update_fields=["local_instance", "representation_type"])
 
-        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        product_type = (
+            MiraklProductType.objects.filter(sales_channel=self.sales_channel, remote_id="cat-1")
+            .order_by("id")
+            .first()
+        )
         for remote_code in ["feature_2", "feature_3"]:
             extra_property = baker.make(
                 MiraklProperty,
@@ -1868,7 +1917,11 @@ class MiraklProductPayloadBuilderTests(DisableMiraklConnectionMixin, TestCase):
         remote_property.local_instance = None
         remote_property.representation_type = remote_property.REPRESENTATION_PRODUCT_TITLE
         remote_property.save()
-        product_type = MiraklProductType.objects.get(sales_channel=self.sales_channel, remote_id="cat-1")
+        product_type = (
+            MiraklProductType.objects.filter(sales_channel=self.sales_channel, remote_id="cat-1")
+            .order_by("id")
+            .first()
+        )
         remote_property_fr = baker.make(
             MiraklProperty,
             multi_tenant_company=self.multi_tenant_company,

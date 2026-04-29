@@ -87,6 +87,16 @@ mutation (
 }
 """
 
+SUGGEST_MIRAKL_CATEGORY_MUTATION = """
+mutation ($instance: MiraklSalesChannelPartialInput!) {
+  suggestMiraklCategory(instance: $instance) {
+    id
+    remoteId
+    name
+  }
+}
+"""
+
 class MiraklMutationTests(
     DisableMiraklConnectionMixin,
     TransactionTestCaseMixin,
@@ -247,6 +257,47 @@ class MiraklMutationTests(
         self.assertEqual(duplicate.local_instance, second_local_value)
         self.assertEqual(duplicate.remote_property, remote_property)
         self.assertEqual(duplicate.raw_data, source.raw_data)
+
+    def test_suggest_mirakl_category_returns_all_categories(self):
+        parent = baker.make(
+            "mirakl.MiraklCategory",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="ROOT",
+            name="Root",
+            level=0,
+            is_leaf=False,
+        )
+        child = baker.make(
+            "mirakl.MiraklCategory",
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CHILD",
+            name="Child",
+            parent=parent,
+            parent_code="ROOT",
+            level=1,
+            is_leaf=True,
+        )
+
+        response = self.strawberry_test_client(
+            query=SUGGEST_MIRAKL_CATEGORY_MUTATION,
+            variables={
+                "instance": {
+                    "id": self.to_global_id(self.sales_channel),
+                },
+            },
+        )
+
+        self.assertIsNone(response.errors)
+        payload = response.data["suggestMiraklCategory"]
+        self.assertEqual(len(payload), 2)
+        remote_ids = {entry["remoteId"] for entry in payload}
+        self.assertEqual(remote_ids, {"ROOT", "CHILD"})
+        self.assertEqual(
+            {entry["id"] for entry in payload},
+            {self.to_global_id(parent), self.to_global_id(child)},
+        )
 
     def test_duplicate_mirakl_property_select_value_rejects_non_property_representation(self):
         local_property = baker.make(

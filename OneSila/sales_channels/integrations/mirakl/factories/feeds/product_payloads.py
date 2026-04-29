@@ -649,22 +649,32 @@ class MiraklProductPayloadBuilder:
             .first()
         )
         category_remote_id = getattr(category_mapping, "remote_id", "") or ""
+        product_rule = product.get_product_rule(sales_channel=self.sales_channel)
         if category_remote_id:
             cache_key = (product.id, 1)
             if cache_key not in self._product_type_cache:
-                self._product_type_cache[cache_key] = (
+                queryset = (
                     MiraklProductType.objects.filter(
                         sales_channel=self.sales_channel,
                         remote_id=category_remote_id,
                     )
                     .select_related("category", "local_instance")
-                    .first()
+                    .order_by("local_instance_id", "id")
                 )
+                if product_rule is not None:
+                    self._product_type_cache[cache_key] = queryset.filter(
+                        local_instance=product_rule,
+                    ).first()
+                if self._product_type_cache[cache_key] is None:
+                    self._product_type_cache[cache_key] = queryset.filter(
+                        local_instance__isnull=True,
+                    ).first()
+                if self._product_type_cache[cache_key] is None:
+                    self._product_type_cache[cache_key] = queryset.first()
             product_type = self._product_type_cache[cache_key]
             if product_type is not None:
                 return product_type
 
-        product_rule = product.get_product_rule(sales_channel=self.sales_channel)
         if product_rule is None:
             return None
         cache_key = (product.id, 2)

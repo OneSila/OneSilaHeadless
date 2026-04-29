@@ -303,7 +303,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
 
     def sync_categories(self, *, hierarchies: list[dict[str, Any]]) -> None:
         categories_by_code: dict[str, MiraklCategory] = {}
-        product_types_by_code: dict[str, MiraklProductType] = {}
+        product_types_by_code: dict[str, list[MiraklProductType]] = {}
         parent_codes: set[str] = set()
 
         for item in hierarchies:
@@ -327,16 +327,27 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             category.save()
             categories_by_code[code] = category
 
-            product_type, _ = MiraklProductType.objects.get_or_create(
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.sales_channel.multi_tenant_company,
-                remote_id=code,
+            product_types = list(
+                MiraklProductType.objects.filter(
+                    sales_channel=self.sales_channel,
+                    remote_id=code,
+                ).order_by("id")
             )
-            product_type.category = category
-            product_type.name = category.name
-            product_type.imported = True
-            product_type.save()
-            product_types_by_code[code] = product_type
+            if not product_types:
+                product_types = [
+                    MiraklProductType.objects.create(
+                        sales_channel=self.sales_channel,
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                        remote_id=code,
+                    )
+                ]
+
+            for product_type in product_types:
+                product_type.category = category
+                product_type.name = category.name
+                product_type.imported = True
+                product_type.save()
+            product_types_by_code[code] = product_types
             self.summary_data["categories"] += 1
             self._increment_progress()
 
@@ -346,8 +357,7 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             category.is_leaf = code not in parent_codes
             category.save(update_fields=["parent", "is_leaf"])
 
-            product_type = product_types_by_code.get(code)
-            if product_type is not None:
+            for product_type in product_types_by_code.get(code, []):
                 update_fields: list[str] = []
                 if product_type.category_id != category.id:
                     product_type.category = category
@@ -359,13 +369,19 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
                     product_type.save(update_fields=update_fields)
 
     def sync_properties(self, *, attributes: list[dict[str, Any]]) -> None:
-        product_types_by_code = {
-            product_type.remote_id: product_type
-            for product_type in MiraklProductType.objects.filter(sales_channel=self.sales_channel)
-        }
+        product_types_by_code: dict[str, list[MiraklProductType]] = {}
+        product_types = list(
+            MiraklProductType.objects.filter(sales_channel=self.sales_channel)
+            .exclude(remote_id__in=(None, ""))
+            .order_by("id")
+        )
+        for product_type in product_types:
+            remote_id = self._clean_string(product_type.remote_id)
+            if remote_id:
+                product_types_by_code.setdefault(remote_id, []).append(product_type)
         expected_property_ids_by_product_type: dict[int, set[int]] = {
             product_type.id: set()
-            for product_type in product_types_by_code.values()
+            for product_type in product_types
         }
         expected_document_property_ids: set[int] = set()
 
@@ -404,11 +420,11 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
             message="Cleaning stale Mirakl product type items",
             product_types=len(product_types_by_code),
         )
-        cleanup_total = len(product_types_by_code)
+        cleanup_total = len(product_types)
         cleanup_log_interval = self._build_log_interval(total=max(1, cleanup_total), minimum=25)
         next_cleanup_log_at = 1
 
-        for cleanup_index, product_type in enumerate(product_types_by_code.values(), start=1):
+        for cleanup_index, product_type in enumerate(product_types, start=1):
             if (
                 cleanup_index == 1
                 or cleanup_index == cleanup_total
@@ -1381,18 +1397,17 @@ class MiraklFullSchemaSyncFactory(GetMiraklAPIMixin):
         self,
         *,
         item: dict[str, Any],
-        product_types_by_code: dict[str, MiraklProductType],
+        product_types_by_code: dict[str, list[MiraklProductType]],
     ) -> list[MiraklProductType]:
         hierarchy_code = self._clean_string(item.get("hierarchy_code"))
         if not hierarchy_code:
             target_codes = self._all_hierarchy_codes
         else:
             target_codes = self._descendant_hierarchy_codes.get(hierarchy_code, [hierarchy_code])
-        return [
-            product_types_by_code[target_code]
-            for target_code in target_codes
-            if target_code in product_types_by_code
-        ]
+        product_types: list[MiraklProductType] = []
+        for target_code in target_codes:
+            product_types.extend(product_types_by_code.get(target_code, []))
+        return product_types
 
     def _dedupe_attributes_for_hierarchy(self, *, hierarchy_code: str, attributes: list[dict[str, Any]]) -> list[dict[str, Any]]:
         deduped_by_code: dict[str, dict[str, Any]] = {}

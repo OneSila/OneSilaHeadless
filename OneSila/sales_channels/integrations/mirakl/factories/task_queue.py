@@ -87,14 +87,21 @@ class MiraklProductPropertyAddTask(ProductPropertyAddTask, MiraklNonLiveMarketpl
             .first()
         )
         if category_remote_id:
-            product_type = (
+            queryset = (
                 MiraklProductType.objects.filter(
                     sales_channel=sales_channel,
                     category__remote_id=category_remote_id,
                 )
                 .select_related("category", "local_instance")
-                .first()
+                .order_by("local_instance_id", "id")
             )
+            if getattr(self, "rule", None) is not None:
+                product_type = queryset.filter(local_instance=self.rule).first()
+                if product_type is not None:
+                    return product_type
+            product_type = queryset.filter(local_instance__isnull=True).first()
+            if product_type is None:
+                product_type = queryset.first()
             if product_type is not None:
                 return product_type
 

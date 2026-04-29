@@ -73,6 +73,28 @@ class MiraklSalesChannelMutation:
     update_mirakl_import_process: MiraklSalesChannelImportType = update(MiraklSalesChannelImportPartialInput)
     create_mirakl_import_export_file: MiraklSalesChannelImportExportFileType = create(MiraklSalesChannelImportExportFileInput)
 
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def suggest_mirakl_category(
+        self,
+        instance: MiraklSalesChannelPartialInput,
+        info: Info,
+    ) -> List[MiraklCategoryType]:
+        """Return all synced Mirakl categories for a sales channel."""
+        from sales_channels.integrations.mirakl.models import MiraklCategory, MiraklSalesChannel
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        sales_channel = MiraklSalesChannel.objects.get(
+            id=instance.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        return list(
+            MiraklCategory.objects.filter(
+                sales_channel=sales_channel,
+                multi_tenant_company=multi_tenant_company,
+            ).select_related("parent"),
+        )
+
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def validate_mirakl_credentials(
         self,
