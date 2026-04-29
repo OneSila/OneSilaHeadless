@@ -38,6 +38,8 @@ from sales_channels.models import (
     SalesChannelViewAssign,
     RejectedSalesChannelViewAssign,
     SalesChannelContentTemplate,
+    ManualSalesChannel,
+    ManualSalesChannelView,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
 
@@ -166,6 +168,12 @@ class SalesChannelFilter(SearchFilterMixin):
     active: auto
 
 
+@filter(ManualSalesChannel)
+class ManualSalesChannelFilter(SearchFilterMixin):
+    id: auto
+    active: auto
+
+
 @filter(SalesChannelIntegrationPricelist)
 class SalesChannelIntegrationPricelistFilter(SearchFilterMixin):
     id: auto
@@ -213,6 +221,16 @@ class SalesChannelViewFilter(SearchFilterMixin):
     include_in_todo: auto
     todo_sort_order: auto
     sales_channel: Optional[SalesChannelFilter]
+
+
+@filter(ManualSalesChannelView)
+class ManualSalesChannelViewFilter(SearchFilterMixin):
+    search: Optional[str]
+    id: auto
+    remote_id: auto
+    include_in_todo: auto
+    todo_sort_order: auto
+    sales_channel: Optional[ManualSalesChannelFilter]
 
 
 @filter(RemoteLanguage)

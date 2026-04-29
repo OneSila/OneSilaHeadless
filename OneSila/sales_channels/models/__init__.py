@@ -10,6 +10,7 @@ from .sales_channels import (
 )
 from .gpt import SalesChannelGptFeed
 from .feeds import SalesChannelFeed, SalesChannelFeedItem
+from .manual import ManualSalesChannel, ManualSalesChannelView
 
 # Import related models
 from .imports import (

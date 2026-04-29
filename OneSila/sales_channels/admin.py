@@ -10,7 +10,16 @@ from django.utils.translation import gettext_lazy as _
 from polymorphic.admin import PolymorphicChildModelAdmin
 from pygments.lexers import JsonLexer
 from core.admin import ModelAdmin
-from .models import SalesChannel, RemoteLog, SalesChannelImport, SalesChannelViewAssign, SalesChannelGptFeed, SyncRequest
+from .models import (
+    ManualSalesChannel,
+    ManualSalesChannelView,
+    RemoteLog,
+    SalesChannel,
+    SalesChannelGptFeed,
+    SalesChannelImport,
+    SalesChannelViewAssign,
+    SyncRequest,
+)
 from .models.products import RemoteProductConfigurator
 import json
 from pygments import highlight
@@ -94,6 +103,16 @@ class RemoteProductConfiguratorAdmin(ModelAdmin):
 @admin.register(SalesChannel)
 class SalesChannelAdmin(PolymorphicChildModelAdmin):
     base_model = SalesChannel
+
+
+@admin.register(ManualSalesChannel)
+class ManualSalesChannelAdmin(PolymorphicChildModelAdmin):
+    base_model = ManualSalesChannel
+
+
+@admin.register(ManualSalesChannelView)
+class ManualSalesChannelViewAdmin(ModelAdmin):
+    raw_id_fields = ["sales_channel", "multi_tenant_company"]
 
 
 @admin.register(RemoteLog)

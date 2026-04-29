@@ -25,6 +25,8 @@ from sales_channels.models import (
     SalesChannelContentTemplate,
     SalesChannelGptFeed,
     ImportProperty,
+    ManualSalesChannel,
+    ManualSalesChannelView,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
 
@@ -204,6 +206,16 @@ class SalesChannelPartialInput(NodeInput):
     pass
 
 
+@input(ManualSalesChannel, exclude=["integration_ptr", "saleschannel_ptr"])
+class ManualSalesChannelInput:
+    pass
+
+
+@partial(ManualSalesChannel, fields="__all__")
+class ManualSalesChannelPartialInput(NodeInput):
+    pass
+
+
 @input(SalesChannelIntegrationPricelist, fields="__all__")
 class SalesChannelIntegrationPricelistInput:
     pass
@@ -221,6 +233,16 @@ class SalesChannelViewInput:
 
 @partial(SalesChannelView, fields="__all__")
 class SalesChannelViewPartialInput(NodeInput):
+    pass
+
+
+@input(ManualSalesChannelView, exclude=["saleschannelview_ptr"])
+class ManualSalesChannelViewInput:
+    pass
+
+
+@partial(ManualSalesChannelView, fields="__all__")
+class ManualSalesChannelViewPartialInput(NodeInput):
     pass
 
 

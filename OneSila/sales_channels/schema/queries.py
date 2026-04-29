@@ -27,6 +27,8 @@ from .types.types import (
     RemotePropertyType,
     RemoteDocumentTypeType,
     RemotePropertySelectValueType,
+    ManualSalesChannelType,
+    ManualSalesChannelViewType,
 )
 from .types.types import RemoteLogType, RemoteProductType, SalesChannelType, \
     SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType, RejectedSalesChannelViewAssignType, RemoteLanguageType, \
@@ -53,11 +55,17 @@ class SalesChannelsQuery:
     sales_channel: SalesChannelType = node()
     sales_channels: DjangoListConnection[SalesChannelType] = connection()
 
+    manual_sales_channel: ManualSalesChannelType = node()
+    manual_sales_channels: DjangoListConnection[ManualSalesChannelType] = connection()
+
     sales_channel_integration_pricelist: SalesChannelIntegrationPricelistType = node()
     sales_channel_integration_pricelists: DjangoListConnection[SalesChannelIntegrationPricelistType] = connection()
 
     sales_channel_view: SalesChannelViewType = node()
     sales_channel_views: DjangoListConnection[SalesChannelViewType] = connection()
+
+    manual_sales_channel_view: ManualSalesChannelViewType = node()
+    manual_sales_channel_views: DjangoListConnection[ManualSalesChannelViewType] = connection()
 
     remote_language: RemoteLanguageType = node()
     remote_languages: DjangoListConnection[RemoteLanguageType] = connection()

@@ -7,6 +7,7 @@ from django.utils.translation import activate, get_language_info, deactivate
 from integrations.constants import (
     AMAZON_INTEGRATION,
     EBAY_INTEGRATION,
+    MANUAL_INTEGRATION,
     SHEIN_INTEGRATION,
     INTEGRATIONS_TYPES_MAP,
 )
@@ -90,7 +91,7 @@ def _format_sales_channel_label(*, sales_channel: SalesChannel) -> str:
         return "Unknown"
 
     integration_type = INTEGRATIONS_TYPES_MAP.get(sales_channel.__class__)
-    if integration_type in {AMAZON_INTEGRATION, EBAY_INTEGRATION, SHEIN_INTEGRATION}:
+    if integration_type in {AMAZON_INTEGRATION, EBAY_INTEGRATION, SHEIN_INTEGRATION, MANUAL_INTEGRATION}:
         return raw_label
 
     try:

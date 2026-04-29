@@ -7,7 +7,7 @@ from core.schema.core.types.types import type, relay, field, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
-from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION, MIRAKL_INTEGRATION
+from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION, MIRAKL_INTEGRATION, MANUAL_INTEGRATION
 from integrations.schema.types.types import IntegrationType
 from integrations.helpers import get_public_integration_asset_url
 
@@ -42,6 +42,8 @@ from sales_channels.models import (
     RejectedSalesChannelViewAssign,
     SalesChannelGptFeed,
     RemoteOrder,
+    ManualSalesChannel,
+    ManualSalesChannelView,
 )
 from .filters import (
     ImportCurrencyFilter,
@@ -74,6 +76,8 @@ from .filters import (
     RejectedSalesChannelViewAssignFilter,
     SalesChannelContentTemplateFilter,
     RemoteLanguageFilter,
+    ManualSalesChannelFilter,
+    ManualSalesChannelViewFilter,
 )
 from .ordering import (
     ImportCurrencyOrder,
@@ -106,6 +110,8 @@ from .ordering import (
     RejectedSalesChannelViewAssignOrder,
     SalesChannelContentTemplateOrder,
     RemoteLanguageOrder,
+    ManualSalesChannelOrder,
+    ManualSalesChannelViewOrder,
 )
 from ...integrations.amazon.models import AmazonSalesChannelImport, AmazonSalesChannel
 from ...integrations.ebay.models import EbaySalesChannelImport
@@ -213,6 +219,8 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.integrations.shein.schema.types.types import SheinSalesChannelType
         from sales_channels.integrations.mirakl.models import MiraklSalesChannel
         from sales_channels.integrations.mirakl.schema.types.types import MiraklSalesChannelType
+        from sales_channels.models import ManualSalesChannel
+        from sales_channels.schema.types.types import ManualSalesChannelType
 
 
         if isinstance(self, MagentoSalesChannel):
@@ -231,6 +239,8 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = EbaySalesChannelType
         elif isinstance(self, MiraklSalesChannel):
             graphql_type = MiraklSalesChannelType
+        elif isinstance(self, ManualSalesChannel):
+            graphql_type = ManualSalesChannelType
         else:
             raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
@@ -461,9 +471,35 @@ class SalesChannelIntegrationPricelistType(relay.Node, GetQuerysetMultiTenantMix
     price_list: Annotated['SalesPriceListType', lazy("sales_prices.schema.types.types")]
 
 
+@type(ManualSalesChannel, filters=ManualSalesChannelFilter, order=ManualSalesChannelOrder, pagination=True, fields='__all__')
+class ManualSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
+    gpt_feed: Optional[Annotated['SalesChannelGptFeedType', lazy("sales_channels.schema.types.types")]]
+
+    @field()
+    def proxy_id(self, info) -> str:
+        return to_base64(ManualSalesChannelType, self.pk)
+
+    @field()
+    def type(self, info) -> str:
+        return MANUAL_INTEGRATION
+
+    @field()
+    def views(self, info) -> List[Annotated['ManualSalesChannelViewType', lazy("sales_channels.schema.types.types")]]:
+        return ManualSalesChannelView.objects.filter(sales_channel=self)
+
+
 @type(SalesChannelView, filters=SalesChannelViewFilter, order=SalesChannelViewOrder, pagination=True, fields='__all__')
 class SalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
+
+    @field()
+    def active(self, info) -> bool:
+        return self.sales_channel.active
+
+
+@type(ManualSalesChannelView, filters=ManualSalesChannelViewFilter, order=ManualSalesChannelViewOrder, pagination=True, fields='__all__')
+class ManualSalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: ManualSalesChannelType
 
     @field()
     def active(self, info) -> bool:

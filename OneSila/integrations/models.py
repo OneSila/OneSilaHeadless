@@ -47,8 +47,9 @@ class Integration(PolymorphicModel, models.Model):
         from sales_channels.integrations.amazon.models import AmazonSalesChannel
         from sales_channels.integrations.ebay.models import EbaySalesChannel
         from sales_channels.integrations.shein.models import SheinSalesChannel
+        from sales_channels.models import ManualSalesChannel
 
-        if not isinstance(self, (AmazonSalesChannel, EbaySalesChannel, SheinSalesChannel)):
+        if not isinstance(self, (AmazonSalesChannel, EbaySalesChannel, SheinSalesChannel, ManualSalesChannel)):
             validator = URLValidator(schemes=['http', 'https'])
             try:
                 validator(self.hostname)

@@ -24,7 +24,8 @@ from .product_view_status import (
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
     SalesChannelViewAssignType, SalesChannelContentTemplateType, SalesChannelImportType, RemoteLanguageType, \
     RemoteCurrencyType, ImportPropertyType, SalesChannelContentTemplateCheckType, FormattedIssueType, \
-    SalesChannelGptFeedType, RemoteDocumentTypeType, RemotePropertySelectValueType
+    SalesChannelGptFeedType, RemoteDocumentTypeType, RemotePropertySelectValueType, \
+    ManualSalesChannelType, ManualSalesChannelViewType
 from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInput, SalesChannelInput, \
     SalesChannelPartialInput, \
     SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
@@ -32,7 +33,9 @@ from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInpu
     SalesChannelContentTemplateInput, SalesChannelContentTemplatePartialInput, \
     SalesChannelGptFeedPartialInput, \
     RemoteLanguagePartialInput, RemoteCurrencyPartialInput, ImportPropertyInput, \
-    RemoteDocumentTypePartialInput, RemotePropertySelectValuePartialInput
+    RemoteDocumentTypePartialInput, RemotePropertySelectValuePartialInput, \
+    ManualSalesChannelInput, ManualSalesChannelPartialInput, ManualSalesChannelViewInput, \
+    ManualSalesChannelViewPartialInput
 from core.helpers import get_languages
 from products.models import Product
 from properties.models import PropertySelectValue
@@ -60,6 +63,12 @@ class SalesChannelsMutation:
     delete_sales_channels: List[SalesChannelType] = delete()
     refresh_sales_channel_websites: SalesChannelType = refresh_website_models_mutation()
 
+    create_manual_sales_channel: ManualSalesChannelType = create(ManualSalesChannelInput)
+    create_manual_sales_channels: List[ManualSalesChannelType] = create(List[ManualSalesChannelInput])
+    update_manual_sales_channel: ManualSalesChannelType = update(ManualSalesChannelPartialInput)
+    delete_manual_sales_channel: ManualSalesChannelType = delete()
+    delete_manual_sales_channels: List[ManualSalesChannelType] = delete()
+
     create_sales_channel_integration_pricelist: SalesChannelIntegrationPricelistType = create(SalesChannelIntegrationPricelistInput)
     create_sales_channel_integration_pricelists: List[SalesChannelIntegrationPricelistType] = create(List[SalesChannelIntegrationPricelistInput])
     update_sales_channel_integration_pricelist: SalesChannelIntegrationPricelistType = update(SalesChannelIntegrationPricelistPartialInput)
@@ -67,6 +76,11 @@ class SalesChannelsMutation:
     delete_sales_channel_integration_pricelists: List[SalesChannelIntegrationPricelistType] = delete()
 
     update_sales_channel_view: SalesChannelViewType = update(SalesChannelViewPartialInput)
+    create_manual_sales_channel_view: ManualSalesChannelViewType = create(ManualSalesChannelViewInput)
+    create_manual_sales_channel_views: List[ManualSalesChannelViewType] = create(List[ManualSalesChannelViewInput])
+    update_manual_sales_channel_view: ManualSalesChannelViewType = update(ManualSalesChannelViewPartialInput)
+    delete_manual_sales_channel_view: ManualSalesChannelViewType = delete()
+    delete_manual_sales_channel_views: List[ManualSalesChannelViewType] = delete()
     update_remote_language: RemoteLanguageType = update(RemoteLanguagePartialInput)
     update_remote_currency: RemoteCurrencyType = update(RemoteCurrencyPartialInput)
     update_remote_document_type: RemoteDocumentTypeType = update(RemoteDocumentTypePartialInput)

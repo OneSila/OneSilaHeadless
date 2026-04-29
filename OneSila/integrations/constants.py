@@ -7,6 +7,7 @@ from sales_channels.integrations.woocommerce.models import WoocommerceSalesChann
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.integrations.shein.models import SheinSalesChannel
 from sales_channels.integrations.mirakl.models import MiraklSalesChannel
+from sales_channels.models import ManualSalesChannel
 from webhooks.models import WebhookIntegration
 
 MAGENTO_INTEGRATION = 'magento'
@@ -17,6 +18,7 @@ EBAY_INTEGRATION = 'ebay'
 WEBHOOK_INTEGRATION = 'webhook'
 SHEIN_INTEGRATION = 'shein'
 MIRAKL_INTEGRATION = 'mirakl'
+MANUAL_INTEGRATION = 'manual'
 
 INTEGRATIONS_TYPES = (
     (MAGENTO_INTEGRATION, _('Magento')),
@@ -26,6 +28,7 @@ INTEGRATIONS_TYPES = (
     (EBAY_INTEGRATION, _('Ebay')),
     (SHEIN_INTEGRATION, _('Shein')),
     (MIRAKL_INTEGRATION, _('Mirakl')),
+    (MANUAL_INTEGRATION, _('Manual')),
     (WEBHOOK_INTEGRATION, _('Webhook')),
 )
 
@@ -37,5 +40,6 @@ INTEGRATIONS_TYPES_MAP = {
     EbaySalesChannel: EBAY_INTEGRATION,
     SheinSalesChannel: SHEIN_INTEGRATION,
     MiraklSalesChannel: MIRAKL_INTEGRATION,
+    ManualSalesChannel: MANUAL_INTEGRATION,
     WebhookIntegration: WEBHOOK_INTEGRATION,
 }
