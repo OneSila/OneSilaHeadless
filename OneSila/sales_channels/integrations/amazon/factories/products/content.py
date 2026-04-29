@@ -1,9 +1,55 @@
-from products.models import ProductTranslation, ProductTranslationBulletPoint
 from sales_channels.factories.products.content import RemoteProductContentUpdateFactory
+from sales_channels.helpers import build_content_payload
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models.products import AmazonProductContent
 from sales_channels.integrations.amazon.models.properties import AmazonProductType
 from sales_channels.integrations.amazon.helpers import is_safe_content
+
+
+def build_amazon_content_attributes(*, product, sales_channel, view, language=None):
+    view_lang = (
+        view.remote_languages.first().local_instance
+        if view and view.remote_languages.exists()
+        else sales_channel.multi_tenant_company.language
+    )
+    content_payload = build_content_payload(
+        product=product,
+        sales_channel=sales_channel,
+        language=language or view_lang,
+    )
+
+    item_name = content_payload.get("name")
+    product_description = content_payload.get("description")
+    bullet_points = content_payload.get("bulletPoints") or []
+
+    attrs = {}
+    language_tag = view.language_tag if view else None
+    marketplace_id = view.remote_id if view else None
+
+    if item_name:
+        attrs["item_name"] = [{
+            "value": item_name,
+            "language_tag": language_tag,
+            "marketplace_id": marketplace_id,
+        }]
+    if is_safe_content(product_description):
+        attrs["product_description"] = [{
+            "value": product_description,
+            "language_tag": language_tag,
+            "marketplace_id": marketplace_id,
+        }]
+
+    if bullet_points:
+        attrs["bullet_point"] = [
+            {
+                "value": bullet_point,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }
+            for bullet_point in bullet_points
+        ]
+
+    return {k: v for k, v in attrs.items() if v not in (None, "")}
 
 
 class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentUpdateFactory):
@@ -59,76 +105,12 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
         )
 
     def build_content_attributes(self):
-        view_lang = (
-            self.view.remote_languages.first().local_instance
-            if self.view and self.view.remote_languages.exists()
-            else self.sales_channel.multi_tenant_company.language
-        )
-
-        lang = self.language or view_lang
-
-        channel_translation = ProductTranslation.objects.filter(
+        return build_amazon_content_attributes(
             product=self.local_instance,
-            language=lang,
             sales_channel=self.sales_channel,
-        ).first()
-
-        default_translation = ProductTranslation.objects.filter(
-            product=self.local_instance,
-            language=lang,
-            sales_channel=None,
-        ).first()
-
-        item_name = None
-        product_description = None
-
-        if channel_translation:
-            item_name = channel_translation.name or None
-            product_description = channel_translation.description or None
-
-        if not item_name and default_translation:
-            item_name = default_translation.name
-
-        if not product_description and default_translation:
-            product_description = default_translation.description
-
-        bullet_points = []
-        if channel_translation:
-            bullet_points = list(
-                ProductTranslationBulletPoint.objects.filter(
-                    product_translation=channel_translation
-                )
-                .order_by("sort_order")
-                .values_list("text", flat=True)
-            )
-
-        attrs = {}
-        language_tag = self.view.language_tag if self.view else None
-        marketplace_id = self.view.remote_id if self.view else None
-        if item_name:
-            attrs["item_name"] = [{
-                "value": item_name,
-                "language_tag": language_tag,
-                "marketplace_id": marketplace_id,
-            }]
-        if is_safe_content(product_description):
-            attrs["product_description"] = [{
-                "value": product_description,
-                "language_tag": language_tag,
-                "marketplace_id": marketplace_id,
-            }]
-
-        if bullet_points:
-            attrs["bullet_point"] = [
-                {
-                    "value": bp,
-                    "language_tag": language_tag,
-                    "marketplace_id": marketplace_id,
-                }
-                for bp in bullet_points
-            ]
-
-        return {k: v for k, v in attrs.items() if v not in (None, "")}
+            view=self.view,
+            language=self.language,
+        )
 
     def customize_payload(self):
         self.payload = self.build_content_attributes()

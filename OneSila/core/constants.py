@@ -1,6 +1,7 @@
 BASE_CONTENT_FIELD_FLAGS = {
     "name": True,
     "subtitle": False,
+    "urlKey": True,
     "shortDescription": True,
     "description": True,
     "bulletPoints": False,
@@ -34,6 +35,10 @@ CONTENT_INTEGRATION_RULES = {
     "ebay": {
         "flags": {"subtitle": True},
         "limits": {"name": {"max": 80}, "subtitle": {"max": 55}, "description": {"max": 4000}},
+    },
+    "mirakl": {
+        "flags": {"subtitle": True, "bulletPoints": True},
+        "limits": {},
     },
     "shein": {
         "flags": {"subtitle": False, "shortDescription": False, "bulletPoints": False},

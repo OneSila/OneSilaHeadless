@@ -267,16 +267,15 @@ class BulkGenerateContentFlow:
         for sales_channel in self.sales_channels:
             integration_type = INTEGRATIONS_TYPES_MAP.get(type(sales_channel), "default")
             field_rules = build_field_rules(integration_type=integration_type, sales_channel=sales_channel)
-            translations = self.context_builder.translations_by_product.get(product.id, [])
             languages = self.sales_channel_languages.get(sales_channel.id, [])
             if not languages:
                 raise ValidationError("Languages missing for sales channel.")
 
             existing_by_language = {
                 language: self.context_builder.build_existing_content(
-                    translations=translations,
+                    product=product,
                     language=language,
-                    sales_channel_id=sales_channel.id,
+                    sales_channel=sales_channel,
                 )
                 for language in languages
             }
@@ -320,7 +319,7 @@ class BulkGenerateContentFlow:
                             product=product,
                             languages=languages,
                             default_language=channel_default,
-                            sales_channel_id=sales_channel.id,
+                            sales_channel=sales_channel,
                         ),
                         "integration_guidelines": INTEGRATION_GUIDELINES.get(integration_type, []),
                     }
@@ -330,13 +329,12 @@ class BulkGenerateContentFlow:
             integration_key = "default"
             integration_type = "default"
             field_rules = build_field_rules(integration_type=integration_type)
-            translations = self.context_builder.translations_by_product.get(product.id, [])
             languages = list(self.default_channel_languages)
             existing_by_language = {
                 language: self.context_builder.build_existing_content(
-                    translations=translations,
+                    product=product,
                     language=language,
-                    sales_channel_id=None,
+                    sales_channel=None,
                 )
                 for language in languages
             }
@@ -376,7 +374,7 @@ class BulkGenerateContentFlow:
                             product=product,
                             languages=languages,
                             default_language=channel_default,
-                            sales_channel_id=None,
+                            sales_channel=None,
                         ),
                         "integration_guidelines": [],
                     }

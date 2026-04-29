@@ -15,8 +15,8 @@ from django.template import TemplateSyntaxError
 
 from currencies.models import Currency
 from media.models import MediaProductThrough
-from products.models import ProductTranslation
 from properties.models import ProductProperty, Property, PropertySelectValue
+from sales_channels.helpers import build_content_payload
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.factories.mixins import PreFlightCheckError
 from sales_channels.factories.value_mixins import RemoteValueMixin
@@ -165,9 +165,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
             raise ValueError("Remote product missing local instance for payload build")
 
         language_code = self._get_language_code()
-        translation = self._get_translation(language_code=language_code)
         title, subtitle, description, listing_description = self._extract_content(
-            translation=translation,
             language_code=language_code,
         )
 
@@ -586,75 +584,28 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
 
         return getattr(self.sales_channel.multi_tenant_company, "language", None)
 
-    def _get_translation(self, *, language_code: str | None) -> ProductTranslation | None:
-        product = self.remote_product.local_instance
-        if language_code is None:
-            return ProductTranslation.objects.filter(
-                product=product,
-                sales_channel=None,
-            ).first()
-
-        channel_translation = ProductTranslation.objects.filter(
-            product=product,
-            language=language_code,
-            sales_channel=self.sales_channel,
-        ).first()
-        if channel_translation:
-            return channel_translation
-
-        return ProductTranslation.objects.filter(
-            product=product,
-            language=language_code,
-            sales_channel=None,
-        ).first()
-
     def _extract_content(
         self,
         *,
-        translation: ProductTranslation | None,
         language_code: str | None,
     ) -> tuple[str | None, str | None, str | None, str | None]:
         product = self.remote_product.local_instance
-        default_translation = None
-        if translation and translation.sales_channel_id:
-            default_translation = ProductTranslation.objects.filter(
-                product=product,
-                language=translation.language,
-                sales_channel=None,
-            ).first()
-        elif translation:
-            default_translation = translation
+        content_payload = build_content_payload(
+            product=product,
+            sales_channel=self.sales_channel,
+            language=language_code,
+        )
 
-        title = None
-        subtitle = None
-        description = None
-        listing_description = None
-
-        if translation:
-            title = translation.name or None
-            subtitle = translation.subtitle or None
-            description = translation.description or translation.short_description or None
-            listing_description = translation.short_description or translation.description or None
-
-        if not title and default_translation:
-            title = default_translation.name or None
-        if not subtitle and default_translation:
-            subtitle = default_translation.subtitle or None
-        if not description and default_translation:
-            description = default_translation.description or default_translation.short_description or None
-        if not listing_description and default_translation:
-            listing_description = (
-                default_translation.short_description
-                or default_translation.description
-                or None
-            )
-
+        title = content_payload.get("name")
+        subtitle = content_payload.get("subtitle")
+        description = content_payload.get("description") or content_payload.get("shortDescription")
+        listing_description = content_payload.get("shortDescription") or content_payload.get("description")
         if not title:
             title = getattr(product, "name", None)
         if not description:
             description = getattr(product, "description", None)
 
-        template_language = language_code or (translation.language if translation else None)
+        template_language = language_code
         template_source = description or listing_description or getattr(product, "description", None)
         rendered_description, template_used = self._render_content_template(
             description=template_source,

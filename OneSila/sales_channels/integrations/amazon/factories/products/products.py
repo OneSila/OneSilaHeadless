@@ -7,8 +7,7 @@ from datetime import timedelta
 from django.utils import timezone
 from products.models import (
     Product,
-    ProductTranslation,
-    ProductTranslationBulletPoint, ConfigurableVariation,
+    ConfigurableVariation,
 )
 from properties.models import ProductProperty
 from sales_channels.factories.products.products import (
@@ -42,8 +41,8 @@ from sales_channels.integrations.amazon.factories.properties import (
 )
 from sales_channels.integrations.amazon.factories.products.content import (
     AmazonProductContentUpdateFactory,
+    build_amazon_content_attributes,
 )
-from sales_channels.integrations.amazon.helpers import is_safe_content
 from sales_channels.integrations.amazon.models.products import (
     AmazonEanCode,
     AmazonPrice,
@@ -240,75 +239,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if self.content is not None and not force:
             return
 
-        lang = (
-            self.view.remote_languages.first().local_instance
-            if self.view.remote_languages.exists()
-            else self.sales_channel.multi_tenant_company.language
-        )
-
-        channel_translation = ProductTranslation.objects.filter(
+        self.content = build_amazon_content_attributes(
             product=self.local_instance,
-            language=lang,
             sales_channel=self.sales_channel,
-        ).first()
-
-        default_translation = ProductTranslation.objects.filter(
-            product=self.local_instance,
-            language=lang,
-            sales_channel=None,
-        ).first()
-
-        item_name = None
-        product_description = None
-
-        if channel_translation:
-            item_name = channel_translation.name or None
-            product_description = channel_translation.description or None
-
-        if not item_name and default_translation:
-            item_name = default_translation.name
-
-        if not product_description and default_translation:
-            product_description = default_translation.description
-
-        bullet_points = []
-        if channel_translation:
-            bullet_points = list(
-                ProductTranslationBulletPoint.objects.filter(
-                    product_translation=channel_translation
-                )
-                .order_by("sort_order")
-                .values_list("text", flat=True)
-            )
-
-        attrs = {}
-        language_tag = self.view.language_tag if self.view else None
-        marketplace_id = self.view.remote_id if self.view else None
-
-        if item_name:
-            attrs["item_name"] = [{
-                "value": item_name,
-                "language_tag": language_tag,
-                "marketplace_id": marketplace_id,
-            }]
-        if is_safe_content(product_description):
-            attrs["product_description"] = [{
-                "value": product_description,
-                "language_tag": language_tag,
-                "marketplace_id": marketplace_id,
-            }]
-
-        if bullet_points:
-            attrs["bullet_point"] = [
-                {
-                    "value": bp,
-                    "language_tag": language_tag,
-                    "marketplace_id": marketplace_id,
-                }
-                for bp in bullet_points
-            ]
-
-        self.content = {k: v for k, v in attrs.items() if v not in (None, "")}
+            view=self.view,
+        )
 
     def validate(self):
         if getattr(self, "skip_checks", False):

@@ -8,10 +8,12 @@ from llm.schema.types.input import ContentAiGenerateType
 from django.utils.translation import gettext_lazy as _
 from products.models import Product, ProductTranslation
 from properties.models import Property, PropertySelectValue, PropertyTranslation, PropertySelectValueTranslation
+from sales_channels.helpers import build_content_payload
 
 
 BULLET_POINT_SEPARATOR = "__BULLET_SEPARATOR__"
 logger = logging.getLogger(__name__)
+TRANSLATABLE_CONTENT_FLAGS = {"subtitle": True, "bulletPoints": True}
 
 
 class AITranslateContentFlow:
@@ -30,44 +32,45 @@ class AITranslateContentFlow:
         self.return_one_bullet_point = return_one_bullet_point
         self.bullet_point_index = bullet_point_index
 
-    def _get_safe_translation(self, translation, attr):
-        """Helper method to safely get a translation attribute."""
-        return getattr(translation, attr, '') or ''
-
     def _set_product_translation(self):
         if self.product:
-            qs = self.product.translations.exclude(language=self.to_language_code)
-            default_lang = self.multi_tenant_company.language
+            default_lang = self.from_language_code or self.multi_tenant_company.language
+            content_payload = build_content_payload(
+                product=self.product,
+                sales_channel=self.sales_channel,
+                language=default_lang,
+                allow_language_fallback=False,
+                flags_override=TRANSLATABLE_CONTENT_FLAGS,
+            )
+            source_language = default_lang
+            if not content_payload and default_lang != self.multi_tenant_company.language:
+                source_language = self.multi_tenant_company.language
+                content_payload = build_content_payload(
+                    product=self.product,
+                    sales_channel=self.sales_channel,
+                    language=source_language,
+                    allow_language_fallback=False,
+                    flags_override=TRANSLATABLE_CONTENT_FLAGS,
+                )
+            if not content_payload:
+                return
 
-            translation = None
-            if self.sales_channel:
-                translation = qs.filter(language=default_lang, sales_channel=self.sales_channel).first()
+            if self.content_type == ContentAiGenerateType.DESCRIPTION:
+                self.to_translate = content_payload.get("description", "")
 
-            if not translation:
-                translation = qs.filter(language=default_lang, sales_channel__isnull=True).first()
+            if self.content_type == ContentAiGenerateType.SHORT_DESCRIPTION:
+                self.to_translate = content_payload.get("shortDescription", "")
 
-            if not translation:
-                translation = qs.first()
+            if self.content_type == ContentAiGenerateType.SUBTITLE:
+                self.to_translate = content_payload.get("subtitle", "")
 
-            if translation:
-                if self.content_type == ContentAiGenerateType.DESCRIPTION:
-                    self.to_translate = self._get_safe_translation(translation, 'description')
+            if self.content_type == ContentAiGenerateType.NAME:
+                self.to_translate = content_payload.get("name", "")
 
-                if self.content_type == ContentAiGenerateType.SHORT_DESCRIPTION:
-                    self.to_translate = self._get_safe_translation(translation, 'short_description')
+            if self.content_type == ContentAiGenerateType.BULLET_POINTS:
+                self.to_translate = content_payload.get("bulletPoints", [])
 
-                if self.content_type == ContentAiGenerateType.SUBTITLE:
-                    self.to_translate = self._get_safe_translation(translation, 'subtitle')
-
-                if self.content_type == ContentAiGenerateType.NAME:
-                    self.to_translate = self._get_safe_translation(translation, 'name')
-
-                if self.content_type == ContentAiGenerateType.BULLET_POINTS:
-                    self.to_translate = list(
-                        translation.bullet_points.order_by('sort_order').values_list('text', flat=True)
-                    )
-
-                self.from_language_code = translation.language
+            self.from_language_code = source_language
 
     def _validate(self):
         if not self.to_translate:

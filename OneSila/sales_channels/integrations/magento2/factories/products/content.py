@@ -1,6 +1,6 @@
 from magento.models import Product
-from products.models import ProductTranslation
 from sales_channels.factories.products.content import RemoteProductContentUpdateFactory
+from sales_channels.helpers import build_content_payload
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin, MagentoTranslationMixin
 from sales_channels.integrations.magento2.models import MagentoProductContent
 
@@ -17,33 +17,25 @@ class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductConten
         )
 
         for lang_code, magento_langs in remote_languages_map.items():
-            channel_translation = ProductTranslation.objects.filter(
+            content_payload = build_content_payload(
                 product=self.local_instance,
-                language=lang_code,
                 sales_channel=self.sales_channel,
-            ).first()
-
-            default_translation = ProductTranslation.objects.filter(
-                product=self.local_instance,
                 language=lang_code,
-                sales_channel=None,
-            ).first()
-
-            translation = channel_translation or default_translation
-            if not translation:
+            )
+            if not content_payload:
                 continue
 
             for magento_lang in magento_langs:
                 remote_code = magento_lang.store_view_code
 
                 content = {
-                    "name": translation.name,
-                    "url_key": translation.url_key,
+                    "name": content_payload.get("name"),
+                    "url_key": content_payload.get("urlKey"),
                 }
 
                 if self.sales_channel.sync_contents:
-                    content["short_description"] = translation.short_description
-                    content["description"] = translation.description
+                    content["short_description"] = content_payload.get("shortDescription")
+                    content["description"] = content_payload.get("description")
 
                 self.payload[remote_code] = content
 

@@ -8,8 +8,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional
 
 from currencies.models import Currency
-from products.models import ProductTranslation
 from properties.models import ProductPropertiesRuleItem, ProductProperty, Property
+from sales_channels.helpers import build_content_data, build_content_payload
 from sales_channels.factories.products.products import (
     RemoteProductCreateFactory,
     RemoteProductSyncFactory,
@@ -806,10 +806,6 @@ class SheinProductBaseFactory(
         return getattr(company, "language", None) or TranslationFieldsMixin.LANGUAGES[0][0]
 
     def _build_translations(self):
-        translations = list(self.local_instance.translations.all())
-        if not translations:
-            return
-
         default_language = self._get_default_language()
         from sales_channels.integrations.shein.models import SheinRemoteLanguage
 
@@ -837,41 +833,27 @@ class SheinProductBaseFactory(
 
         name_by_language: dict[str, str] = {}
         desc_by_language: dict[str, str] = {}
-        sales_channel_id = self.sales_channel.id
-        channel_translations: dict[str, ProductTranslation] = {}
-        default_translations: dict[str, ProductTranslation] = {}
-
-        for translation in translations:
-            language = translation.language or default_language
-            if not language:
-                continue
-            translation_sales_channel_id = getattr(translation, "sales_channel_id", None)
-            if translation_sales_channel_id == sales_channel_id:
-                channel_translations[language] = translation
-            elif translation_sales_channel_id is None:
-                default_translations[language] = translation
+        content_data = build_content_data(
+            product=self.local_instance,
+            sales_channel=self.sales_channel,
+        )
 
         for language in allowed_languages:
-            selected = channel_translations.get(language) or default_translations.get(language)
-            if selected is None:
+            content_payload = content_data.get(language)
+            if not content_payload and not content_data:
+                content_payload = build_content_payload(
+                    product=self.local_instance,
+                    sales_channel=self.sales_channel,
+                    language=language,
+                )
+            if not content_payload:
                 continue
 
-            fallback = default_translations.get(language)
-            name = selected.name
-            if not name and fallback is not None and fallback is not selected:
-                name = fallback.name
+            name = content_payload.get("name")
             if name:
                 name_by_language[language] = name
 
-            description = selected.description or selected.short_description
-            if fallback is not None and fallback is not selected:
-                fallback_desc = fallback.description or fallback.short_description
-                if not description or (
-                    self._is_blank_html(description)
-                    and fallback_desc
-                    and not self._is_blank_html(fallback_desc)
-                ):
-                    description = fallback_desc
+            description = content_payload.get("description") or content_payload.get("shortDescription")
             if description:
                 existing = desc_by_language.get(language)
                 if existing is None or (self._is_blank_html(existing) and not self._is_blank_html(description)):

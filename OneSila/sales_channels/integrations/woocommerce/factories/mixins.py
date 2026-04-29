@@ -12,6 +12,7 @@ from django.db.models import Q
 from sales_channels.factories.prices.prices import ToUpdateCurrenciesMixin
 from django.utils.translation import gettext as _
 from sales_channels.factories.value_mixins import RemoteValueMixin
+from sales_channels.helpers import build_content_payload
 
 import logging
 logger = logging.getLogger(__name__)
@@ -555,41 +556,14 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
 
         product = self.get_local_product()
         lang = getattr(self, "language", None) or self.sales_channel_assign_language
-
-        channel_translation = product.translations.filter(
-            language=lang,
+        content_payload = build_content_payload(
+            product=product,
             sales_channel=self.sales_channel,
-        ).first()
-
-        default_translation = product.translations.filter(
             language=lang,
-            sales_channel=None,
-        ).first()
-
-        name = None
-        description = None
-        short_description = None
-
-        if channel_translation:
-            name = channel_translation.name or None
-            description = channel_translation.description
-            if description == "<p><br></p>":
-                description = ""
-            short_description = channel_translation.short_description
-
-        if not name and default_translation:
-            name = default_translation.name
-
-        if (not description) and default_translation:
-            description = default_translation.description
-            if description == "<p><br></p>":
-                description = ""
-
-        if (not short_description) and default_translation:
-            short_description = default_translation.short_description
-
-        if short_description == "<p><br></p>":
-            short_description = ""
+        )
+        name = content_payload.get("name")
+        description = content_payload.get("description")
+        short_description = content_payload.get("shortDescription")
 
         if name is not None:
             self.payload["name"] = name

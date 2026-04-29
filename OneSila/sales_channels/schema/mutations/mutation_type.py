@@ -44,6 +44,7 @@ from sales_channels.content_templates import (
     build_content_template_context,
     render_sales_channel_content_template,
 )
+from sales_channels.helpers import build_content_payload
 from sales_channels.models import SalesChannel, SalesChannelGptFeed, SalesChannelImport, SalesChannelViewAssign, RemotePropertySelectValue
 from ...integrations.mirakl.schema.types import MiraklPropertySelectValueType
 
@@ -254,19 +255,13 @@ class SalesChannelsMutation:
                 ],
             )
 
-        description = product_instance._get_translated_value(
-            field_name='description',
-            language=language_code,
-            related_name='translations',
+        content_payload = build_content_payload(
+            product=product_instance,
             sales_channel=channel,
-        )
-
-        title = product_instance._get_translated_value(
-            field_name='name',
             language=language_code,
-            related_name='translations',
-            sales_channel=channel,
         )
+        description = content_payload.get("description", "")
+        title = content_payload.get("name", "")
 
         context = build_content_template_context(
             product=product_instance,

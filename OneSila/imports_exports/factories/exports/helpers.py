@@ -2,12 +2,16 @@ from typing import Iterable
 
 from integrations.helpers import resolve_public_integration_lookup
 from products.models import ProductTranslation
+from sales_channels.helpers import build_content_payload
 from properties.models import (
     ProductProperty,
     ProductPropertyTextTranslation,
     Property,
     PropertySelectValue,
 )
+
+EXPORT_CONTENT_FLAGS = {"subtitle": True, "bulletPoints": True}
+
 
 def get_related_objects(*, instance, related_name):
     prefetched = getattr(instance, "_prefetched_objects_cache", {})
@@ -216,6 +220,30 @@ def serialize_translation_sales_channel(*, sales_channel):
     return sales_channel.id if sales_channel is not None else None
 
 
+def serialize_content_payload_translation(*, content_payload, language, sales_channel):
+    if not content_payload:
+        return []
+
+    payload = {
+        "language": language,
+        "name": content_payload.get("name", ""),
+        "sales_channel": serialize_translation_sales_channel(sales_channel=sales_channel),
+    }
+
+    if content_payload.get("subtitle"):
+        payload["subtitle"] = content_payload["subtitle"]
+    if content_payload.get("shortDescription"):
+        payload["short_description"] = content_payload["shortDescription"]
+    if content_payload.get("description"):
+        payload["description"] = content_payload["description"]
+    if content_payload.get("urlKey"):
+        payload["url_key"] = content_payload["urlKey"]
+    if content_payload.get("bulletPoints"):
+        payload["bullet_points"] = content_payload["bulletPoints"]
+
+    return [payload]
+
+
 def serialize_sales_channel_payload(*, sales_channel):
     integration_type, subtype = resolve_public_integration_lookup(
         integration=sales_channel,
@@ -234,6 +262,26 @@ def get_product_translation_payloads(
     language=None,
     sales_channel=None,
 ):
+    if language is not None and sales_channel is not None and hasattr(product, "_meta"):
+        content_payload = build_content_payload(
+            product=product,
+            sales_channel=sales_channel,
+            language=language,
+            flags_override=EXPORT_CONTENT_FLAGS,
+        )
+        payload_sales_channel = sales_channel
+        if not ProductTranslation.objects.filter(
+            product=product,
+            language=language,
+            sales_channel=sales_channel,
+        ).exists():
+            payload_sales_channel = None
+        return serialize_content_payload_translation(
+            content_payload=content_payload,
+            language=language,
+            sales_channel=payload_sales_channel,
+        )
+
     selected = list(product.translations.all())
     if language is not None:
         selected = [

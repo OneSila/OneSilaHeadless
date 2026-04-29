@@ -1,4 +1,7 @@
 from llm.factories.content import BulletPointsLLM
+from sales_channels.helpers import build_content_payload
+
+GENERATE_BULLET_POINTS_CONTENT_FLAGS = {"bulletPoints": True}
 
 
 class AIGenerateBulletPointsFlow:
@@ -17,17 +20,13 @@ class AIGenerateBulletPointsFlow:
         self.used_points = 0
 
     def _get_existing_bullet_points(self):
-        translations = self.product.translations.prefetch_related("bullet_points")
-        translation = translations.filter(language=self.language).first() or translations.first()
-
-        if not translation:
-            return []
-
-        return [
-            bp
-            for bp in translation.bullet_points.order_by("sort_order").values_list("text", flat=True)
-            if bp
-        ]
+        content_payload = build_content_payload(
+            product=self.product,
+            sales_channel=None,
+            language=self.language,
+            flags_override=GENERATE_BULLET_POINTS_CONTENT_FLAGS,
+        )
+        return [point for point in content_payload.get("bulletPoints", []) if point]
 
     def generate_points(self):
         self.factory.generate_response()
@@ -38,4 +37,3 @@ class AIGenerateBulletPointsFlow:
     def flow(self):
         self.generate_points()
         return self.generated_points
-

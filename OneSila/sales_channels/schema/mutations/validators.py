@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from sales_channels.exceptions import VariationAlreadyExistsOnWebsite
+from sales_channels.helpers import build_content_payload
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.shopify.models import ShopifySalesChannel
 
@@ -101,18 +102,13 @@ def validate_amazon_assignment(data, info):
         if not remote_language_code:
             remote_language_code = getattr(sales_channel.multi_tenant_company, "language", None)
 
-        localized_title = product._get_translated_value(
-            field_name='name',
-            language=remote_language_code,
-            related_name='translations',
+        content_payload = build_content_payload(
+            product=product,
             sales_channel=sales_channel,
-        )
-        localized_description = product._get_translated_value(
-            field_name='description',
             language=remote_language_code,
-            related_name='translations',
-            sales_channel=sales_channel,
         )
+        localized_title = content_payload.get("name", "")
+        localized_description = content_payload.get("description", "")
 
         title_length = len((localized_title or '').strip())
         description_length = len((localized_description or '').strip())

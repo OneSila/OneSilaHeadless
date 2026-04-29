@@ -6,6 +6,9 @@ from llm.models import BrandCustomPrompt
 from media.models import Media, MediaProductThrough
 from products.models import ConfigurableVariation, Product, ProductTranslation
 from properties.models import ProductProperty, Property
+from sales_channels.helpers import build_content_payload
+
+CONTEXT_CONTENT_FLAGS = {"subtitle": True, "bulletPoints": True}
 
 
 class BulkContentContextBuilder:
@@ -176,29 +179,18 @@ class BulkContentContextBuilder:
     def build_existing_content(
         self,
         *,
-        translations: list[ProductTranslation],
+        product: Product,
         language: str,
-        sales_channel_id: int | None,
+        sales_channel=None,
     ) -> dict[str, Any]:
-        translation = self.select_translation(
-            translations=translations,
+        content_payload = build_content_payload(
+            product=product,
+            sales_channel=sales_channel,
             language=language,
-            sales_channel_id=sales_channel_id,
+            allow_language_fallback=False,
+            flags_override=CONTEXT_CONTENT_FLAGS,
         )
-        if not translation:
-            return {}
-
-        bullets = sorted(list(translation.bullet_points.all()), key=lambda item: item.sort_order)
-        bullet_points = [bullet.text for bullet in bullets]
-
-        return {
-            "name": translation.name,
-            "subtitle": translation.subtitle,
-            "shortDescription": translation.short_description,
-            "description": translation.description,
-            "urlKey": translation.url_key,
-            "bulletPoints": bullet_points,
-        }
+        return dict(content_payload) if content_payload else {}
 
     def build_product_context(
         self,
@@ -206,14 +198,15 @@ class BulkContentContextBuilder:
         product: Product,
         languages: list[str],
         default_language: str | None = None,
-        sales_channel_id: int | None = None,
+        sales_channel=None,
     ) -> dict[str, Any]:
         default_language = default_language or self.default_language
-        translations = self.translations_by_product.get(product.id, [])
-        default_translation = self.select_translation(
-            translations=translations,
+        default_content = build_content_payload(
+            product=product,
+            sales_channel=sales_channel,
             language=default_language,
-            sales_channel_id=sales_channel_id,
+            allow_language_fallback=False,
+            flags_override=CONTEXT_CONTENT_FLAGS,
         )
 
         base_properties = self.property_map.get(product.id, {})
@@ -261,9 +254,9 @@ class BulkContentContextBuilder:
                 "id": product.id,
                 "sku": product.sku,
                 "type": product.type,
-                "default_name": default_translation.name if default_translation else "",
-                "default_short_description": default_translation.short_description if default_translation else "",
-                "default_description": default_translation.description if default_translation else "",
+                "default_name": default_content.get("name", ""),
+                "default_short_description": default_content.get("shortDescription", ""),
+                "default_description": default_content.get("description", ""),
             },
             "properties": properties_payload,
             "brand_prompt_by_language": brand_prompt_by_language,

@@ -9,6 +9,7 @@ from sales_channels.content_templates import (
     get_sales_channel_content_template_iframe,
     render_sales_channel_content_template,
 )
+from sales_channels.helpers import build_content_payload
 from sales_channels.models.sales_channels import SalesChannelContentTemplate
 
 
@@ -23,18 +24,13 @@ def sales_channel_content_template_preview(request, template_id: int, product_id
         raise Http404()
 
     language = template.language
-    description = product._get_translated_value(
-        field_name="description",
-        related_name="translations",
-        language=language,
+    content_payload = build_content_payload(
+        product=product,
         sales_channel=template.sales_channel,
-    )
-    title = product._get_translated_value(
-        field_name="name",
-        related_name="translations",
         language=language,
-        sales_channel=template.sales_channel,
     )
+    description = content_payload.get("description", "")
+    title = content_payload.get("name", "")
 
     if not template.template.strip():
         return HttpResponse(mark_safe(description or ""))

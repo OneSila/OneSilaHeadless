@@ -534,6 +534,9 @@ def _content_is_empty(value):
 def _resolve_content_integration_type(*, sales_channel):
     from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
 
+    if sales_channel is None:
+        return "default"
+
     return INTEGRATIONS_TYPES_MAP.get(sales_channel.__class__, MAGENTO_INTEGRATION)
 
 
@@ -549,20 +552,115 @@ def _resolve_content_rules(*, sales_channel):
 def _get_content_translation(*, product, language, sales_channel):
     from products.models import ProductTranslation
 
-    specific = ProductTranslation.objects.filter(
-        product=product,
-        language=language,
-        sales_channel=sales_channel,
-    ).first()
     default = ProductTranslation.objects.filter(
         product=product,
         language=language,
         sales_channel__isnull=True,
     ).first()
+    if sales_channel is None:
+        return None, default
+
+    specific = ProductTranslation.objects.filter(
+        product=product,
+        language=language,
+        sales_channel=sales_channel,
+    ).first()
     return specific, default
 
 
-def build_content_data(*, product, sales_channel):
+def _build_content_payload_for_language(*, product, sales_channel, language, flags=None):
+    flags = flags or _resolve_content_rules(sales_channel=sales_channel)
+    specific, default = _get_content_translation(
+        product=product,
+        language=language,
+        sales_channel=sales_channel,
+    )
+    if not specific and not default:
+        return {}
+
+    payload = {}
+    if flags.get("name"):
+        value = specific.name if specific and not _content_is_empty(specific.name) else (
+            default.name if default else None
+        )
+        if not _content_is_empty(value):
+            payload["name"] = value
+    if flags.get("subtitle"):
+        value = specific.subtitle if specific and not _content_is_empty(specific.subtitle) else (
+            default.subtitle if default else None
+        )
+        if not _content_is_empty(value):
+            payload["subtitle"] = value
+    if flags.get("urlKey"):
+        value = specific.url_key if specific and not _content_is_empty(specific.url_key) else (
+            default.url_key if default else None
+        )
+        if not _content_is_empty(value):
+            payload["urlKey"] = value
+    if flags.get("shortDescription"):
+        value = (
+            specific.short_description if specific and not _content_is_empty(specific.short_description) else (
+                default.short_description if default else None
+            )
+        )
+        if not _content_is_empty(value):
+            payload["shortDescription"] = value
+    if flags.get("description"):
+        value = specific.description if specific and not _content_is_empty(specific.description) else (
+            default.description if default else None
+        )
+        if not _content_is_empty(value):
+            payload["description"] = value
+    if flags.get("bulletPoints"):
+        if specific and specific.bullet_points.exists():
+            points = [bp.text for bp in specific.bullet_points.all() if not _content_is_empty(bp.text)]
+        elif default:
+            points = [bp.text for bp in default.bullet_points.all() if not _content_is_empty(bp.text)]
+        else:
+            points = []
+        if points:
+            payload["bulletPoints"] = points
+
+    return payload
+
+
+def _validate_content_payloads(*, product, sales_channel, content_data):
+    from sales_channels.exceptions import PreFlightCheckError
+
+    if sales_channel is None:
+        return
+
+    min_name_length = getattr(sales_channel, "min_name_length", 0)
+    min_description_length = getattr(sales_channel, "min_description_length", 0)
+    if not min_name_length and not min_description_length:
+        return
+
+    for language, payload in (content_data or {}).items():
+        name_length = len((payload.get("name") or "").strip())
+        description_length = len((payload.get("description") or "").strip())
+
+        if min_name_length and name_length < min_name_length:
+            raise PreFlightCheckError(
+                "Product {} content for language {} must have at least {} name characters. Current length: {}.".format(
+                    getattr(product, "sku", product.pk),
+                    language,
+                    min_name_length,
+                    name_length,
+                )
+            )
+
+        if min_description_length and description_length < min_description_length:
+            raise PreFlightCheckError(
+                "Product {} content for language {} must have at least {} description characters. Current length: {}.".format(
+                    getattr(product, "sku", product.pk),
+                    language,
+                    min_description_length,
+                    description_length,
+                )
+            )
+
+
+def build_content_data(*, product, sales_channel, apply_validations=False, flags_override=None):
     from sales_channels.models import RemoteLanguage
 
     resolved = getattr(sales_channel, "get_real_instance", None)
@@ -570,7 +668,22 @@ def build_content_data(*, product, sales_channel):
         sales_channel = resolved()
 
     flags = _resolve_content_rules(sales_channel=sales_channel)
+    if flags_override:
+        flags = {**flags, **flags_override}
     content_data = {}
+
+    if sales_channel is None:
+        fallback_language = getattr(getattr(product, "multi_tenant_company", None), "language", None)
+        if fallback_language:
+            payload = _build_content_payload_for_language(
+                product=product,
+                sales_channel=None,
+                language=fallback_language,
+                flags=flags,
+            )
+            if payload:
+                content_data[str(fallback_language)] = payload
+        return content_data
 
     remote_languages = RemoteLanguage.objects.filter(
         sales_channel=sales_channel,
@@ -578,55 +691,102 @@ def build_content_data(*, product, sales_channel):
     )
     for remote_language in remote_languages:
         language = remote_language.local_instance
-        specific, default = _get_content_translation(
+        payload = _build_content_payload_for_language(
             product=product,
-            language=language,
             sales_channel=sales_channel,
+            language=language,
+            flags=flags,
         )
-        if not specific and not default:
-            continue
-
-        payload = {}
-        if flags.get("name"):
-            value = specific.name if specific and not _content_is_empty(specific.name) else (
-                default.name if default else None
-            )
-            if not _content_is_empty(value):
-                payload["name"] = value
-        if flags.get("subtitle"):
-            value = specific.subtitle if specific and not _content_is_empty(specific.subtitle) else (
-                default.subtitle if default else None
-            )
-            if not _content_is_empty(value):
-                payload["subtitle"] = value
-        if flags.get("shortDescription"):
-            value = (
-                specific.short_description if specific and not _content_is_empty(specific.short_description) else (
-                    default.short_description if default else None
-                )
-            )
-            if not _content_is_empty(value):
-                payload["shortDescription"] = value
-        if flags.get("description"):
-            value = specific.description if specific and not _content_is_empty(specific.description) else (
-                default.description if default else None
-            )
-            if not _content_is_empty(value):
-                payload["description"] = value
-        if flags.get("bulletPoints"):
-            if specific and specific.bullet_points.exists():
-                points = [bp.text for bp in specific.bullet_points.all() if not _content_is_empty(bp.text)]
-            elif default:
-                points = [bp.text for bp in default.bullet_points.all() if not _content_is_empty(bp.text)]
-            else:
-                points = []
-            if points:
-                payload["bulletPoints"] = points
 
         if payload:
             content_data[str(language)] = payload
 
+    if apply_validations:
+        _validate_content_payloads(
+            product=product,
+            sales_channel=sales_channel,
+            content_data=content_data,
+        )
+
     return content_data
+
+
+def select_content_payload(*, content_data, language=None, fallback_language=None):
+    if not content_data:
+        return {}
+
+    preferred_languages = []
+    for candidate in (language, fallback_language):
+        if candidate is None:
+            continue
+        candidate = str(candidate)
+        if candidate not in preferred_languages:
+            preferred_languages.append(candidate)
+
+    preferred_languages.extend(
+        content_language
+        for content_language in content_data.keys()
+        if content_language not in preferred_languages
+    )
+
+    for content_language in preferred_languages:
+        payload = content_data.get(content_language)
+        if payload:
+            return payload
+
+    return {}
+
+
+def build_content_payload(
+    *,
+    product,
+    sales_channel,
+    language=None,
+    content_data=None,
+    apply_validations=False,
+    allow_language_fallback=True,
+    flags_override=None,
+):
+    if content_data is None:
+        content_data = build_content_data(
+            product=product,
+            sales_channel=sales_channel,
+            apply_validations=apply_validations,
+            flags_override=flags_override,
+        )
+
+    if not allow_language_fallback:
+        if language is None:
+            return {}
+        payload = (content_data or {}).get(str(language))
+        if payload:
+            return payload
+        return _build_content_payload_for_language(
+            product=product,
+            sales_channel=sales_channel,
+            language=language,
+            flags={**_resolve_content_rules(sales_channel=sales_channel), **(flags_override or {})},
+        )
+
+    fallback_language = getattr(getattr(sales_channel, "multi_tenant_company", None), "language", None)
+    payload = select_content_payload(
+        content_data=content_data,
+        language=language,
+        fallback_language=fallback_language,
+    )
+    if payload:
+        return payload
+
+    resolved_language = language or fallback_language
+    if not resolved_language:
+        return {}
+
+    return _build_content_payload_for_language(
+        product=product,
+        sales_channel=sales_channel,
+        language=resolved_language,
+        flags={**_resolve_content_rules(sales_channel=sales_channel), **(flags_override or {})},
+    )
 
 
 def run_remote_product_dependent_sales_channel_factory(

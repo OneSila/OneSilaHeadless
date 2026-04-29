@@ -95,6 +95,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.is_switched = is_switched
         self._content_template_media_assignments = None
         self._content_template_cache = {}
+        self._content_data_cache = {}
         self.successfully_created = True
 
     def _set_successfully_created(self, *, value: bool) -> None:
@@ -245,6 +246,29 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             return description
 
         return rendered or description
+
+    def _get_content_data(self, *, product=None):
+        from sales_channels.helpers import build_content_data
+
+        product = product or self.local_instance
+        product_id = getattr(product, "id", None)
+        if product_id not in self._content_data_cache:
+            self._content_data_cache[product_id] = build_content_data(
+                product=product,
+                sales_channel=self.sales_channel,
+            )
+        return self._content_data_cache[product_id]
+
+    def _get_content_payload(self, *, product=None, language=None):
+        from sales_channels.helpers import build_content_payload
+
+        fallback_language = getattr(getattr(self.sales_channel, "multi_tenant_company", None), "language", None)
+        return build_content_payload(
+            product=product or self.local_instance,
+            sales_channel=self.sales_channel,
+            content_data=self._get_content_data(product=product),
+            language=language or fallback_language,
+        )
 
     def initialize_remote_product(self):
         """
@@ -479,8 +503,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Sets the name for the product or variation in the payload.
         For variations, it delegates to set_variation_name.
         """
-        self.name = self.local_instance._get_translated_value(
-            field_name='name', related_name='translations', sales_channel=self.sales_channel)
+        self.name = self._get_content_payload().get("name", "")
 
         if self.is_variation:
             self.set_variation_name()
@@ -493,8 +516,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         This method can be overridden for custom naming logic for variations.
         """
         if self.is_variation and self.sales_channel.use_configurable_name:
-            self.name = self.parent_local_instance._get_translated_value(
-                field_name='name', related_name='translations', sales_channel=self.sales_channel)
+            self.name = self._get_content_payload(product=self.parent_local_instance).get("name", "")
 
     def set_sku(self):
         """Sets the SKU for the product or variation in the payload."""
@@ -558,8 +580,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_short_description(self):
         """Sets the short description for the product or variation in the payload."""
-        self.short_description = self.local_instance._get_translated_value(
-            field_name='short_description', related_name='translations', sales_channel=self.sales_channel)
+        self.short_description = self._get_content_payload().get("shortDescription", "")
 
         if self.is_variation:
             self.set_variation_short_description()
@@ -572,11 +593,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_description(self):
         """Sets the description for the product or variation in the payload."""
-        self.description = self.local_instance._get_translated_value(
-            field_name='description',
-            related_name='translations',
-            sales_channel=self.sales_channel,
-        )
+        self.description = self._get_content_payload().get("description", "")
 
         if self.is_variation:
             self.set_variation_description()
@@ -589,7 +606,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_url_key(self):
         """Sets the URL key for the product or variation in the payload."""
-        self.url_key = self.local_instance._get_translated_value(field_name='url_key', related_name='translations', sales_channel=self.sales_channel)
+        self.url_key = self._get_content_payload().get("urlKey", "")
 
         if self.is_variation:
             self.set_variation_url_key()
@@ -816,41 +833,20 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             return
 
         for remote_language in self.get_remote_languages():
-            # Fetch translations for each content field
-            short_description = self.local_instance._get_translated_value(
-                field_name='short_description',
+            content_payload = self._get_content_payload(
                 language=remote_language.local_instance,
-                related_name='translations',
-                sales_channel=self.sales_channel
             )
-
-            description = self.local_instance._get_translated_value(
-                field_name='description',
-                language=remote_language.local_instance,
-                related_name='translations',
-                sales_channel=self.sales_channel
-            )
-
+            short_description = content_payload.get("shortDescription", "")
+            description = content_payload.get("description", "")
             description = self._render_content_template(
                 description=description,
                 language=remote_language.local_instance,
-                title=self.local_instance._get_translated_value(
-                    field_name='name',
-                    language=remote_language.local_instance,
-                    related_name='translations',
-                    sales_channel=self.sales_channel,
-                ),
+                title=content_payload.get("name", ""),
                 price=getattr(self, 'price', None),
                 discount_price=getattr(self, 'discount', None),
                 currency=getattr(self, 'default_currency_code', None),
             )
-
-            url_key = self.local_instance._get_translated_value(
-                field_name='url_key',
-                language=remote_language.local_instance,
-                related_name='translations',
-                sales_channel=self.sales_channel
-            )
+            url_key = content_payload.get("urlKey", "")
 
             self.process_content_translation(
                 short_description=short_description,

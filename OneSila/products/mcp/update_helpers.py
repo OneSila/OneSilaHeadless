@@ -24,8 +24,11 @@ from products.mcp.types import (
 from products.models import Product, ProductTranslation
 from properties.mcp.helpers import get_company_language_codes
 from properties.models import Property
+from sales_channels.helpers import build_content_payload
 from sales_channels.models import SalesChannel, SalesChannelView, SalesChannelViewAssign
 from workflows.models import Workflow, WorkflowProductAssignment, WorkflowState
+
+TRANSLATION_SEED_CONTENT_FLAGS = {"subtitle": True, "bulletPoints": True}
 
 
 def parse_boolean_input(*, value, field_name: str) -> bool:
@@ -517,36 +520,13 @@ def get_existing_translation_seed(
     language: str,
     sales_channel,
 ) -> dict[str, Any]:
-    target_sales_channel_id = getattr(sales_channel, "id", None)
-    translations = list(product.translations.all())
-
-    current_translation = next(
-        (
-            translation for translation in translations
-            if translation.language == language and translation.sales_channel_id == target_sales_channel_id
-        ),
-        None,
+    content_payload = build_content_payload(
+        product=product,
+        sales_channel=sales_channel,
+        language=language,
+        flags_override=TRANSLATION_SEED_CONTENT_FLAGS,
     )
-    if current_translation is None and sales_channel is not None:
-        current_translation = next(
-            (
-                translation for translation in translations
-                if translation.language == language and translation.sales_channel_id is None
-            ),
-            None,
-        )
-    if current_translation is None:
-        current_translation = next(
-            (
-                translation for translation in translations
-                if translation.language == language
-            ),
-            None,
-        )
-    if current_translation is None and translations:
-        current_translation = translations[0]
-
-    if current_translation is None:
+    if not content_payload:
         return {
             "name": product.name,
             "subtitle": None,
@@ -556,14 +536,11 @@ def get_existing_translation_seed(
         }
 
     return {
-        "name": current_translation.name or product.name,
-        "subtitle": current_translation.subtitle,
-        "short_description": current_translation.short_description,
-        "description": current_translation.description,
-        "bullet_points": [
-            bullet_point.text
-            for bullet_point in current_translation.bullet_points.order_by("sort_order", "id")
-        ],
+        "name": content_payload.get("name") or product.name,
+        "subtitle": content_payload.get("subtitle"),
+        "short_description": content_payload.get("shortDescription"),
+        "description": content_payload.get("description"),
+        "bullet_points": content_payload.get("bulletPoints", []),
     }
 
 

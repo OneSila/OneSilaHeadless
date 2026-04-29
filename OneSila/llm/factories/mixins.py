@@ -10,8 +10,8 @@ from django.utils.translation import gettext_lazy as _
 from billing.models import AiPointTransaction
 from llm.models import AiGenerateProcess, AiTranslationProcess, AiImportProcess
 from media.models import MediaProductThrough
-from products.models import ProductTranslation
 from properties.helpers import get_product_properties_dict
+from sales_channels.helpers import build_content_payload
 
 import logging
 logger = logging.getLogger(__name__)
@@ -222,24 +222,20 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         self.brand_prompt = None
 
     def _set_translation(self):
-        self.translation = ProductTranslation.objects.filter(
+        self.content_payload = build_content_payload(
             product=self.product,
-            language=self.language_code
-        ).first()
-
-        # we can generate content for not existent translations
-        # ex we have the english product then we switch to Dutch and we want to generate the translation
-        if self.translation is None:
-            self.translation = ProductTranslation.objects.filter(product=self.product).first()
+            sales_channel=None,
+            language=self.language_code,
+        )
 
     def _set_product_name(self):
-        self.product_name = self.translation.name
+        self.product_name = self.content_payload.get("name") or getattr(self.product, "sku", "") or ""
 
     def _set_short_description(self):
-        self.short_description = self.translation.short_description
+        self.short_description = self.content_payload.get("shortDescription", "")
 
     def _set_description(self):
-        self.description = self.translation.description
+        self.description = self.content_payload.get("description", "")
 
     def _set_images(self):
 

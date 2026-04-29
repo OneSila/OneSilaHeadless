@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from django.conf import settings
 from django.utils import timezone
@@ -14,8 +13,9 @@ from llm.exceptions import (
 )
 from llm.models import ChatGptProductFeedConfig
 from media.models import Media, MediaProductThrough
-from products.models import Product, ProductTranslation
+from products.models import Product
 from properties.models import ProductProperty
+from sales_channels.helpers import build_content_payload
 from sales_channels.models import RemoteProduct, SalesChannelViewAssign
 
 
@@ -44,20 +44,25 @@ class ProductFeedPayloadFactory:
     def build(self) -> List[Dict[str, object]]:
         products = self._resolve_products()
         property_cache = self._prepare_property_cache(products=products)
-        translations_map = self._prepare_translations(products=products)
         media_map = self._prepare_media(products=products)
-        parent_translation = self._select_translation(
-            translations=translations_map.get(self.parent_product.id, [])
+        parent_content_payload = build_content_payload(
+            product=self.parent_product,
+            sales_channel=self.sales_channel,
+            language=self.language_code,
         )
 
         payloads: List[Dict[str, object]] = []
         for product in products:
-            translation = self._select_translation(translations=translations_map.get(product.id, []))
+            content_payload = build_content_payload(
+                product=product,
+                sales_channel=self.sales_channel,
+                language=self.language_code,
+            )
             payloads.append(
                 self._build_payload_for_product(
                     product=product,
-                    translation=translation,
-                    parent_translation=parent_translation,
+                    content_payload=content_payload,
+                    parent_content_payload=parent_content_payload,
                     property_cache=property_cache,
                     media_map=media_map,
                 )
@@ -199,16 +204,6 @@ class ProductFeedPayloadFactory:
 
         return {(item.product_id, item.property_id): item for item in queryset}
 
-    def _prepare_translations(self, *, products: Sequence[Product]) -> Dict[int, List[ProductTranslation]]:
-        product_ids = {product.id for product in products}
-        product_ids.add(self.parent_product.id)
-
-        queryset = ProductTranslation.objects.filter(product_id__in=product_ids)
-        translations_map: Dict[int, List[ProductTranslation]] = defaultdict(list)
-        for translation in queryset:
-            translations_map[translation.product_id].append(translation)
-        return translations_map
-
     def _prepare_media(self, *, products: Sequence[Product]) -> Dict[int, List[MediaProductThrough]]:
         relevant_products = {product.id: product for product in products}
         relevant_products.setdefault(self.parent_product.id, self.parent_product)
@@ -227,33 +222,6 @@ class ProductFeedPayloadFactory:
             media_map[product.id] = list(throughs)
 
         return media_map
-
-    def _select_translation(self, *, translations: Iterable[ProductTranslation]) -> Optional[ProductTranslation]:
-        translations = list(translations)
-        if not translations:
-            return None
-
-        def _match(*, prefer_channel: Optional[int], prefer_language: Optional[str]) -> Optional[ProductTranslation]:
-            for trans in translations:
-                if prefer_language and trans.language != prefer_language:
-                    continue
-                if prefer_channel is None and trans.sales_channel_id is not None:
-                    continue
-                if prefer_channel is not None and trans.sales_channel_id != prefer_channel:
-                    continue
-                return trans
-            return None
-
-        channel_id = getattr(self.sales_channel, "id", None)
-        language = self.language_code
-
-        return (
-            _match(prefer_channel=channel_id, prefer_language=language)
-            or _match(prefer_channel=None, prefer_language=language)
-            or _match(prefer_channel=channel_id, prefer_language=None)
-            or _match(prefer_channel=None, prefer_language=None)
-            or translations[0]
-        )
 
     def _get_property_value(
         self,
@@ -496,13 +464,13 @@ class ProductFeedPayloadFactory:
         self,
         *,
         product: Product,
-        translation: Optional[ProductTranslation],
-        parent_translation: Optional[ProductTranslation],
+        content_payload: Dict[str, object],
+        parent_content_payload: Dict[str, object],
         property_cache: Dict[tuple[int, int], ProductProperty],
         media_map: Dict[int, List[MediaProductThrough]],
     ) -> Dict[str, object]:
-        title = translation.name if translation else product.name
-        description = translation.description if translation else None
+        title = content_payload.get("name") or product.name
+        description = content_payload.get("description")
 
         assignments = media_map.get(product.id) or media_map.get(self.parent_product.id, [])
         thumbnail, additional_images, video_link = self._extract_media_urls(assignments=assignments)
@@ -526,10 +494,7 @@ class ProductFeedPayloadFactory:
         item_group_title = None
         if self.parent_product.is_configurable():
             item_group_id = self.parent_product.sku
-            if parent_translation:
-                item_group_title = parent_translation.name
-            else:
-                item_group_title = self.parent_product.name
+            item_group_title = parent_content_payload.get("name") or self.parent_product.name
 
         variants = self._build_custom_variants(product=product, property_cache=property_cache)
 

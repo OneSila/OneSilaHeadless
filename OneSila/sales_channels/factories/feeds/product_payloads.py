@@ -5,8 +5,9 @@ from typing import Any
 
 from eancodes.models import EanCode
 from media.models import Media, MediaProductThrough
-from products.models import Product, ProductTranslation
+from products.models import Product
 from properties.models import ProductProperty
+from sales_channels.helpers import build_content_payload
 from sales_channels.models import SalesChannelIntegrationPricelist
 from sales_channels.models.products import RemoteProduct
 from sales_prices.models import SalesPriceListItem
@@ -26,7 +27,6 @@ class SalesChannelFeedProductPayloadFactory:
             return []
 
         products = self._resolve_products()
-        translations = self._load_translations(products=products)
         product_properties = self._load_properties(products=products)
         prices = self._load_prices(products=products)
         media = self._load_media(products=products)
@@ -37,7 +37,11 @@ class SalesChannelFeedProductPayloadFactory:
 
         payloads: list[dict[str, Any]] = []
         for product in products:
-            translation = self._select_translation(translations=translations.get(product.id, []))
+            content_payload = build_content_payload(
+                product=product,
+                sales_channel=self.sales_channel,
+                language=self.language,
+            )
             product_payload = {
                 "local_product_id": product.id,
                 "action": self._determine_action(remote_product=self.remote_product, product=product),
@@ -46,10 +50,10 @@ class SalesChannelFeedProductPayloadFactory:
                 "variant_group_code": variant_group_code if product.id != self.local_product.id else "",
                 "type": getattr(product, "type", "") or "",
                 "active": bool(getattr(product, "active", False)),
-                "name": getattr(translation, "name", None) or getattr(product, "name", ""),
-                "short_description": getattr(translation, "short_description", None) or "",
-                "description": getattr(translation, "description", None) or "",
-                "url_key": getattr(translation, "url_key", None) or "",
+                "name": content_payload.get("name") or getattr(product, "name", ""),
+                "short_description": content_payload.get("shortDescription") or "",
+                "description": content_payload.get("description") or "",
+                "url_key": content_payload.get("urlKey") or "",
                 "ean": eans.get(product.id, ""),
                 "brand": self._extract_brand(product_properties=product_properties.get(product.id, [])),
                 "category": self._extract_category(),
@@ -66,13 +70,6 @@ class SalesChannelFeedProductPayloadFactory:
             return [self.local_product]
         variations = list(self.local_product.get_configurable_variations(active_only=False))
         return [self.local_product, *variations] if variations else [self.local_product]
-
-    def _load_translations(self, *, products: list[Product]) -> dict[int, list[ProductTranslation]]:
-        queryset = ProductTranslation.objects.filter(product_id__in=[product.id for product in products]).order_by("id")
-        results: dict[int, list[ProductTranslation]] = defaultdict(list)
-        for translation in queryset.iterator():
-            results[translation.product_id].append(translation)
-        return results
 
     def _load_properties(self, *, products: list[Product]) -> dict[int, list[ProductProperty]]:
         queryset = (
@@ -143,21 +140,6 @@ class SalesChannelFeedProductPayloadFactory:
     def _load_eans(self, *, products: list[Product]) -> dict[int, str]:
         queryset = EanCode.objects.filter(product_id__in=[product.id for product in products]).order_by("id")
         return {ean.product_id: ean.ean_code for ean in queryset.iterator() if ean.ean_code}
-
-    def _select_translation(self, *, translations: list[ProductTranslation]) -> ProductTranslation | None:
-        if not translations:
-            return None
-        if self.language:
-            for translation in translations:
-                if translation.language == self.language and translation.sales_channel_id in (None, self.sales_channel.id):
-                    return translation
-            for translation in translations:
-                if translation.language == self.language:
-                    return translation
-        for translation in translations:
-            if translation.sales_channel_id in (None, self.sales_channel.id):
-                return translation
-        return translations[0]
 
     def _determine_action(self, *, remote_product: RemoteProduct, product: Product) -> str:
         if not getattr(product, "active", False):
