@@ -355,6 +355,7 @@ class MiraklProductPayloadBuilder:
                 sales_channel=self.sales_channel,
                 language=self.language,
                 content_data=content_data,
+                apply_validations=True,
             )
         fallback_name = getattr(content_product, "name", None) or getattr(product, "name", "") or ""
 
@@ -1714,6 +1715,7 @@ class MiraklProductPayloadBuilder:
             sales_channel=self.sales_channel,
             language=self._get_effective_local_language_code(remote_property=remote_property),
             content_data=product_context.get("content_data") or {},
+            apply_validations=True,
         ) or product_context.get("content_payload") or {}
 
     def _resolve_select_backed_default_value(self, *, remote_property: MiraklProperty, raw_default: str) -> str:
@@ -1821,6 +1823,7 @@ class MiraklProductPayloadBuilder:
         return build_content_data(
             product=product,
             sales_channel=self.sales_channel,
+            apply_validations=True,
         )
 
     def _select_content_payload(self, *, content_data: dict[str, Any], language_code: str | None = None) -> dict[str, Any]:

@@ -289,3 +289,44 @@ class BuildContentDataHelperTests(DisableMagentoAndWooConnectionsMixin, TestCase
                 sales_channel=sales_channel,
                 apply_validations=True,
             )
+
+    def test_build_content_data_can_validate_sales_channel_maximum_lengths(self):
+        sales_channel = EbaySalesChannel.objects.create(
+            hostname="https://ebay-validation-max.example.com",
+            environment=EbaySalesChannel.PRODUCTION,
+            multi_tenant_company=self.multi_tenant_company,
+            active=True,
+            min_name_length=0,
+            min_description_length=0,
+            max_name_length=5,
+            max_description_length=10,
+        )
+        view = EbaySalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            remote_id="EBAY_AU",
+            name="Australia",
+        )
+        EbayRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            sales_channel_view=view,
+            local_instance="en",
+            remote_code="en-AU",
+        )
+
+        product = self._create_product(sku="CONTENT-VALIDATION-MAX")
+        self._create_translation(
+            product=product,
+            sales_channel=None,
+            language="en",
+            name="Name too long",
+            description="Description too long",
+        )
+
+        with self.assertRaises(PreFlightCheckError):
+            build_content_data(
+                product=product,
+                sales_channel=sales_channel,
+                apply_validations=True,
+            )

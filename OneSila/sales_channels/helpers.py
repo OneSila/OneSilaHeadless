@@ -632,7 +632,9 @@ def _validate_content_payloads(*, product, sales_channel, content_data):
 
     min_name_length = getattr(sales_channel, "min_name_length", 0)
     min_description_length = getattr(sales_channel, "min_description_length", 0)
-    if not min_name_length and not min_description_length:
+    max_name_length = getattr(sales_channel, "max_name_length", 0)
+    max_description_length = getattr(sales_channel, "max_description_length", 0)
+    if not min_name_length and not min_description_length and not max_name_length and not max_description_length:
         return
 
     for language, payload in (content_data or {}).items():
@@ -649,12 +651,32 @@ def _validate_content_payloads(*, product, sales_channel, content_data):
                 )
             )
 
+        if max_name_length and name_length > max_name_length:
+            raise PreFlightCheckError(
+                "Product {} content for language {} must have at most {} name characters. Current length: {}.".format(
+                    getattr(product, "sku", product.pk),
+                    language,
+                    max_name_length,
+                    name_length,
+                )
+            )
+
         if min_description_length and description_length < min_description_length:
             raise PreFlightCheckError(
                 "Product {} content for language {} must have at least {} description characters. Current length: {}.".format(
                     getattr(product, "sku", product.pk),
                     language,
                     min_description_length,
+                    description_length,
+                )
+            )
+
+        if max_description_length and description_length > max_description_length:
+            raise PreFlightCheckError(
+                "Product {} content for language {} must have at most {} description characters. Current length: {}.".format(
+                    getattr(product, "sku", product.pk),
+                    language,
+                    max_description_length,
                     description_length,
                 )
             )

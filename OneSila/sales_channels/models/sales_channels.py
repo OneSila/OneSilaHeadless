@@ -39,6 +39,14 @@ class SalesChannel(Integration, models.Model):
         default=1000,
         help_text=_("Minimum product description length enforced by this sales channel."),
     )
+    max_name_length = models.PositiveIntegerField(
+        default=0,
+        help_text=_("Maximum product name length enforced by this sales channel. Set to 0 to disable."),
+    )
+    max_description_length = models.PositiveIntegerField(
+        default=0,
+        help_text=_("Maximum product description length enforced by this sales channel. Set to 0 to disable."),
+    )
 
     gpt_enable = models.BooleanField(default=False, help_text=_("Enable GPT-generated product feed configuration."))
     gpt_enable_checkout = models.BooleanField(default=False, help_text=_("Allow GPT-generated content to power checkout experiences."))

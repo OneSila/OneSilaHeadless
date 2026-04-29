@@ -594,6 +594,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
             product=product,
             sales_channel=self.sales_channel,
             language=language_code,
+            apply_validations=True,
         )
 
         title = content_payload.get("name")

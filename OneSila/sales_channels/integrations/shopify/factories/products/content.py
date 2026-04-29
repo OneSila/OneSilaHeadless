@@ -16,6 +16,7 @@ class ShopifyProductContentUpdateFactory(GetShopifyApiMixin, RemoteProductConten
             product=self.local_instance,
             sales_channel=self.sales_channel,
             language=self.language or self.local_instance.multi_tenant_company.language,
+            apply_validations=True,
         )
 
         self.payload = {"id": self.remote_product.remote_id}

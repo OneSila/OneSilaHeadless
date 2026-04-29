@@ -16,6 +16,7 @@ def build_amazon_content_attributes(*, product, sales_channel, view, language=No
         product=product,
         sales_channel=sales_channel,
         language=language or view_lang,
+        apply_validations=True,
     )
 
     item_name = content_payload.get("name")

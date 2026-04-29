@@ -21,6 +21,7 @@ class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductConten
                 product=self.local_instance,
                 sales_channel=self.sales_channel,
                 language=lang_code,
+                apply_validations=True,
             )
             if not content_payload:
                 continue

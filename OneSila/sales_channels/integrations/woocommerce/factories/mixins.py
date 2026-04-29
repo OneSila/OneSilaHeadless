@@ -560,6 +560,7 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
             product=product,
             sales_channel=self.sales_channel,
             language=lang,
+            apply_validations=True,
         )
         name = content_payload.get("name")
         description = content_payload.get("description")

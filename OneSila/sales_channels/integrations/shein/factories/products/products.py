@@ -836,6 +836,7 @@ class SheinProductBaseFactory(
         content_data = build_content_data(
             product=self.local_instance,
             sales_channel=self.sales_channel,
+            apply_validations=True,
         )
 
         for language in allowed_languages:
@@ -845,6 +846,7 @@ class SheinProductBaseFactory(
                     product=self.local_instance,
                     sales_channel=self.sales_channel,
                     language=language,
+                    apply_validations=True,
                 )
             if not content_payload:
                 continue

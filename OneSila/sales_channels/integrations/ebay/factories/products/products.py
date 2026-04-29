@@ -748,6 +748,7 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         content_data = build_content_data(
             product=self.local_instance,
             sales_channel=self.sales_channel,
+            apply_validations=True,
         )
         content.content_data = content_data
         content.save()
